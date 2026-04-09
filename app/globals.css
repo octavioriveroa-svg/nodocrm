@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-acento: #D7FF2F;
+  --color-principal: #000000;
+  --color-fondo: #F9F6EF;
+  --color-borde: #CFCFCF;
+}
+
+body {
+  background-color: #F9F6EF;
+  color: #000000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input, textarea, select {
+  outline: none;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid #D7FF2F;
+  outline-offset: 0;
+}
