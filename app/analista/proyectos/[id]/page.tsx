@@ -19,8 +19,9 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     async function load() {
       const { id } = await params
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const user = session.user
 
       const [{ data: proyecto }, { data: comentarios }, { data: archivos }, { data: profile }] =
         await Promise.all([

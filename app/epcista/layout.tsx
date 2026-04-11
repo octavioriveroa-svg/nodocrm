@@ -14,10 +14,10 @@ export default function EpcistaLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { router.replace('/login'); return }
 
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
       if (!data) { router.replace('/login'); return }
       if (data.rol === 'analista') { router.replace('/analista'); return }
 

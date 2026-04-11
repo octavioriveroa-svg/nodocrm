@@ -21,12 +21,12 @@ export default function EpcistaDashboard() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
       const { data } = await supabase
         .from('proyectos')
         .select('*')
-        .eq('epcista_id', user.id)
+        .eq('epcista_id', session.user.id)
         .order('created_at', { ascending: false })
       setProyectos((data ?? []) as Proyecto[])
       setLoading(false)
