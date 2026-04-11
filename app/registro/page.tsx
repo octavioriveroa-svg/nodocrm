@@ -24,7 +24,13 @@ export default function RegistroPage() {
     setError('')
     setLoading(true)
 
-    const { data, error: authError } = await supabase.auth.signUp({ email, password })
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { nombre, empresa, rol },
+      },
+    })
 
     if (authError || !data.user) {
       setError(authError?.message ?? 'Error al crear la cuenta.')
@@ -32,18 +38,13 @@ export default function RegistroPage() {
       return
     }
 
-    const { error: profileError } = await supabase.from('profiles').insert({
+    // Intentar guardar en profiles (no bloquea si falla)
+    await supabase.from('profiles').insert({
       id: data.user.id,
       nombre,
       empresa,
       rol,
     })
-
-    if (profileError) {
-      setError('Error al guardar perfil: ' + profileError.message)
-      setLoading(false)
-      return
-    }
 
     window.location.href = '/epcista'
   }

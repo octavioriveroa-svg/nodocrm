@@ -17,11 +17,18 @@ export default function AnalistaLayout({ children }: { children: React.ReactNode
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { router.replace('/login'); return }
 
-      const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-      if (!data) { router.replace('/login'); return }
-      if (data.rol === 'epcista') { router.replace('/epcista'); return }
+      const meta = session.user.user_metadata
+      const rol = meta?.rol ?? 'epcista'
 
-      setProfile(data as Profile)
+      if (rol === 'epcista') { router.replace('/epcista'); return }
+
+      setProfile({
+        id: session.user.id,
+        nombre: meta?.nombre ?? session.user.email ?? '',
+        empresa: meta?.empresa ?? '',
+        rol,
+        created_at: session.user.created_at,
+      })
       setLoading(false)
     }
     checkAuth()
