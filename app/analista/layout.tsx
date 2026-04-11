@@ -18,7 +18,7 @@ export default function AnalistaLayout({ children }: { children: React.ReactNode
       if (!session?.user) { router.replace('/login'); return }
 
       const { data: profiles } = await supabase.rpc('get_my_profile')
-      const profile = profiles?.[0]
+      const profile = profiles?.[0] as { id: string; nombre: string; empresa: string; rol: string; created_at: string } | undefined
 
       const rol = profile?.rol ?? session.user.user_metadata?.rol ?? 'epcista'
       if (rol === 'epcista') { router.replace('/epcista'); return }
