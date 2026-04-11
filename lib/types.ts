@@ -49,6 +49,22 @@ export interface Comentario {
   profiles?: Profile
 }
 
+export interface Cliente {
+  id: string
+  epcista_id: string
+  razon_social: string
+  rfc: string | null
+  industria: string | null
+  ubicacion_estado: string | null
+  contacto_nombre: string
+  contacto_cargo: string | null
+  contacto_email: string | null
+  contacto_telefono: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Archivo {
   id: string
   proyecto_id: string

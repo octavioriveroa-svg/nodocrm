@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, FolderPlus, LogOut } from 'lucide-react'
+import { LayoutDashboard, FolderPlus, Users, LogOut } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -19,6 +19,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
   const navEpcista = [
     { href: '/epcista', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/epcista/clientes', label: 'Clientes', icon: Users },
     { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
   ]
 
