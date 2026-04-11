@@ -35,13 +35,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && (isAuthRoute || isPublic)) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
-
-    url.pathname = profile?.rol === 'analista' ? '/analista' : '/epcista'
+    url.pathname = '/epcista'
     return NextResponse.redirect(url)
   }
 
