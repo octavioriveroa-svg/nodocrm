@@ -1,25 +1,43 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import type { Profile } from '@/lib/types'
 
-export default async function AnalistaLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default function AnalistaLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const supabase = createClient()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (!user) redirect('/login')
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (!data) { router.replace('/login'); return }
+      if (data.rol === 'epcista') { router.replace('/epcista'); return }
 
-  if (!profile) redirect('/login')
-  if (profile.rol === 'epcista') redirect('/epcista')
+      setProfile(data as Profile)
+      setLoading(false)
+    }
+    checkAuth()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F6EF' }}>
+        <div className="text-sm" style={{ color: '#888' }}>Cargando…</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar rol={profile.rol} nombre={profile.nombre} />
+      <Sidebar rol={profile!.rol} nombre={profile!.nombre} />
       <main className="flex-1 p-8" style={{ backgroundColor: '#F9F6EF' }}>
         {children}
       </main>

@@ -1,44 +1,49 @@
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { notFound } from 'next/navigation'
 import DetalleProyecto from '@/components/DetalleProyecto'
+import type { Proyecto, Comentario, Archivo, Profile } from '@/lib/types'
 
-export default async function DetalleAnalistaPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: string }> }) {
+  const supabase = createClient()
+  const [data, setData] = useState<{
+    proyecto: Proyecto
+    comentarios: Comentario[]
+    archivos: Archivo[]
+    currentUser: Profile
+  } | null>(null)
+  const [notFound404, setNotFound404] = useState(false)
 
-  const { data: proyecto } = await supabase
-    .from('proyectos')
-    .select('*, profiles(*)')
-    .eq('id', id)
-    .single()
+  useEffect(() => {
+    async function load() {
+      const { id } = await params
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-  if (!proyecto) notFound()
+      const [{ data: proyecto }, { data: comentarios }, { data: archivos }, { data: profile }] =
+        await Promise.all([
+          supabase.from('proyectos').select('*, profiles(*)').eq('id', id).single(),
+          supabase.from('comentarios').select('*, profiles(*)').eq('proyecto_id', id).order('created_at', { ascending: true }),
+          supabase.from('archivos').select('*, profiles(*)').eq('proyecto_id', id).order('created_at', { ascending: false }),
+          supabase.from('profiles').select('*').eq('id', user.id).single(),
+        ])
 
-  const { data: comentarios } = await supabase
-    .from('comentarios')
-    .select('*, profiles(*)')
-    .eq('proyecto_id', id)
-    .order('created_at', { ascending: true })
+      if (!proyecto || !profile) { setNotFound404(true); return }
 
-  const { data: archivos } = await supabase
-    .from('archivos')
-    .select('*, profiles(*)')
-    .eq('proyecto_id', id)
-    .order('created_at', { ascending: false })
+      setData({
+        proyecto: proyecto as Proyecto,
+        comentarios: (comentarios ?? []) as Comentario[],
+        archivos: (archivos ?? []) as Archivo[],
+        currentUser: profile as Profile,
+      })
+    }
+    load()
+  }, [])
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user!.id)
-    .single()
+  if (notFound404) return notFound()
+  if (!data) return null
 
-  return (
-    <DetalleProyecto
-      proyecto={proyecto}
-      comentarios={comentarios ?? []}
-      archivos={archivos ?? []}
-      currentUser={profile}
-    />
-  )
+  return <DetalleProyecto {...data} />
 }
