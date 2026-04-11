@@ -36,11 +36,10 @@ export default function LoginPage() {
       .single()
 
     if (profile?.rol === 'analista') {
-      router.push('/analista')
+      window.location.href = '/analista'
     } else {
-      router.push('/epcista')
+      window.location.href = '/epcista'
     }
-    router.refresh()
   }
 
   return (

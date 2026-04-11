@@ -45,12 +45,7 @@ export default function RegistroPage() {
       return
     }
 
-    if (rol === 'analista') {
-      router.push('/analista')
-    } else {
-      router.push('/epcista')
-    }
-    router.refresh()
+    window.location.href = '/epcista'
   }
 
   return (
