@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento } from '@/lib/types'
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente } from '@/lib/types'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -17,6 +19,7 @@ interface FormData {
   // Paso 1
   tipo: TipoProyecto | ''
   nombre_proyecto: string
+  cliente_id: string
   cliente_final_nombre: string
   cliente_final_empresa: string
   cliente_final_contacto: string
@@ -40,6 +43,7 @@ interface FormData {
 const initial: FormData = {
   tipo: '',
   nombre_proyecto: '',
+  cliente_id: '',
   cliente_final_nombre: '',
   cliente_final_empresa: '',
   cliente_final_contacto: '',
@@ -93,6 +97,36 @@ export default function NuevoProyectoPage() {
   const [form, setForm] = useState<FormData>(initial)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [clientes, setClientes] = useState<Cliente[]>([])
+
+  useEffect(() => {
+    async function loadClientes() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('epcista_id', session.user.id)
+        .order('razon_social', { ascending: true })
+      setClientes((data ?? []) as Cliente[])
+    }
+    loadClientes()
+  }, [])
+
+  function seleccionarCliente(clienteId: string) {
+    const c = clientes.find(c => c.id === clienteId)
+    if (!c) {
+      set('cliente_id', '')
+      set('cliente_final_nombre', '')
+      set('cliente_final_empresa', '')
+      set('cliente_final_contacto', '')
+      return
+    }
+    set('cliente_id', c.id)
+    set('cliente_final_nombre', c.contacto_nombre)
+    set('cliente_final_empresa', c.razon_social)
+    set('cliente_final_contacto', c.contacto_email ?? c.contacto_telefono ?? '')
+  }
 
   function set(field: keyof FormData, value: unknown) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -154,11 +188,12 @@ export default function NuevoProyectoPage() {
     if (err) { setError(err); return }
     setLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Sesión expirada.'); setLoading(false); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { setError('Sesión expirada.'); setLoading(false); return }
 
     const payload = {
-      epcista_id: user.id,
+      epcista_id: session.user.id,
+      cliente_id: form.cliente_id || null,
       tipo: form.tipo,
       nombre_proyecto: form.nombre_proyecto,
       estado: 'recibido',
@@ -246,18 +281,42 @@ export default function NuevoProyectoPage() {
             </div>
 
             <hr style={{ borderColor: '#CFCFCF' }} />
-            <h3 className="font-semibold">Cliente final</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Cliente final</h3>
+              <Link href="/epcista/clientes/nuevo" className="flex items-center gap-1 text-xs font-medium underline" style={{ color: '#666' }}>
+                <Plus size={11} /> Nuevo cliente
+              </Link>
+            </div>
+
+            {clientes.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Seleccionar cliente guardado</label>
+                <select
+                  value={form.cliente_id}
+                  onChange={e => seleccionarCliente(e.target.value)}
+                  className={inputClass}
+                  style={inputStyle}
+                >
+                  <option value="">— Capturar manualmente —</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.razon_social} · {c.contacto_nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre *</label>
+                <label className="block text-sm font-medium mb-1">Nombre del contacto *</label>
                 <input
                   type="text"
                   value={form.cliente_final_nombre}
                   onChange={e => set('cliente_final_nombre', e.target.value)}
                   className={inputClass}
                   style={inputStyle}
-                  placeholder="Nombre del cliente"
+                  placeholder="Nombre del contacto"
                 />
               </div>
               <div>
