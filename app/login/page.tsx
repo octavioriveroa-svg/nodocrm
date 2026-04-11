@@ -22,18 +22,23 @@ export default function LoginPage() {
 
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError) {
-      setError('Correo o contraseña incorrectos.')
+    if (authError || !data.user) {
+      setError('Error de autenticación: ' + (authError?.message ?? 'sin usuario'))
       setLoading(false)
       return
     }
 
-    // Get profile to redirect by role
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('rol')
       .eq('id', data.user.id)
       .single()
+
+    if (profileError) {
+      setError('Error al cargar perfil: ' + profileError.message)
+      setLoading(false)
+      return
+    }
 
     if (profile?.rol === 'analista') {
       window.location.href = '/analista'
