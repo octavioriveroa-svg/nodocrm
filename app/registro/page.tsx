@@ -38,12 +38,11 @@ export default function RegistroPage() {
       return
     }
 
-    // Intentar guardar en profiles (no bloquea si falla)
-    await supabase.from('profiles').insert({
-      id: data.user.id,
-      nombre,
-      empresa,
-      rol,
+    // Guardar perfil via RPC
+    await supabase.rpc('upsert_profile', {
+      p_nombre: nombre,
+      p_empresa: empresa,
+      p_rol: rol,
     })
 
     window.location.href = '/epcista'
