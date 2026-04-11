@@ -20,31 +20,15 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError || !data.user) {
-      setError('Error de autenticación: ' + (authError?.message ?? 'sin usuario'))
+    if (authError) {
+      setError('Correo o contraseña incorrectos.')
       setLoading(false)
       return
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', data.user.id)
-      .single()
-
-    if (profileError) {
-      setError('Error al cargar perfil: ' + profileError.message)
-      setLoading(false)
-      return
-    }
-
-    if (profile?.rol === 'analista') {
-      window.location.href = '/analista'
-    } else {
-      window.location.href = '/epcista'
-    }
+    window.location.href = '/epcista'
   }
 
   return (
