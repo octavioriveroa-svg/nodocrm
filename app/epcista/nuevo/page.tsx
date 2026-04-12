@@ -98,17 +98,19 @@ export default function NuevoProyectoPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [clientesCargados, setClientesCargados] = useState(false)
 
   useEffect(() => {
     async function loadClientes() {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) return
-      const { data } = await supabase
+      if (!session?.user) { setClientesCargados(true); return }
+      const { data, error } = await supabase
         .from('clientes')
         .select('*')
         .eq('epcista_id', session.user.id)
         .order('razon_social', { ascending: true })
-      setClientes((data ?? []) as Cliente[])
+      if (!error) setClientes((data ?? []) as Cliente[])
+      setClientesCargados(true)
     }
     loadClientes()
   }, [])
@@ -288,7 +290,7 @@ export default function NuevoProyectoPage() {
               </Link>
             </div>
 
-            {clientes.length > 0 && (
+            {clientesCargados && (
               <div>
                 <label className="block text-sm font-medium mb-1">Seleccionar cliente guardado</label>
                 <select
@@ -298,6 +300,9 @@ export default function NuevoProyectoPage() {
                   style={inputStyle}
                 >
                   <option value="">— Capturar manualmente —</option>
+                  {clientes.length === 0 && (
+                    <option disabled>Sin clientes guardados aún</option>
+                  )}
                   {clientes.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.razon_social} · {c.contacto_nombre}
