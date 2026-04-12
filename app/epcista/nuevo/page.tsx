@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Eye, Pencil, Upload, FileText } from 'lucide-react'
 import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -96,6 +96,18 @@ export default function NuevoProyectoPage() {
   const [mostrarNuevoSitio, setMostrarNuevoSitio] = useState(false)
   const [nuevoSitio, setNuevoSitio] = useState(emptyNuevoSitio)
   const [guardandoSitio, setGuardandoSitio] = useState(false)
+  const [reciboUrlNuevo, setReciboUrlNuevo] = useState<string | null>(null)
+  const [subiendoPdfNuevo, setSubiendoPdfNuevo] = useState(false)
+  const fileRefNuevo = useRef<HTMLInputElement>(null)
+
+  // Ver / editar sitios existentes
+  const [viendoSitioId, setViendoSitioId] = useState<string | null>(null)
+  const [editandoSitioId, setEditandoSitioId] = useState<string | null>(null)
+  const [editSitioForm, setEditSitioForm] = useState(emptyNuevoSitio)
+  const [editSitioReciboUrl, setEditSitioReciboUrl] = useState<string | null>(null)
+  const [subiendoPdfEdit, setSubiendoPdfEdit] = useState(false)
+  const [guardandoEditSitio, setGuardandoEditSitio] = useState(false)
+  const fileRefEdit = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function loadClientes() {
@@ -120,12 +132,46 @@ export default function NuevoProyectoPage() {
     set('cliente_id', clienteId)
     cargarSitios(clienteId)
     setMostrarNuevoSitio(false)
+    setViendoSitioId(null)
+    setEditandoSitioId(null)
   }
 
   function toggleSitio(sitioId: string) {
     setSitiosSeleccionados(prev =>
       prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
     )
+  }
+
+  async function subirPdfNuevo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !form.cliente_id) return
+    setSubiendoPdfNuevo(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { setSubiendoPdfNuevo(false); return }
+    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
+    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
+    if (!uploadErr) {
+      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+      setReciboUrlNuevo(publicUrl)
+    }
+    setSubiendoPdfNuevo(false)
+    if (fileRefNuevo.current) fileRefNuevo.current.value = ''
+  }
+
+  async function subirPdfEdit(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !form.cliente_id) return
+    setSubiendoPdfEdit(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { setSubiendoPdfEdit(false); return }
+    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
+    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
+    if (!uploadErr) {
+      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+      setEditSitioReciboUrl(publicUrl)
+    }
+    setSubiendoPdfEdit(false)
+    if (fileRefEdit.current) fileRefEdit.current.value = ''
   }
 
   async function guardarNuevoSitio() {
@@ -141,6 +187,7 @@ export default function NuevoProyectoPage() {
       ciudad: nuevoSitio.ciudad || null,
       ubicacion_estado: nuevoSitio.ubicacion_estado || null,
       rpu: nuevoSitio.rpu || null,
+      recibo_url: reciboUrlNuevo,
     }).select().single()
 
     if (data) {
@@ -149,8 +196,35 @@ export default function NuevoProyectoPage() {
       setSitiosSeleccionados(prev => [...prev, sitio.id])
     }
     setNuevoSitio(emptyNuevoSitio)
+    setReciboUrlNuevo(null)
     setMostrarNuevoSitio(false)
     setGuardandoSitio(false)
+  }
+
+  async function actualizarSitio() {
+    if (!editandoSitioId || !editSitioForm.nombre.trim()) return
+    setGuardandoEditSitio(true)
+    const { data } = await supabase.from('sitios').update({
+      nombre: editSitioForm.nombre,
+      ciudad: editSitioForm.ciudad || null,
+      ubicacion_estado: editSitioForm.ubicacion_estado || null,
+      rpu: editSitioForm.rpu || null,
+      recibo_url: editSitioReciboUrl,
+    }).eq('id', editandoSitioId).select().single()
+
+    if (data) setSitiosCliente(prev => prev.map(s => s.id === editandoSitioId ? data as Sitio : s))
+    setEditandoSitioId(null)
+    setEditSitioForm(emptyNuevoSitio)
+    setEditSitioReciboUrl(null)
+    setGuardandoEditSitio(false)
+  }
+
+  function abrirEditarSitio(s: Sitio) {
+    setEditandoSitioId(editandoSitioId === s.id ? null : s.id)
+    setEditSitioForm({ nombre: s.nombre, ciudad: s.ciudad ?? '', ubicacion_estado: s.ubicacion_estado ?? '', rpu: s.rpu ?? '' })
+    setEditSitioReciboUrl(s.recibo_url ?? null)
+    setViendoSitioId(null)
+    setMostrarNuevoSitio(false)
   }
 
   function set(field: keyof FormData, value: unknown) {
@@ -314,23 +388,147 @@ export default function NuevoProyectoPage() {
                   </p>
                 )}
 
+                {/* Lista de sitios con checkboxes + Ver/Editar */}
                 {sitiosCliente.length > 0 && (
-                  <div className="flex flex-col gap-2 mb-3">
+                  <div className="flex flex-col gap-1 mb-3">
                     {sitiosCliente.map(s => (
-                      <label key={s.id}
-                        className="flex items-center gap-3 border p-3 cursor-pointer transition-colors"
-                        style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f5f5f0' : '#fff' }}>
-                        <input type="checkbox" checked={sitiosSeleccionados.includes(s.id)}
-                          onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0" />
-                        <div>
-                          <div className="text-sm font-semibold">{s.nombre}</div>
-                          {(s.ciudad || s.ubicacion_estado) && (
-                            <div className="text-xs" style={{ color: '#666' }}>
-                              {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
-                            </div>
-                          )}
+                      <div key={s.id}>
+                        {/* Fila principal */}
+                        <div
+                          className="flex items-center gap-3 border p-3"
+                          style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f5f5f0' : '#fff' }}
+                        >
+                          <input
+                            type="checkbox"
+                            id={`sitio-${s.id}`}
+                            checked={sitiosSeleccionados.includes(s.id)}
+                            onChange={() => toggleSitio(s.id)}
+                            className="w-4 h-4 flex-shrink-0"
+                          />
+                          <label htmlFor={`sitio-${s.id}`} className="flex-1 cursor-pointer min-w-0">
+                            <div className="text-sm font-semibold">{s.nombre}</div>
+                            {(s.ciudad || s.ubicacion_estado) && (
+                              <div className="text-xs truncate" style={{ color: '#666' }}>
+                                {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                              </div>
+                            )}
+                          </label>
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViendoSitioId(viendoSitioId === s.id ? null : s.id)
+                                setEditandoSitioId(null)
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                              style={{ borderColor: viendoSitioId === s.id ? '#000' : '#CFCFCF', backgroundColor: viendoSitioId === s.id ? '#000' : '#fff', color: viendoSitioId === s.id ? '#D7FF2F' : '#444' }}
+                            >
+                              <Eye size={11} /> Ver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirEditarSitio(s)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                              style={{ borderColor: editandoSitioId === s.id ? '#000' : '#CFCFCF', backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff', color: '#444' }}
+                            >
+                              <Pencil size={11} /> Editar
+                            </button>
+                          </div>
                         </div>
-                      </label>
+
+                        {/* Panel Ver */}
+                        {viendoSitioId === s.id && (
+                          <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                              {s.rpu && (
+                                <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>
+                              )}
+                              {(s.ciudad || s.ubicacion_estado) && (
+                                <div><span style={{ color: '#888' }}>Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>
+                              )}
+                              {s.recibo_url && (
+                                <div className="col-span-2">
+                                  <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 underline font-medium" style={{ color: '#000' }}>
+                                    <FileText size={11} /> Ver recibo CFE
+                                  </a>
+                                </div>
+                              )}
+                              {!s.rpu && !s.recibo_url && !s.ciudad && !s.ubicacion_estado && (
+                                <p style={{ color: '#aaa' }} className="col-span-2">Sin datos adicionales.</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Panel Editar */}
+                        {editandoSitioId === s.id && (
+                          <div className="border border-t-0 px-4 py-4" style={{ borderColor: '#000' }}>
+                            <p className="text-xs font-bold mb-3">Editar sitio</p>
+                            <div className="flex flex-col gap-3">
+                              <div>
+                                <label className="block text-xs font-medium mb-1">Nombre *</label>
+                                <input type="text" value={editSitioForm.nombre}
+                                  onChange={e => setEditSitioForm(f => ({ ...f, nombre: e.target.value }))}
+                                  className={inp} style={borde} />
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Ciudad</label>
+                                  <input type="text" value={editSitioForm.ciudad}
+                                    onChange={e => setEditSitioForm(f => ({ ...f, ciudad: e.target.value }))}
+                                    className={inp} style={borde} placeholder="Monterrey" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Estado</label>
+                                  <select value={editSitioForm.ubicacion_estado}
+                                    onChange={e => setEditSitioForm(f => ({ ...f, ubicacion_estado: e.target.value }))}
+                                    className={inp} style={borde}>
+                                    <option value="">Selecciona</option>
+                                    {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">RPU</label>
+                                  <input type="text" value={editSitioForm.rpu}
+                                    onChange={e => setEditSitioForm(f => ({ ...f, rpu: e.target.value }))}
+                                    className={inp} style={borde} placeholder="RPU" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium mb-1">Recibo CFE (PDF)</label>
+                                <div className="flex items-center gap-3">
+                                  <input ref={fileRefEdit} type="file" accept=".pdf" onChange={subirPdfEdit} className="hidden" id="edit-recibo-pdf" />
+                                  <label htmlFor="edit-recibo-pdf"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
+                                    style={{ borderColor: '#CFCFCF' }}>
+                                    <Upload size={11} />
+                                    {subiendoPdfEdit ? 'Subiendo…' : 'Seleccionar PDF'}
+                                  </label>
+                                  {editSitioReciboUrl && (
+                                    <a href={editSitioReciboUrl} target="_blank" rel="noopener noreferrer"
+                                      className="text-xs underline flex items-center gap-1">
+                                      <FileText size={11} /> Ver PDF
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex justify-between mt-3">
+                              <button type="button" onClick={() => setEditandoSitioId(null)}
+                                className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                                Cancelar
+                              </button>
+                              <button type="button" onClick={actualizarSitio}
+                                disabled={guardandoEditSitio || !editSitioForm.nombre.trim()}
+                                className="px-4 py-1.5 text-xs font-bold disabled:opacity-50"
+                                style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                                {guardandoEditSitio ? 'Guardando…' : 'Guardar cambios'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -340,7 +538,7 @@ export default function NuevoProyectoPage() {
                   <div className="border p-4" style={{ borderColor: '#000' }}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-bold">Nuevo sitio</span>
-                      <button onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio) }}>
+                      <button type="button" onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio); setReciboUrlNuevo(null) }}>
                         <X size={14} />
                       </button>
                     </div>
@@ -351,7 +549,8 @@ export default function NuevoProyectoPage() {
                           onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
                           className={inp} style={borde} placeholder="Ej: Bodega Norte" />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      {/* Ciudad + Estado + RPU en misma fila */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
                         <div>
                           <label className="block text-xs font-medium mb-1">Ciudad</label>
                           <input type="text" value={nuevoSitio.ciudad}
@@ -367,16 +566,35 @@ export default function NuevoProyectoPage() {
                             {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1">RPU</label>
+                          <input type="text" value={nuevoSitio.rpu}
+                            onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
+                            className={inp} style={borde} placeholder="RPU" />
+                        </div>
                       </div>
+                      {/* PDF recibo */}
                       <div>
-                        <label className="block text-xs font-medium mb-1">RPU</label>
-                        <input type="text" value={nuevoSitio.rpu}
-                          onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
-                          className={inp} style={borde} placeholder="Número RPU CFE" />
+                        <label className="block text-xs font-medium mb-1">Recibo CFE (PDF)</label>
+                        <div className="flex items-center gap-3">
+                          <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="nuevo-recibo-pdf" />
+                          <label htmlFor="nuevo-recibo-pdf"
+                            className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
+                            style={{ borderColor: '#CFCFCF' }}>
+                            <Upload size={11} />
+                            {subiendoPdfNuevo ? 'Subiendo…' : 'Seleccionar PDF'}
+                          </label>
+                          {reciboUrlNuevo && (
+                            <a href={reciboUrlNuevo} target="_blank" rel="noopener noreferrer"
+                              className="text-xs underline flex items-center gap-1">
+                              <FileText size={11} /> Ver PDF
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end mt-3">
-                      <button onClick={guardarNuevoSitio} disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
+                      <button type="button" onClick={guardarNuevoSitio} disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
                         className="px-4 py-2 text-xs font-bold disabled:opacity-50"
                         style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
                         {guardandoSitio ? 'Guardando…' : 'Agregar sitio'}
@@ -384,7 +602,7 @@ export default function NuevoProyectoPage() {
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => setMostrarNuevoSitio(true)}
+                  <button type="button" onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null) }}
                     className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center"
                     style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
                     <Plus size={14} />
