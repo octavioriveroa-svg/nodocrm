@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -16,23 +15,16 @@ const ESTADOS_MX = [
 ]
 
 interface FormData {
-  // Paso 1
   tipo: TipoProyecto | ''
   nombre_proyecto: string
   cliente_id: string
-  cliente_final_nombre: string
-  cliente_final_empresa: string
-  cliente_final_contacto: string
-  // Paso 2 BESS
   capacidad_mwh: string
   capacidad_mw: string
   tecnologia_bateria: TecnologiaBateria | ''
   duracion_descarga_hrs: string
   punto_interconexion: string
-  // Paso 2 MEM
   tipo_participacion_mem: string
   volumen_energia_mwh_anual: string
-  // Paso 3
   modalidad_financiamiento: ModalidadFinanciamiento[]
   capex_estimado: string
   moneda: Moneda
@@ -44,9 +36,6 @@ const initial: FormData = {
   tipo: '',
   nombre_proyecto: '',
   cliente_id: '',
-  cliente_final_nombre: '',
-  cliente_final_empresa: '',
-  cliente_final_contacto: '',
   capacidad_mwh: '',
   capacidad_mw: '',
   tecnologia_bateria: '',
@@ -60,6 +49,8 @@ const initial: FormData = {
   ubicacion_estado: '',
   notas_adicionales: '',
 }
+
+const emptyNuevoSitio = { nombre: '', ciudad: '', ubicacion_estado: '', rpu: '' }
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -76,10 +67,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
             {i < current ? '✓' : i + 1}
           </div>
           {i < total - 1 && (
-            <div
-              className="h-px w-8"
-              style={{ backgroundColor: i < current ? '#000' : '#CFCFCF' }}
-            />
+            <div className="h-px w-8" style={{ backgroundColor: i < current ? '#000' : '#CFCFCF' }} />
           )}
         </div>
       ))}
@@ -97,21 +85,25 @@ export default function NuevoProyectoPage() {
   const [form, setForm] = useState<FormData>(initial)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Clientes y sitios
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [clientesCargados, setClientesCargados] = useState(false)
   const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
   const [sitiosSeleccionados, setSitiosSeleccionados] = useState<string[]>([])
 
+  // Mini-form de nuevo sitio inline
+  const [mostrarNuevoSitio, setMostrarNuevoSitio] = useState(false)
+  const [nuevoSitio, setNuevoSitio] = useState(emptyNuevoSitio)
+  const [guardandoSitio, setGuardandoSitio] = useState(false)
+
   useEffect(() => {
     async function loadClientes() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { setClientesCargados(true); return }
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('epcista_id', session.user.id)
-        .order('razon_social', { ascending: true })
-      if (!error) setClientes((data ?? []) as Cliente[])
+      const { data } = await supabase
+        .from('clientes').select('*').eq('epcista_id', session.user.id).order('razon_social')
+      setClientes((data ?? []) as Cliente[])
       setClientesCargados(true)
     }
     loadClientes()
@@ -124,27 +116,41 @@ export default function NuevoProyectoPage() {
     setSitiosSeleccionados([])
   }
 
+  function seleccionarCliente(clienteId: string) {
+    set('cliente_id', clienteId)
+    cargarSitios(clienteId)
+    setMostrarNuevoSitio(false)
+  }
+
   function toggleSitio(sitioId: string) {
     setSitiosSeleccionados(prev =>
       prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
     )
   }
 
-  function seleccionarCliente(clienteId: string) {
-    const c = clientes.find(c => c.id === clienteId)
-    if (!c) {
-      set('cliente_id', '')
-      set('cliente_final_nombre', '')
-      set('cliente_final_empresa', '')
-      set('cliente_final_contacto', '')
-      cargarSitios('')
-      return
+  async function guardarNuevoSitio() {
+    if (!nuevoSitio.nombre.trim() || !form.cliente_id) return
+    setGuardandoSitio(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { setGuardandoSitio(false); return }
+
+    const { data } = await supabase.from('sitios').insert({
+      cliente_id: form.cliente_id,
+      epcista_id: session.user.id,
+      nombre: nuevoSitio.nombre,
+      ciudad: nuevoSitio.ciudad || null,
+      ubicacion_estado: nuevoSitio.ubicacion_estado || null,
+      rpu: nuevoSitio.rpu || null,
+    }).select().single()
+
+    if (data) {
+      const sitio = data as Sitio
+      setSitiosCliente(prev => [...prev, sitio])
+      setSitiosSeleccionados(prev => [...prev, sitio.id])
     }
-    set('cliente_id', c.id)
-    set('cliente_final_nombre', c.contacto_nombre)
-    set('cliente_final_empresa', c.razon_social)
-    set('cliente_final_contacto', c.contacto_email ?? c.contacto_telefono ?? '')
-    cargarSitios(c.id)
+    setNuevoSitio(emptyNuevoSitio)
+    setMostrarNuevoSitio(false)
+    setGuardandoSitio(false)
   }
 
   function set(field: keyof FormData, value: unknown) {
@@ -152,24 +158,17 @@ export default function NuevoProyectoPage() {
   }
 
   function toggleModalidad(m: ModalidadFinanciamiento) {
-    if (m === 'no_sabe') {
-      set('modalidad_financiamiento', ['no_sabe'])
-      return
-    }
+    if (m === 'no_sabe') { set('modalidad_financiamiento', ['no_sabe']); return }
     const current = form.modalidad_financiamiento.filter(x => x !== 'no_sabe')
-    if (current.includes(m)) {
-      set('modalidad_financiamiento', current.filter(x => x !== m))
-    } else {
-      set('modalidad_financiamiento', [...current, m])
-    }
+    if (current.includes(m)) set('modalidad_financiamiento', current.filter(x => x !== m))
+    else set('modalidad_financiamiento', [...current, m])
   }
 
   function validarPaso1() {
     if (!form.tipo) return 'Selecciona el tipo de proyecto.'
     if (!form.nombre_proyecto.trim()) return 'Ingresa el nombre del proyecto.'
-    if (!form.cliente_final_nombre.trim()) return 'Ingresa el nombre del cliente final.'
-    if (!form.cliente_final_empresa.trim()) return 'Ingresa la empresa del cliente final.'
-    if (!form.cliente_final_contacto.trim()) return 'Ingresa el contacto del cliente final.'
+    if (!form.cliente_id) return 'Selecciona un cliente.'
+    if (sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio a cotizar.'
     return ''
   }
 
@@ -189,8 +188,8 @@ export default function NuevoProyectoPage() {
   }
 
   function validarPaso3() {
-    if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad de financiamiento.'
-    if (!form.ubicacion_estado) return 'Selecciona el estado de la República.'
+    if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad.'
+    if (!form.ubicacion_estado) return 'Selecciona el estado.'
     return ''
   }
 
@@ -210,15 +209,17 @@ export default function NuevoProyectoPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { setError('Sesión expirada.'); setLoading(false); return }
 
+    const cliente = clientes.find(c => c.id === form.cliente_id)
+
     const payload = {
       epcista_id: session.user.id,
-      cliente_id: form.cliente_id || null,
+      cliente_id: form.cliente_id,
       tipo: form.tipo,
       nombre_proyecto: form.nombre_proyecto,
       estado: 'recibido',
-      cliente_final_nombre: form.cliente_final_nombre,
-      cliente_final_empresa: form.cliente_final_empresa,
-      cliente_final_contacto: form.cliente_final_contacto,
+      cliente_final_nombre: cliente?.contacto_nombre ?? '',
+      cliente_final_empresa: cliente?.razon_social ?? '',
+      cliente_final_contacto: cliente?.contacto_email ?? cliente?.contacto_telefono ?? '',
       capacidad_mwh: form.capacidad_mwh ? Number(form.capacidad_mwh) : null,
       capacidad_mw: form.capacidad_mw ? Number(form.capacidad_mw) : null,
       tecnologia_bateria: form.tecnologia_bateria || null,
@@ -234,14 +235,8 @@ export default function NuevoProyectoPage() {
     }
 
     const { data, error: dbError } = await supabase.from('proyectos').insert(payload).select('id').single()
+    if (dbError) { setError('Error al guardar: ' + dbError.message); setLoading(false); return }
 
-    if (dbError) {
-      setError('Error al guardar: ' + dbError.message)
-      setLoading(false)
-      return
-    }
-
-    // Guardar relaciones proyecto-sitios
     if (sitiosSeleccionados.length > 0) {
       await supabase.from('proyecto_sitios').insert(
         sitiosSeleccionados.map(sitio_id => ({ proyecto_id: data.id, sitio_id }))
@@ -251,8 +246,8 @@ export default function NuevoProyectoPage() {
     router.push(`/epcista/proyectos/${data.id}`)
   }
 
-  const inputClass = "w-full border px-3 py-2 text-sm bg-white"
-  const inputStyle = { borderColor: '#CFCFCF' }
+  const inp = "w-full border px-3 py-2 text-sm bg-white"
+  const borde = { borderColor: '#CFCFCF' }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -265,26 +260,19 @@ export default function NuevoProyectoPage() {
 
       <div className="border p-8" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
 
-        {/* PASO 1 */}
+        {/* ── PASO 1 ── */}
         {step === 0 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Tipo y cliente final</h2>
+            <h2 className="font-bold text-lg">Cliente y sitios</h2>
 
+            {/* Tipo */}
             <div>
               <label className="block text-sm font-medium mb-2">Tipo de proyecto *</label>
               <div className="grid grid-cols-3 gap-3">
                 {(['BESS', 'MEM', 'BESS+MEM'] as TipoProyecto[]).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => set('tipo', t)}
+                  <button key={t} type="button" onClick={() => set('tipo', t)}
                     className="border p-4 text-center transition-colors"
-                    style={{
-                      borderColor: form.tipo === t ? '#000' : '#CFCFCF',
-                      backgroundColor: form.tipo === t ? '#000' : '#fff',
-                      color: form.tipo === t ? '#D7FF2F' : '#000',
-                    }}
-                  >
+                    style={{ borderColor: form.tipo === t ? '#000' : '#CFCFCF', backgroundColor: form.tipo === t ? '#000' : '#fff', color: form.tipo === t ? '#D7FF2F' : '#000' }}>
                     <div className="font-black text-lg">{t}</div>
                     <div className="text-xs mt-1 opacity-70">
                       {t === 'BESS' ? 'Almacenamiento' : t === 'MEM' ? 'Mercado eléctrico' : 'Ambos'}
@@ -294,210 +282,192 @@ export default function NuevoProyectoPage() {
               </div>
             </div>
 
+            {/* Nombre */}
             <div>
               <label className="block text-sm font-medium mb-1">Nombre del proyecto *</label>
-              <input
-                type="text"
-                value={form.nombre_proyecto}
-                onChange={e => set('nombre_proyecto', e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-                placeholder="Ej: Planta Solar Norte"
-              />
+              <input type="text" value={form.nombre_proyecto} onChange={e => set('nombre_proyecto', e.target.value)}
+                className={inp} style={borde} placeholder="Ej: Planta Solar Norte" />
             </div>
 
             <hr style={{ borderColor: '#CFCFCF' }} />
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Cliente final</h3>
-              <Link href="/epcista/clientes/nuevo" className="flex items-center gap-1 text-xs font-medium underline" style={{ color: '#666' }}>
-                <Plus size={11} /> Nuevo cliente
-              </Link>
+
+            {/* Cliente */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Cliente *</label>
+              {clientesCargados && (
+                <select value={form.cliente_id} onChange={e => seleccionarCliente(e.target.value)}
+                  className={inp} style={borde}>
+                  <option value="">Selecciona un cliente</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
+                </select>
+              )}
             </div>
 
-            {clientesCargados && (
+            {/* Sitios */}
+            {form.cliente_id && (
               <div>
-                <label className="block text-sm font-medium mb-1">Seleccionar cliente guardado</label>
-                <select
-                  value={form.cliente_id}
-                  onChange={e => seleccionarCliente(e.target.value)}
-                  className={inputClass}
-                  style={inputStyle}
-                >
-                  <option value="">— Capturar manualmente —</option>
-                  {clientes.length === 0 && (
-                    <option disabled>Sin clientes guardados aún</option>
-                  )}
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.razon_social} · {c.contacto_nombre}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
+
+                {sitiosCliente.length === 0 && !mostrarNuevoSitio && (
+                  <p className="text-sm mb-3" style={{ color: '#888' }}>
+                    Este cliente no tiene sitios registrados.
+                  </p>
+                )}
+
+                {sitiosCliente.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-3">
+                    {sitiosCliente.map(s => (
+                      <label key={s.id}
+                        className="flex items-center gap-3 border p-3 cursor-pointer transition-colors"
+                        style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f5f5f0' : '#fff' }}>
+                        <input type="checkbox" checked={sitiosSeleccionados.includes(s.id)}
+                          onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0" />
+                        <div>
+                          <div className="text-sm font-semibold">{s.nombre}</div>
+                          {(s.ciudad || s.ubicacion_estado) && (
+                            <div className="text-xs" style={{ color: '#666' }}>
+                              {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {/* Mini-form nuevo sitio */}
+                {mostrarNuevoSitio ? (
+                  <div className="border p-4" style={{ borderColor: '#000' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-bold">Nuevo sitio</span>
+                      <button onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio) }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Nombre *</label>
+                        <input type="text" value={nuevoSitio.nombre}
+                          onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
+                          className={inp} style={borde} placeholder="Ej: Bodega Norte" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Ciudad</label>
+                          <input type="text" value={nuevoSitio.ciudad}
+                            onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
+                            className={inp} style={borde} placeholder="Monterrey" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Estado</label>
+                          <select value={nuevoSitio.ubicacion_estado}
+                            onChange={e => setNuevoSitio(f => ({ ...f, ubicacion_estado: e.target.value }))}
+                            className={inp} style={borde}>
+                            <option value="">Selecciona</option>
+                            {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">RPU</label>
+                        <input type="text" value={nuevoSitio.rpu}
+                          onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
+                          className={inp} style={borde} placeholder="Número RPU CFE" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end mt-3">
+                      <button onClick={guardarNuevoSitio} disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
+                        className="px-4 py-2 text-xs font-bold disabled:opacity-50"
+                        style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                        {guardandoSitio ? 'Guardando…' : 'Agregar sitio'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setMostrarNuevoSitio(true)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center"
+                    style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
+                    <Plus size={14} />
+                    {sitiosCliente.length === 0 ? 'Agregar sitio' : 'Agregar otro sitio'}
+                  </button>
+                )}
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nombre del contacto *</label>
-                <input
-                  type="text"
-                  value={form.cliente_final_nombre}
-                  onChange={e => set('cliente_final_nombre', e.target.value)}
-                  className={inputClass}
-                  style={inputStyle}
-                  placeholder="Nombre del contacto"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Empresa *</label>
-                <input
-                  type="text"
-                  value={form.cliente_final_empresa}
-                  onChange={e => set('cliente_final_empresa', e.target.value)}
-                  className={inputClass}
-                  style={inputStyle}
-                  placeholder="Empresa cliente"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Contacto (email o teléfono) *</label>
-              <input
-                type="text"
-                value={form.cliente_final_contacto}
-                onChange={e => set('cliente_final_contacto', e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-                placeholder="contacto@empresa.com"
-              />
-            </div>
           </div>
         )}
 
-        {/* PASO 2 */}
+        {/* ── PASO 2 ── */}
         {step === 1 && (
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Datos técnicos</h2>
 
-            {sitiosCliente.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium mb-2">Sitios del proyecto</label>
-                <div className="flex flex-col gap-2">
-                  {sitiosCliente.map(s => (
-                    <label key={s.id} className="flex items-center gap-3 border p-3 cursor-pointer"
-                      style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f9f9f9' : '#fff' }}>
-                      <input type="checkbox" checked={sitiosSeleccionados.includes(s.id)}
-                        onChange={() => toggleSitio(s.id)} className="w-4 h-4" />
-                      <div>
-                        <div className="text-sm font-semibold">{s.nombre}</div>
-                        {(s.ciudad || s.ubicacion_estado) && (
-                          <div className="text-xs" style={{ color: '#666' }}>
-                            {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs mt-1" style={{ color: '#888' }}>Selecciona los sitios que aplican a este proyecto</p>
-              </div>
-            )}
-
             {(form.tipo === 'BESS' || form.tipo === 'BESS+MEM') && (
               <div className="flex flex-col gap-4">
                 {form.tipo === 'BESS+MEM' && (
-                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>
-                    Sistema de almacenamiento (BESS)
-                  </h3>
+                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>Sistema de almacenamiento (BESS)</h3>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Capacidad (MWh) *</label>
-                    <input type="number" min="0" value={form.capacidad_mwh}
-                      onChange={e => set('capacidad_mwh', e.target.value)}
-                      className={inputClass} style={inputStyle} placeholder="0" />
+                    <input type="number" min="0" value={form.capacidad_mwh} onChange={e => set('capacidad_mwh', e.target.value)} className={inp} style={borde} placeholder="0" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Potencia (MW) *</label>
-                    <input type="number" min="0" value={form.capacidad_mw}
-                      onChange={e => set('capacidad_mw', e.target.value)}
-                      className={inputClass} style={inputStyle} placeholder="0" />
+                    <input type="number" min="0" value={form.capacidad_mw} onChange={e => set('capacidad_mw', e.target.value)} className={inp} style={borde} placeholder="0" />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Tecnología de batería *</label>
                   <div className="grid grid-cols-4 gap-2">
                     {(['Li-ion', 'LFP', 'NMC', 'Otra'] as TecnologiaBateria[]).map(t => (
-                      <button key={t} type="button"
-                        onClick={() => set('tecnologia_bateria', t)}
+                      <button key={t} type="button" onClick={() => set('tecnologia_bateria', t)}
                         className="border py-2 px-3 text-sm font-medium transition-colors"
-                        style={{
-                          borderColor: form.tecnologia_bateria === t ? '#000' : '#CFCFCF',
-                          backgroundColor: form.tecnologia_bateria === t ? '#000' : '#fff',
-                          color: form.tecnologia_bateria === t ? '#D7FF2F' : '#000',
-                        }}
-                      >
+                        style={{ borderColor: form.tecnologia_bateria === t ? '#000' : '#CFCFCF', backgroundColor: form.tecnologia_bateria === t ? '#000' : '#fff', color: form.tecnologia_bateria === t ? '#D7FF2F' : '#000' }}>
                         {t}
                       </button>
                     ))}
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Duración de descarga (hrs) *</label>
-                    <input type="number" min="0" value={form.duracion_descarga_hrs}
-                      onChange={e => set('duracion_descarga_hrs', e.target.value)}
-                      className={inputClass} style={inputStyle} placeholder="0" />
+                    <input type="number" min="0" value={form.duracion_descarga_hrs} onChange={e => set('duracion_descarga_hrs', e.target.value)} className={inp} style={borde} placeholder="0" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Punto de interconexión *</label>
-                    <input type="text" value={form.punto_interconexion}
-                      onChange={e => set('punto_interconexion', e.target.value)}
-                      className={inputClass} style={inputStyle} placeholder="Ej: Subestación Norte" />
+                    <input type="text" value={form.punto_interconexion} onChange={e => set('punto_interconexion', e.target.value)} className={inp} style={borde} placeholder="Ej: Subestación Norte" />
                   </div>
                 </div>
               </div>
             )}
 
-            {form.tipo === 'BESS+MEM' && (
-              <hr style={{ borderColor: '#CFCFCF' }} />
-            )}
+            {form.tipo === 'BESS+MEM' && <hr style={{ borderColor: '#CFCFCF' }} />}
 
             {(form.tipo === 'MEM' || form.tipo === 'BESS+MEM') && (
               <div className="flex flex-col gap-4">
                 {form.tipo === 'BESS+MEM' && (
-                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>
-                    Mercado Eléctrico Mayorista (MEM)
-                  </h3>
+                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>Mercado Eléctrico Mayorista (MEM)</h3>
                 )}
                 <div>
                   <label className="block text-sm font-medium mb-1">Tipo de participación MEM *</label>
-                  <input type="text" value={form.tipo_participacion_mem}
-                    onChange={e => set('tipo_participacion_mem', e.target.value)}
-                    className={inputClass} style={inputStyle}
-                    placeholder="Ej: Suministrador, Generador, Comercializador" />
+                  <input type="text" value={form.tipo_participacion_mem} onChange={e => set('tipo_participacion_mem', e.target.value)} className={inp} style={borde} placeholder="Ej: Suministrador, Generador" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Volumen de energía anual (MWh) *</label>
-                  <input type="number" min="0" value={form.volumen_energia_mwh_anual}
-                    onChange={e => set('volumen_energia_mwh_anual', e.target.value)}
-                    className={inputClass} style={inputStyle} placeholder="0" />
+                  <input type="number" min="0" value={form.volumen_energia_mwh_anual} onChange={e => set('volumen_energia_mwh_anual', e.target.value)} className={inp} style={borde} placeholder="0" />
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* PASO 3 */}
+        {/* ── PASO 3 ── */}
         {step === 2 && (
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Financiamiento y ubicación</h2>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Modalidad de financiamiento sugerida *</label>
+              <label className="block text-sm font-medium mb-2">Modalidad de financiamiento *</label>
               <div className="grid grid-cols-2 gap-3">
                 {([
                   { value: 'credito', label: 'Crédito', desc: 'Financiamiento bancario o institucional' },
@@ -508,36 +478,20 @@ export default function NuevoProyectoPage() {
                   const noSabe = form.modalidad_financiamiento.includes('no_sabe')
                   const selected = form.modalidad_financiamiento.includes(opt.value)
                   return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      disabled={noSabe}
+                    <button key={opt.value} type="button" disabled={noSabe}
                       onClick={() => toggleModalidad(opt.value)}
                       className="border p-3 text-left transition-colors disabled:opacity-40"
-                      style={{
-                        borderColor: selected ? '#000' : '#CFCFCF',
-                        backgroundColor: selected ? '#000' : '#fff',
-                        color: selected ? '#D7FF2F' : '#000',
-                      }}
-                    >
+                      style={{ borderColor: selected ? '#000' : '#CFCFCF', backgroundColor: selected ? '#000' : '#fff', color: selected ? '#D7FF2F' : '#000' }}>
                       <div className="font-semibold text-sm">{opt.label}</div>
                       <div className="text-xs mt-0.5 opacity-70">{opt.desc}</div>
                     </button>
                   )
                 })}
               </div>
-
               <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => toggleModalidad('no_sabe')}
+                <button type="button" onClick={() => toggleModalidad('no_sabe')}
                   className="border p-3 text-left w-full transition-colors"
-                  style={{
-                    borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#CFCFCF',
-                    backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff',
-                    color: '#000',
-                  }}
-                >
+                  style={{ borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#CFCFCF', backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff', color: '#000' }}>
                   <div className="font-semibold text-sm">No sé, que el analista recomiende</div>
                   <div className="text-xs mt-0.5" style={{ color: '#666' }}>El analista definirá la modalidad más adecuada</div>
                 </button>
@@ -547,88 +501,53 @@ export default function NuevoProyectoPage() {
             <div>
               <label className="block text-sm font-medium mb-1">CAPEX estimado</label>
               <div className="flex gap-2">
-                <select
-                  value={form.moneda}
-                  onChange={e => set('moneda', e.target.value as Moneda)}
-                  className="border px-2 py-2 text-sm"
-                  style={{ borderColor: '#CFCFCF' }}
-                >
+                <select value={form.moneda} onChange={e => set('moneda', e.target.value as Moneda)}
+                  className="border px-2 py-2 text-sm" style={borde}>
                   <option value="MXN">MXN</option>
                   <option value="USD">USD</option>
                 </select>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.capex_estimado}
+                <input type="number" min="0" value={form.capex_estimado}
                   onChange={e => set('capex_estimado', e.target.value)}
-                  className={`${inputClass} flex-1`}
-                  style={inputStyle}
-                  placeholder="0"
-                />
+                  className={`${inp} flex-1`} style={borde} placeholder="0" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Estado de la República *</label>
-              <select
-                value={form.ubicacion_estado}
-                onChange={e => set('ubicacion_estado', e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-              >
+              <select value={form.ubicacion_estado} onChange={e => set('ubicacion_estado', e.target.value)}
+                className={inp} style={borde}>
                 <option value="">Selecciona un estado</option>
-                {ESTADOS_MX.map(est => (
-                  <option key={est} value={est}>{est}</option>
-                ))}
+                {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Notas adicionales</label>
-              <textarea
-                value={form.notas_adicionales}
-                onChange={e => set('notas_adicionales', e.target.value)}
-                rows={4}
-                className={inputClass}
-                style={inputStyle}
-                placeholder="Cualquier información adicional relevante para el analista…"
-              />
+              <textarea value={form.notas_adicionales} onChange={e => set('notas_adicionales', e.target.value)}
+                rows={4} className={inp} style={borde}
+                placeholder="Cualquier información adicional relevante para el analista…" />
             </div>
           </div>
         )}
 
-        {error && (
-          <p className="text-sm text-red-600 mt-4">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
 
         <div className="flex justify-between mt-8">
-          <button
-            type="button"
-            onClick={() => { setError(''); setStep(s => s - 1) }}
-            disabled={step === 0}
-            className="px-5 py-2 text-sm font-medium border disabled:opacity-30"
-            style={{ borderColor: '#CFCFCF' }}
-          >
+          <button type="button" onClick={() => { setError(''); setStep(s => s - 1) }}
+            disabled={step === 0} className="px-5 py-2 text-sm font-medium border disabled:opacity-30"
+            style={{ borderColor: '#CFCFCF' }}>
             Anterior
           </button>
-
           {step < 2 ? (
-            <button
-              type="button"
-              onClick={handleNext}
+            <button type="button" onClick={handleNext}
               className="px-5 py-2 text-sm font-bold"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
-            >
+              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
               Siguiente
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
+            <button type="button" onClick={handleSubmit} disabled={loading}
               className="px-5 py-2 text-sm font-bold disabled:opacity-50"
-              style={{ backgroundColor: '#000', color: '#D7FF2F' }}
-            >
+              style={{ backgroundColor: '#000', color: '#D7FF2F' }}>
               {loading ? 'Enviando...' : 'Enviar proyecto'}
             </button>
           )}
