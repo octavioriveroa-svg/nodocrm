@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente } from '@/lib/types'
+import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -99,6 +99,8 @@ export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false)
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [clientesCargados, setClientesCargados] = useState(false)
+  const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
+  const [sitiosSeleccionados, setSitiosSeleccionados] = useState<string[]>([])
 
   useEffect(() => {
     async function loadClientes() {
@@ -115,6 +117,19 @@ export default function NuevoProyectoPage() {
     loadClientes()
   }, [])
 
+  async function cargarSitios(clienteId: string) {
+    if (!clienteId) { setSitiosCliente([]); setSitiosSeleccionados([]); return }
+    const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
+    setSitiosCliente((data ?? []) as Sitio[])
+    setSitiosSeleccionados([])
+  }
+
+  function toggleSitio(sitioId: string) {
+    setSitiosSeleccionados(prev =>
+      prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
+    )
+  }
+
   function seleccionarCliente(clienteId: string) {
     const c = clientes.find(c => c.id === clienteId)
     if (!c) {
@@ -122,12 +137,14 @@ export default function NuevoProyectoPage() {
       set('cliente_final_nombre', '')
       set('cliente_final_empresa', '')
       set('cliente_final_contacto', '')
+      cargarSitios('')
       return
     }
     set('cliente_id', c.id)
     set('cliente_final_nombre', c.contacto_nombre)
     set('cliente_final_empresa', c.razon_social)
     set('cliente_final_contacto', c.contacto_email ?? c.contacto_telefono ?? '')
+    cargarSitios(c.id)
   }
 
   function set(field: keyof FormData, value: unknown) {
@@ -222,6 +239,13 @@ export default function NuevoProyectoPage() {
       setError('Error al guardar: ' + dbError.message)
       setLoading(false)
       return
+    }
+
+    // Guardar relaciones proyecto-sitios
+    if (sitiosSeleccionados.length > 0) {
+      await supabase.from('proyecto_sitios').insert(
+        sitiosSeleccionados.map(sitio_id => ({ proyecto_id: data.id, sitio_id }))
+      )
     }
 
     router.push(`/epcista/proyectos/${data.id}`)
@@ -355,6 +379,30 @@ export default function NuevoProyectoPage() {
         {step === 1 && (
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Datos técnicos</h2>
+
+            {sitiosCliente.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Sitios del proyecto</label>
+                <div className="flex flex-col gap-2">
+                  {sitiosCliente.map(s => (
+                    <label key={s.id} className="flex items-center gap-3 border p-3 cursor-pointer"
+                      style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f9f9f9' : '#fff' }}>
+                      <input type="checkbox" checked={sitiosSeleccionados.includes(s.id)}
+                        onChange={() => toggleSitio(s.id)} className="w-4 h-4" />
+                      <div>
+                        <div className="text-sm font-semibold">{s.nombre}</div>
+                        {(s.ciudad || s.ubicacion_estado) && (
+                          <div className="text-xs" style={{ color: '#666' }}>
+                            {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs mt-1" style={{ color: '#888' }}>Selecciona los sitios que aplican a este proyecto</p>
+              </div>
+            )}
 
             {(form.tipo === 'BESS' || form.tipo === 'BESS+MEM') && (
               <div className="flex flex-col gap-4">

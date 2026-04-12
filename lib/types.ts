@@ -49,6 +49,27 @@ export interface Comentario {
   profiles?: Profile
 }
 
+export interface Sitio {
+  id: string
+  cliente_id: string
+  epcista_id: string
+  nombre: string
+  ciudad: string | null
+  ubicacion_estado: string | null
+  rpu: string | null
+  recibo_url: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProyectoSitio {
+  id: string
+  proyecto_id: string
+  sitio_id: string
+  sitios?: Sitio
+}
+
 export interface Cliente {
   id: string
   epcista_id: string

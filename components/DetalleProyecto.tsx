@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento } from '@/lib/types'
-import { Paperclip, Send, ChevronLeft } from 'lucide-react'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio } from '@/lib/types'
+import { Paperclip, Send, ChevronLeft, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
@@ -48,9 +48,10 @@ interface Props {
   comentarios: Comentario[]
   archivos: Archivo[]
   currentUser: Profile
+  sitios?: Sitio[]
 }
 
-export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser }: Props) {
+export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [] }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [proyecto, setProyecto] = useState(initial)
@@ -176,6 +177,34 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           <Campo label="Contacto" value={proyecto.cliente_final_contacto} />
         </div>
       </Seccion>
+
+      {/* Sitios */}
+      {sitios.length > 0 && (
+        <Seccion title="Sitios del proyecto">
+          <div className="flex flex-col gap-3">
+            {sitios.map(s => (
+              <div key={s.id} className="border p-3" style={{ borderColor: '#CFCFCF' }}>
+                <p className="font-semibold text-sm">{s.nombre}</p>
+                <div className="flex flex-wrap gap-3 mt-1">
+                  {(s.ciudad || s.ubicacion_estado) && (
+                    <span className="flex items-center gap-1 text-xs" style={{ color: '#666' }}>
+                      <MapPin size={11} />
+                      {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                    </span>
+                  )}
+                  {s.rpu && <span className="text-xs" style={{ color: '#666' }}>RPU: {s.rpu}</span>}
+                  {s.recibo_url && (
+                    <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs underline" style={{ color: '#000' }}>
+                      Ver recibo CFE
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Seccion>
+      )}
 
       {/* Técnico BESS */}
       {(proyecto.tipo === 'BESS' || proyecto.tipo === 'BESS+MEM') && (

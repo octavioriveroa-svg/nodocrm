@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Trash2, Building2, Mail, Phone, MapPin, FileText } from 'lucide-react'
-import type { Cliente } from '@/lib/types'
+import type { Cliente, Sitio } from '@/lib/types'
+import SitiosCliente from '@/components/SitiosCliente'
 
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
@@ -24,6 +25,8 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   const supabase = createClient()
   const router = useRouter()
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [sitios, setSitios] = useState<Sitio[]>([])
+  const [epcistaId, setEpcistaId] = useState<string>('')
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState<Partial<Cliente>>({})
   const [loading, setLoading] = useState(false)
@@ -45,8 +48,14 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function load() {
       const { id } = await params
-      const { data } = await supabase.from('clientes').select('*').eq('id', id).single()
-      if (data) { setCliente(data as Cliente); setForm(data as Cliente) }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) setEpcistaId(session.user.id)
+      const [{ data: clienteData }, { data: sitiosData }] = await Promise.all([
+        supabase.from('clientes').select('*').eq('id', id).single(),
+        supabase.from('sitios').select('*').eq('cliente_id', id).order('created_at', { ascending: true }),
+      ])
+      if (clienteData) { setCliente(clienteData as Cliente); setForm(clienteData as Cliente) }
+      if (sitiosData) setSitios(sitiosData as Sitio[])
     }
     load()
   }, [])
@@ -232,6 +241,12 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
               </p>
             </div>
           )}
+
+          <SitiosCliente
+            clienteId={cliente.id}
+            epcistaId={epcistaId}
+            initialSitios={sitios}
+          />
         </>
       )}
     </div>
