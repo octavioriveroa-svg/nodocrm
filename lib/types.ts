@@ -1,5 +1,6 @@
 export type Rol = 'epcista' | 'analista'
-export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM'
+export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
+export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
 export type EstadoProyecto = 'recibido' | 'en_analisis' | 'completado'
 export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
@@ -35,9 +36,22 @@ export interface Proyecto {
   ubicacion_estado: string
   modalidad_financiamiento: ModalidadFinanciamiento[]
   notas_adicionales: string | null
+  tipo_instalacion: TipoInstalacion | null
+  incluye_mem: boolean
+  demanda_kw: number | null
   created_at: string
   updated_at: string
   profiles?: Profile
+}
+
+export interface ProyectoSitioProducto {
+  id: string
+  proyecto_id: string
+  sitio_id: string
+  tipo: 'fv' | 'bess'
+  datos: Record<string, unknown>
+  created_at: string
+  sitios?: { nombre: string }
 }
 
 export interface Comentario {

@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, X, Eye, Pencil, Upload, FileText } from 'lucide-react'
-import type { TipoProyecto, TecnologiaBateria, Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
+import { Plus, X, Eye, Pencil, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
+import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -14,75 +14,187 @@ const ESTADOS_MX = [
   'Veracruz','Yucatán','Zacatecas',
 ]
 
+// ── Tipos locales ──────────────────────────────────────────────
+interface FVForm {
+  num_modulos: string
+  potencia_modulos_w: string
+  marca_modulos: string
+  num_inversores: string
+  potencia_inversores_kw: string
+  marca_inversores: string
+  generacion_anual_kwh: string
+  capex: string
+}
+
+interface BESSForm {
+  potencia_kw: string
+  capacidad_kwh: string
+  marca: string
+  uso: string
+  capex: string
+}
+
+interface Producto {
+  tempId: string
+  tipo: 'fv' | 'bess'
+  fv?: FVForm
+  bess?: BESSForm
+}
+
 interface FormData {
-  tipo: TipoProyecto | ''
   nombre_proyecto: string
   cliente_id: string
-  capacidad_mwh: string
-  capacidad_mw: string
-  tecnologia_bateria: TecnologiaBateria | ''
-  duracion_descarga_hrs: string
-  punto_interconexion: string
-  tipo_participacion_mem: string
-  volumen_energia_mwh_anual: string
+  tipo_instalacion: 'nodo_busca' | 'epcista_instala' | ''
   modalidad_financiamiento: ModalidadFinanciamiento[]
   capex_estimado: string
   moneda: Moneda
   ubicacion_estado: string
   notas_adicionales: string
+  demanda_kw: string
+  incluye_mem: boolean
 }
 
-const initial: FormData = {
-  tipo: '',
-  nombre_proyecto: '',
-  cliente_id: '',
-  capacidad_mwh: '',
-  capacidad_mw: '',
-  tecnologia_bateria: '',
-  duracion_descarga_hrs: '',
-  punto_interconexion: '',
-  tipo_participacion_mem: '',
-  volumen_energia_mwh_anual: '',
-  modalidad_financiamiento: [],
-  capex_estimado: '',
-  moneda: 'MXN',
-  ubicacion_estado: '',
-  notas_adicionales: '',
+// ── Valores vacíos ─────────────────────────────────────────────
+const emptyFv: FVForm = {
+  num_modulos: '', potencia_modulos_w: '', marca_modulos: '',
+  num_inversores: '', potencia_inversores_kw: '', marca_inversores: '',
+  generacion_anual_kwh: '', capex: '',
 }
-
+const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '' }
 const emptyNuevoSitio = { nombre: '', ciudad: '', ubicacion_estado: '', rpu: '' }
+const initialForm: FormData = {
+  nombre_proyecto: '', cliente_id: '', tipo_instalacion: '',
+  modalidad_financiamiento: [], capex_estimado: '', moneda: 'MXN',
+  ubicacion_estado: '', notas_adicionales: '', demanda_kw: '', incluye_mem: false,
+}
 
-function StepIndicator({ current, total }: { current: number; total: number }) {
+// ── Helpers de cálculo ────────────────────────────────────────
+function calcFV(fv: FVForm) {
+  const n = Number(fv.num_modulos) || 0
+  const pw = Number(fv.potencia_modulos_w) || 0
+  const ni = Number(fv.num_inversores) || 0
+  const pi = Number(fv.potencia_inversores_kw) || 0
+  const capex = Number(fv.capex) || 0
+  return {
+    kwpSistema: n > 0 && pw > 0 ? n * pw / 1000 : null,
+    kwpInversores: ni > 0 && pi > 0 ? ni * pi : null,
+    precioWatt: capex > 0 && n > 0 && pw > 0 ? capex / (n * pw) : null,
+  }
+}
+
+function calcBESS(bess: BESSForm) {
+  const cap = Number(bess.capacidad_kwh) || 0
+  const capex = Number(bess.capex) || 0
+  return { precioKwh: capex > 0 && cap > 0 ? capex / cap : null }
+}
+
+function n2(v: number | null, dec = 2) {
+  if (v === null) return '—'
+  return v.toLocaleString('es-MX', { maximumFractionDigits: dec })
+}
+
+// ── StepIndicator ─────────────────────────────────────────────
+function StepIndicator({ current }: { current: number }) {
+  const labels = ['Información básica', 'Sitios y productos', 'Financiamiento']
   return (
-    <div className="flex items-center gap-2 mb-8">
-      {Array.from({ length: total }, (_, i) => (
+    <div className="flex items-center gap-3 mb-8">
+      {labels.map((label, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
             style={{
               backgroundColor: i < current ? '#000' : i === current ? '#D7FF2F' : '#CFCFCF',
               color: i < current ? '#D7FF2F' : '#000',
-            }}
-          >
+            }}>
             {i < current ? '✓' : i + 1}
           </div>
-          {i < total - 1 && (
-            <div className="h-px w-8" style={{ backgroundColor: i < current ? '#000' : '#CFCFCF' }} />
-          )}
+          <span className="text-xs font-medium hidden md:block"
+            style={{ color: i === current ? '#000' : '#999' }}>
+            {label}
+          </span>
+          {i < 2 && <div className="h-px w-5 flex-shrink-0" style={{ backgroundColor: i < current ? '#000' : '#CFCFCF' }} />}
         </div>
       ))}
-      <span className="ml-3 text-sm" style={{ color: '#666' }}>
-        Paso {current + 1} de {total}
-      </span>
     </div>
   )
 }
 
+// ── Tarjeta de producto (display) ────────────────────────────
+function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
+  if (p.tipo === 'fv' && p.fv) {
+    const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
+    return (
+      <div className="border p-3 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#fafff0' }}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-bold text-sm mb-2">
+            <Zap size={13} style={{ color: '#888' }} />
+            Fotovoltaico
+          </div>
+          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0" style={{ color: '#888' }}>
+            <X size={13} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
+          <span><span style={{ color: '#888' }}>Módulos: </span>{p.fv.num_modulos} × {p.fv.potencia_modulos_w} W · {p.fv.marca_modulos}</span>
+          <span><span style={{ color: '#888' }}>kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
+          <span><span style={{ color: '#888' }}>Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
+          <span><span style={{ color: '#888' }}>kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
+          <span><span style={{ color: '#888' }}>Generación: </span>{Number(p.fv.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año</span>
+          <span><span style={{ color: '#888' }}>CAPEX: </span>${Number(p.fv.capex).toLocaleString('es-MX')}</span>
+          <span className="col-span-2"><span style={{ color: '#888' }}>Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
+        </div>
+      </div>
+    )
+  }
+  if (p.tipo === 'bess' && p.bess) {
+    const { precioKwh } = calcBESS(p.bess)
+    const usoLabel: Record<string, string> = {
+      load_shifting: 'Load Shifting',
+      ups: 'UPS',
+      load_shifting_ups: 'Load Shifting + UPS',
+    }
+    return (
+      <div className="border p-3 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#f0f8ff' }}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-bold text-sm mb-2">
+            <Battery size={13} style={{ color: '#888' }} />
+            BESS
+          </div>
+          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0" style={{ color: '#888' }}>
+            <X size={13} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
+          <span><span style={{ color: '#888' }}>Potencia: </span>{p.bess.potencia_kw} kW</span>
+          <span><span style={{ color: '#888' }}>Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
+          <span><span style={{ color: '#888' }}>Marca: </span>{p.bess.marca}</span>
+          <span><span style={{ color: '#888' }}>Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
+          <span><span style={{ color: '#888' }}>CAPEX: </span>${Number(p.bess.capex).toLocaleString('es-MX')}</span>
+          <span><span style={{ color: '#888' }}>Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
+// ── Campo calculado (display) ─────────────────────────────────
+function CalcField({ label, value, unit }: { label: string; value: number | null; unit: string }) {
+  return (
+    <div className="border px-3 py-2 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#F9F6EF' }}>
+      <div style={{ color: '#888' }}>{label}</div>
+      <div className="font-bold text-sm mt-0.5">
+        {value !== null ? `${n2(value, 4)} ${unit}` : '—'}
+      </div>
+    </div>
+  )
+}
+
+// ── Página principal ──────────────────────────────────────────
 export default function NuevoProyectoPage() {
   const router = useRouter()
   const supabase = createClient()
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState<FormData>(initial)
+  const [form, setForm] = useState<FormData>(initialForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -92,7 +204,15 @@ export default function NuevoProyectoPage() {
   const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
   const [sitiosSeleccionados, setSitiosSeleccionados] = useState<string[]>([])
 
-  // Mini-form de nuevo sitio inline
+  // Productos por sitio (in-memory)
+  const [productosMap, setProductosMap] = useState<Record<string, Producto[]>>({})
+  const [addingToSitioId, setAddingToSitioId] = useState<string | null>(null)
+  const [productTipo, setProductTipo] = useState<'fv' | 'bess' | null>(null)
+  const [fvForm, setFvForm] = useState<FVForm>(emptyFv)
+  const [bessForm, setBessForm] = useState<BESSForm>(emptyBess)
+  const [addProductError, setAddProductError] = useState('')
+
+  // Inline nuevo sitio
   const [mostrarNuevoSitio, setMostrarNuevoSitio] = useState(false)
   const [nuevoSitio, setNuevoSitio] = useState(emptyNuevoSitio)
   const [guardandoSitio, setGuardandoSitio] = useState(false)
@@ -100,7 +220,7 @@ export default function NuevoProyectoPage() {
   const [subiendoPdfNuevo, setSubiendoPdfNuevo] = useState(false)
   const fileRefNuevo = useRef<HTMLInputElement>(null)
 
-  // Ver / editar sitios existentes
+  // Ver / editar sitios
   const [viendoSitioId, setViendoSitioId] = useState<string | null>(null)
   const [editandoSitioId, setEditandoSitioId] = useState<string | null>(null)
   const [editSitioForm, setEditSitioForm] = useState(emptyNuevoSitio)
@@ -113,8 +233,7 @@ export default function NuevoProyectoPage() {
     async function loadClientes() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { setClientesCargados(true); return }
-      const { data } = await supabase
-        .from('clientes').select('*').eq('epcista_id', session.user.id).order('razon_social')
+      const { data } = await supabase.from('clientes').select('*').eq('epcista_id', session.user.id).order('razon_social')
       setClientes((data ?? []) as Cliente[])
       setClientesCargados(true)
     }
@@ -126,10 +245,11 @@ export default function NuevoProyectoPage() {
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
     setSitiosSeleccionados([])
+    setProductosMap({})
   }
 
   function seleccionarCliente(clienteId: string) {
-    set('cliente_id', clienteId)
+    setF('cliente_id', clienteId)
     cargarSitios(clienteId)
     setMostrarNuevoSitio(false)
     setViendoSitioId(null)
@@ -140,8 +260,66 @@ export default function NuevoProyectoPage() {
     setSitiosSeleccionados(prev =>
       prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
     )
+    // Cerrar el form de producto si se está agregando a este sitio
+    if (addingToSitioId === sitioId) setAddingToSitioId(null)
   }
 
+  // ── Productos ────────────────────────────────────────────────
+  function startAddingProduct(sitioId: string) {
+    setAddingToSitioId(sitioId)
+    setProductTipo(null)
+    setFvForm(emptyFv)
+    setBessForm(emptyBess)
+    setAddProductError('')
+    setViendoSitioId(null)
+    setEditandoSitioId(null)
+  }
+
+  function validarFvForm(): string {
+    if (!fvForm.num_modulos || !fvForm.potencia_modulos_w) return 'Ingresa número y potencia de módulos.'
+    if (!fvForm.marca_modulos.trim()) return 'Ingresa la marca de los módulos.'
+    if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) return 'Ingresa número y potencia de inversores.'
+    if (!fvForm.marca_inversores.trim()) return 'Ingresa la marca de los inversores.'
+    if (!fvForm.generacion_anual_kwh) return 'Ingresa la generación anual estimada.'
+    if (!fvForm.capex) return 'Ingresa el CAPEX del sistema FV.'
+    return ''
+  }
+
+  function validarBessForm(): string {
+    if (!bessForm.potencia_kw) return 'Ingresa la potencia del BESS.'
+    if (!bessForm.capacidad_kwh) return 'Ingresa la capacidad del BESS.'
+    if (!bessForm.marca.trim()) return 'Ingresa la marca del BESS.'
+    if (!bessForm.uso) return 'Selecciona el uso del BESS.'
+    if (!bessForm.capex) return 'Ingresa el CAPEX del BESS.'
+    return ''
+  }
+
+  function addProduct() {
+    if (!addingToSitioId || !productTipo) return
+    const err = productTipo === 'fv' ? validarFvForm() : validarBessForm()
+    if (err) { setAddProductError(err); return }
+
+    const producto: Producto = {
+      tempId: `${Date.now()}-${Math.random()}`,
+      tipo: productTipo,
+      ...(productTipo === 'fv' ? { fv: { ...fvForm } } : { bess: { ...bessForm } }),
+    }
+    setProductosMap(prev => ({
+      ...prev,
+      [addingToSitioId]: [...(prev[addingToSitioId] ?? []), producto],
+    }))
+    setAddingToSitioId(null)
+    setAddProductError('')
+  }
+
+  function removeProduct(sitioId: string, tempId: string) {
+    setProductosMap(prev => ({
+      ...prev,
+      [sitioId]: (prev[sitioId] ?? []).filter(p => p.tempId !== tempId),
+    }))
+  }
+
+  // ── Sitios inline ────────────────────────────────────────────
   async function subirPdfNuevo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !form.cliente_id) return
@@ -179,17 +357,12 @@ export default function NuevoProyectoPage() {
     setGuardandoSitio(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { setGuardandoSitio(false); return }
-
     const { data } = await supabase.from('sitios').insert({
-      cliente_id: form.cliente_id,
-      epcista_id: session.user.id,
-      nombre: nuevoSitio.nombre,
-      ciudad: nuevoSitio.ciudad || null,
+      cliente_id: form.cliente_id, epcista_id: session.user.id,
+      nombre: nuevoSitio.nombre, ciudad: nuevoSitio.ciudad || null,
       ubicacion_estado: nuevoSitio.ubicacion_estado || null,
-      rpu: nuevoSitio.rpu || null,
-      recibo_url: reciboUrlNuevo,
+      rpu: nuevoSitio.rpu || null, recibo_url: reciboUrlNuevo,
     }).select().single()
-
     if (data) {
       const sitio = data as Sitio
       setSitiosCliente(prev => [...prev, sitio])
@@ -205,13 +378,10 @@ export default function NuevoProyectoPage() {
     if (!editandoSitioId || !editSitioForm.nombre.trim()) return
     setGuardandoEditSitio(true)
     const { data } = await supabase.from('sitios').update({
-      nombre: editSitioForm.nombre,
-      ciudad: editSitioForm.ciudad || null,
+      nombre: editSitioForm.nombre, ciudad: editSitioForm.ciudad || null,
       ubicacion_estado: editSitioForm.ubicacion_estado || null,
-      rpu: editSitioForm.rpu || null,
-      recibo_url: editSitioReciboUrl,
+      rpu: editSitioForm.rpu || null, recibo_url: editSitioReciboUrl,
     }).eq('id', editandoSitioId).select().single()
-
     if (data) setSitiosCliente(prev => prev.map(s => s.id === editandoSitioId ? data as Sitio : s))
     setEditandoSitioId(null)
     setEditSitioForm(emptyNuevoSitio)
@@ -225,58 +395,56 @@ export default function NuevoProyectoPage() {
     setEditSitioReciboUrl(s.recibo_url ?? null)
     setViendoSitioId(null)
     setMostrarNuevoSitio(false)
+    setAddingToSitioId(null)
   }
 
-  function set(field: keyof FormData, value: unknown) {
+  // ── Form helpers ─────────────────────────────────────────────
+  function setF(field: keyof FormData, value: unknown) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
   function toggleModalidad(m: ModalidadFinanciamiento) {
-    if (m === 'no_sabe') { set('modalidad_financiamiento', ['no_sabe']); return }
+    if (m === 'no_sabe') { setF('modalidad_financiamiento', ['no_sabe']); return }
     const current = form.modalidad_financiamiento.filter(x => x !== 'no_sabe')
-    if (current.includes(m)) set('modalidad_financiamiento', current.filter(x => x !== m))
-    else set('modalidad_financiamiento', [...current, m])
+    if (current.includes(m)) setF('modalidad_financiamiento', current.filter(x => x !== m))
+    else setF('modalidad_financiamiento', [...current, m])
+  }
+
+  // ── Validaciones ─────────────────────────────────────────────
+  function validarPaso0() {
+    if (!form.nombre_proyecto.trim()) return 'Ingresa el nombre del proyecto.'
+    if (!form.cliente_id) return 'Selecciona un cliente.'
+    if (!form.tipo_instalacion) return 'Selecciona el tipo de instalación.'
+    return ''
   }
 
   function validarPaso1() {
-    if (!form.tipo) return 'Selecciona el tipo de proyecto.'
-    if (!form.nombre_proyecto.trim()) return 'Ingresa el nombre del proyecto.'
-    if (!form.cliente_id) return 'Selecciona un cliente.'
     if (sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio a cotizar.'
+    for (const sid of sitiosSeleccionados) {
+      const sitio = sitiosCliente.find(s => s.id === sid)
+      const prods = productosMap[sid] ?? []
+      if (prods.length === 0) return `El sitio "${sitio?.nombre ?? sid}" no tiene productos. Agrega al menos uno.`
+    }
     return ''
   }
 
   function validarPaso2() {
-    if (form.tipo === 'BESS' || form.tipo === 'BESS+MEM') {
-      if (!form.capacidad_mwh) return 'Ingresa la capacidad en MWh.'
-      if (!form.capacidad_mw) return 'Ingresa la capacidad en MW.'
-      if (!form.tecnologia_bateria) return 'Selecciona la tecnología de batería.'
-      if (!form.duracion_descarga_hrs) return 'Ingresa la duración de descarga.'
-      if (!form.punto_interconexion.trim()) return 'Ingresa el punto de interconexión.'
-    }
-    if (form.tipo === 'MEM' || form.tipo === 'BESS+MEM') {
-      if (!form.tipo_participacion_mem.trim()) return 'Ingresa el tipo de participación MEM.'
-      if (!form.volumen_energia_mwh_anual) return 'Ingresa el volumen de energía anual.'
-    }
-    return ''
-  }
-
-  function validarPaso3() {
-    if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad.'
+    if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad de financiamiento.'
     if (!form.ubicacion_estado) return 'Selecciona el estado.'
     return ''
   }
 
   function handleNext() {
     setError('')
-    const err = step === 0 ? validarPaso1() : step === 1 ? validarPaso2() : ''
+    const err = step === 0 ? validarPaso0() : step === 1 ? validarPaso1() : ''
     if (err) { setError(err); return }
     setStep(s => s + 1)
   }
 
+  // ── Submit ───────────────────────────────────────────────────
   async function handleSubmit() {
     setError('')
-    const err = validarPaso3()
+    const err = validarPaso2()
     if (err) { setError(err); return }
     setLoading(true)
 
@@ -284,88 +452,90 @@ export default function NuevoProyectoPage() {
     if (!session?.user) { setError('Sesión expirada.'); setLoading(false); return }
 
     const cliente = clientes.find(c => c.id === form.cliente_id)
+    const allProds = sitiosSeleccionados.flatMap(sid => productosMap[sid] ?? [])
+    const hasFV = allProds.some(p => p.tipo === 'fv')
+    const hasBESS = allProds.some(p => p.tipo === 'bess')
+    const tipo = hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS'
 
     const payload = {
       epcista_id: session.user.id,
       cliente_id: form.cliente_id,
-      tipo: form.tipo,
+      tipo,
       nombre_proyecto: form.nombre_proyecto,
       estado: 'recibido',
+      tipo_instalacion: form.tipo_instalacion,
+      incluye_mem: form.incluye_mem,
+      demanda_kw: form.demanda_kw ? Number(form.demanda_kw) : null,
       cliente_final_nombre: cliente?.contacto_nombre ?? '',
       cliente_final_empresa: cliente?.razon_social ?? '',
       cliente_final_contacto: cliente?.contacto_email ?? cliente?.contacto_telefono ?? '',
-      capacidad_mwh: form.capacidad_mwh ? Number(form.capacidad_mwh) : null,
-      capacidad_mw: form.capacidad_mw ? Number(form.capacidad_mw) : null,
-      tecnologia_bateria: form.tecnologia_bateria || null,
-      duracion_descarga_hrs: form.duracion_descarga_hrs ? Number(form.duracion_descarga_hrs) : null,
-      punto_interconexion: form.punto_interconexion || null,
-      tipo_participacion_mem: form.tipo_participacion_mem || null,
-      volumen_energia_mwh_anual: form.volumen_energia_mwh_anual ? Number(form.volumen_energia_mwh_anual) : null,
       capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
       moneda: form.moneda,
       ubicacion_estado: form.ubicacion_estado,
       modalidad_financiamiento: form.modalidad_financiamiento,
       notas_adicionales: form.notas_adicionales || null,
+      // Campos legacy — null en proyectos nuevos
+      capacidad_mwh: null, capacidad_mw: null, tecnologia_bateria: null,
+      duracion_descarga_hrs: null, punto_interconexion: null,
+      tipo_participacion_mem: null, volumen_energia_mwh_anual: null,
     }
 
-    const { data, error: dbError } = await supabase.from('proyectos').insert(payload).select('id').single()
-    if (dbError) { setError('Error al guardar: ' + dbError.message); setLoading(false); return }
+    const { data: proyecto, error: dbErr } = await supabase.from('proyectos').insert(payload).select('id').single()
+    if (dbErr) { setError('Error al guardar: ' + dbErr.message); setLoading(false); return }
 
+    // Insertar proyecto_sitios
     if (sitiosSeleccionados.length > 0) {
       await supabase.from('proyecto_sitios').insert(
-        sitiosSeleccionados.map(sitio_id => ({ proyecto_id: data.id, sitio_id }))
+        sitiosSeleccionados.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id }))
       )
     }
 
-    router.push(`/epcista/proyectos/${data.id}`)
+    // Insertar productos
+    const productosRows = sitiosSeleccionados.flatMap(sitio_id =>
+      (productosMap[sitio_id] ?? []).map(p => ({
+        proyecto_id: proyecto.id,
+        sitio_id,
+        tipo: p.tipo,
+        datos: p.tipo === 'fv' ? p.fv : p.bess,
+      }))
+    )
+    if (productosRows.length > 0) {
+      await supabase.from('proyecto_sitio_productos').insert(productosRows)
+    }
+
+    router.push(`/epcista/proyectos/${proyecto.id}`)
   }
 
   const inp = "w-full border px-3 py-2 text-sm bg-white"
   const borde = { borderColor: '#CFCFCF' }
+  const fvCalc = calcFV(fvForm)
+  const bessCalc = calcBESS(bessForm)
+  const demandaKw = Number(form.demanda_kw) || 0
 
+  // ── Render ───────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-black">Nuevo proyecto</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Completa los tres pasos para enviar tu proyecto</p>
+        <p className="text-sm mt-1" style={{ color: '#666' }}>Completa los tres pasos para enviar tu solicitud</p>
       </div>
 
-      <StepIndicator current={step} total={3} />
+      <StepIndicator current={step} />
 
       <div className="border p-8" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
 
-        {/* ── PASO 1 ── */}
+        {/* ══ PASO 0 — Información básica ══════════════════════ */}
         {step === 0 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Cliente y sitios</h2>
+            <h2 className="font-bold text-lg">Información básica</h2>
 
-            {/* Tipo */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Tipo de proyecto *</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['BESS', 'MEM', 'BESS+MEM'] as TipoProyecto[]).map(t => (
-                  <button key={t} type="button" onClick={() => set('tipo', t)}
-                    className="border p-4 text-center transition-colors"
-                    style={{ borderColor: form.tipo === t ? '#000' : '#CFCFCF', backgroundColor: form.tipo === t ? '#000' : '#fff', color: form.tipo === t ? '#D7FF2F' : '#000' }}>
-                    <div className="font-black text-lg">{t}</div>
-                    <div className="text-xs mt-1 opacity-70">
-                      {t === 'BESS' ? 'Almacenamiento' : t === 'MEM' ? 'Mercado eléctrico' : 'Ambos'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Nombre */}
             <div>
               <label className="block text-sm font-medium mb-1">Nombre del proyecto *</label>
-              <input type="text" value={form.nombre_proyecto} onChange={e => set('nombre_proyecto', e.target.value)}
-                className={inp} style={borde} placeholder="Ej: Planta Solar Norte" />
+              <input type="text" value={form.nombre_proyecto}
+                onChange={e => setF('nombre_proyecto', e.target.value)}
+                className={inp} style={borde} placeholder="Ej: Proyecto Energía Norte" />
             </div>
 
-            <hr style={{ borderColor: '#CFCFCF' }} />
-
-            {/* Cliente */}
             <div>
               <label className="block text-sm font-medium mb-1">Cliente *</label>
               {clientesCargados && (
@@ -377,313 +547,505 @@ export default function NuevoProyectoPage() {
               )}
             </div>
 
-            {/* Sitios */}
-            {form.cliente_id && (
-              <div>
-                <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
+            <hr style={{ borderColor: '#CFCFCF' }} />
 
-                {sitiosCliente.length === 0 && !mostrarNuevoSitio && (
-                  <p className="text-sm mb-3" style={{ color: '#888' }}>
-                    Este cliente no tiene sitios registrados.
-                  </p>
-                )}
-
-                {/* Lista de sitios con checkboxes + Ver/Editar */}
-                {sitiosCliente.length > 0 && (
-                  <div className="flex flex-col gap-1 mb-3">
-                    {sitiosCliente.map(s => (
-                      <div key={s.id}>
-                        {/* Fila principal */}
-                        <div
-                          className="flex items-center gap-3 border p-3"
-                          style={{ borderColor: sitiosSeleccionados.includes(s.id) ? '#000' : '#CFCFCF', backgroundColor: sitiosSeleccionados.includes(s.id) ? '#f5f5f0' : '#fff' }}
-                        >
-                          <input
-                            type="checkbox"
-                            id={`sitio-${s.id}`}
-                            checked={sitiosSeleccionados.includes(s.id)}
-                            onChange={() => toggleSitio(s.id)}
-                            className="w-4 h-4 flex-shrink-0"
-                          />
-                          <label htmlFor={`sitio-${s.id}`} className="flex-1 cursor-pointer min-w-0">
-                            <div className="text-sm font-semibold">{s.nombre}</div>
-                            {(s.ciudad || s.ubicacion_estado) && (
-                              <div className="text-xs truncate" style={{ color: '#666' }}>
-                                {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
-                              </div>
-                            )}
-                          </label>
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setViendoSitioId(viendoSitioId === s.id ? null : s.id)
-                                setEditandoSitioId(null)
-                              }}
-                              className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
-                              style={{ borderColor: viendoSitioId === s.id ? '#000' : '#CFCFCF', backgroundColor: viendoSitioId === s.id ? '#000' : '#fff', color: viendoSitioId === s.id ? '#D7FF2F' : '#444' }}
-                            >
-                              <Eye size={11} /> Ver
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => abrirEditarSitio(s)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
-                              style={{ borderColor: editandoSitioId === s.id ? '#000' : '#CFCFCF', backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff', color: '#444' }}
-                            >
-                              <Pencil size={11} /> Editar
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Panel Ver */}
-                        {viendoSitioId === s.id && (
-                          <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                              {s.rpu && (
-                                <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>
-                              )}
-                              {(s.ciudad || s.ubicacion_estado) && (
-                                <div><span style={{ color: '#888' }}>Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>
-                              )}
-                              {s.recibo_url && (
-                                <div className="col-span-2">
-                                  <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1 underline font-medium" style={{ color: '#000' }}>
-                                    <FileText size={11} /> Ver recibo CFE
-                                  </a>
-                                </div>
-                              )}
-                              {!s.rpu && !s.recibo_url && !s.ciudad && !s.ubicacion_estado && (
-                                <p style={{ color: '#aaa' }} className="col-span-2">Sin datos adicionales.</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Panel Editar */}
-                        {editandoSitioId === s.id && (
-                          <div className="border border-t-0 px-4 py-4" style={{ borderColor: '#000' }}>
-                            <p className="text-xs font-bold mb-3">Editar sitio</p>
-                            <div className="flex flex-col gap-3">
-                              <div>
-                                <label className="block text-xs font-medium mb-1">Nombre *</label>
-                                <input type="text" value={editSitioForm.nombre}
-                                  onChange={e => setEditSitioForm(f => ({ ...f, nombre: e.target.value }))}
-                                  className={inp} style={borde} />
-                              </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Ciudad</label>
-                                  <input type="text" value={editSitioForm.ciudad}
-                                    onChange={e => setEditSitioForm(f => ({ ...f, ciudad: e.target.value }))}
-                                    className={inp} style={borde} placeholder="Monterrey" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Estado</label>
-                                  <select value={editSitioForm.ubicacion_estado}
-                                    onChange={e => setEditSitioForm(f => ({ ...f, ubicacion_estado: e.target.value }))}
-                                    className={inp} style={borde}>
-                                    <option value="">Selecciona</option>
-                                    {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">RPU</label>
-                                  <input type="text" value={editSitioForm.rpu}
-                                    onChange={e => setEditSitioForm(f => ({ ...f, rpu: e.target.value }))}
-                                    className={inp} style={borde} placeholder="RPU" />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium mb-1">Recibo CFE (PDF)</label>
-                                <div className="flex items-center gap-3">
-                                  <input ref={fileRefEdit} type="file" accept=".pdf" onChange={subirPdfEdit} className="hidden" id="edit-recibo-pdf" />
-                                  <label htmlFor="edit-recibo-pdf"
-                                    className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
-                                    style={{ borderColor: '#CFCFCF' }}>
-                                    <Upload size={11} />
-                                    {subiendoPdfEdit ? 'Subiendo…' : 'Seleccionar PDF'}
-                                  </label>
-                                  {editSitioReciboUrl && (
-                                    <a href={editSitioReciboUrl} target="_blank" rel="noopener noreferrer"
-                                      className="text-xs underline flex items-center gap-1">
-                                      <FileText size={11} /> Ver PDF
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex justify-between mt-3">
-                              <button type="button" onClick={() => setEditandoSitioId(null)}
-                                className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
-                                Cancelar
-                              </button>
-                              <button type="button" onClick={actualizarSitio}
-                                disabled={guardandoEditSitio || !editSitioForm.nombre.trim()}
-                                className="px-4 py-1.5 text-xs font-bold disabled:opacity-50"
-                                style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
-                                {guardandoEditSitio ? 'Guardando…' : 'Guardar cambios'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
+            <div>
+              <label className="block text-sm font-medium mb-3">Tipo de instalación *</label>
+              <div className="flex flex-col gap-3">
+                {([
+                  {
+                    value: 'nodo_busca',
+                    icon: HelpCircle,
+                    title: 'Quiero que Nodo me ayude a encontrar un instalador',
+                    desc: 'Nodo buscará una empresa certificada que se encargue de la instalación del proyecto.',
+                  },
+                  {
+                    value: 'epcista_instala',
+                    icon: Wrench,
+                    title: 'Tenemos la capacidad para realizar la instalación',
+                    desc: 'Nuestra empresa cuenta con la experiencia y certificaciones para instalar de acuerdo a normativas.',
+                  },
+                ] as { value: 'nodo_busca' | 'epcista_instala'; icon: React.ElementType; title: string; desc: string }[]).map(opt => {
+                  const selected = form.tipo_instalacion === opt.value
+                  const Icon = opt.icon
+                  return (
+                    <button key={opt.value} type="button"
+                      onClick={() => setF('tipo_instalacion', opt.value)}
+                      className="flex items-start gap-4 border p-4 text-left w-full transition-colors"
+                      style={{
+                        borderColor: selected ? '#000' : '#CFCFCF',
+                        backgroundColor: selected ? '#000' : '#fff',
+                      }}>
+                      <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+                        style={{ borderColor: selected ? '#D7FF2F' : '#CFCFCF' }}>
+                        {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#D7FF2F' }} />}
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Mini-form nuevo sitio */}
-                {mostrarNuevoSitio ? (
-                  <div className="border p-4" style={{ borderColor: '#000' }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-bold">Nuevo sitio</span>
-                      <button type="button" onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio); setReciboUrlNuevo(null) }}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                    <div className="flex flex-col gap-3">
                       <div>
-                        <label className="block text-xs font-medium mb-1">Nombre *</label>
-                        <input type="text" value={nuevoSitio.nombre}
-                          onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
-                          className={inp} style={borde} placeholder="Ej: Bodega Norte" />
-                      </div>
-                      {/* Ciudad + Estado + RPU en misma fila */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
-                        <div>
-                          <label className="block text-xs font-medium mb-1">Ciudad</label>
-                          <input type="text" value={nuevoSitio.ciudad}
-                            onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
-                            className={inp} style={borde} placeholder="Monterrey" />
+                        <div className="font-semibold text-sm" style={{ color: selected ? '#D7FF2F' : '#000' }}>
+                          {opt.title}
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium mb-1">Estado</label>
-                          <select value={nuevoSitio.ubicacion_estado}
-                            onChange={e => setNuevoSitio(f => ({ ...f, ubicacion_estado: e.target.value }))}
-                            className={inp} style={borde}>
-                            <option value="">Selecciona</option>
-                            {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium mb-1">RPU</label>
-                          <input type="text" value={nuevoSitio.rpu}
-                            onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
-                            className={inp} style={borde} placeholder="RPU" />
+                        <div className="text-xs mt-1" style={{ color: selected ? '#aaa' : '#666' }}>
+                          {opt.desc}
                         </div>
                       </div>
-                      {/* PDF recibo */}
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Recibo CFE (PDF)</label>
-                        <div className="flex items-center gap-3">
-                          <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="nuevo-recibo-pdf" />
-                          <label htmlFor="nuevo-recibo-pdf"
-                            className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
-                            style={{ borderColor: '#CFCFCF' }}>
-                            <Upload size={11} />
-                            {subiendoPdfNuevo ? 'Subiendo…' : 'Seleccionar PDF'}
-                          </label>
-                          {reciboUrlNuevo && (
-                            <a href={reciboUrlNuevo} target="_blank" rel="noopener noreferrer"
-                              className="text-xs underline flex items-center gap-1">
-                              <FileText size={11} /> Ver PDF
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-end mt-3">
-                      <button type="button" onClick={guardarNuevoSitio} disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
-                        className="px-4 py-2 text-xs font-bold disabled:opacity-50"
-                        style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
-                        {guardandoSitio ? 'Guardando…' : 'Agregar sitio'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button type="button" onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null) }}
-                    className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center"
-                    style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
-                    <Plus size={14} />
-                    {sitiosCliente.length === 0 ? 'Agregar sitio' : 'Agregar otro sitio'}
-                  </button>
-                )}
+                    </button>
+                  )
+                })}
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* ── PASO 2 ── */}
+        {/* ══ PASO 1 — Sitios y productos ══════════════════════ */}
         {step === 1 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Datos técnicos</h2>
+            <h2 className="font-bold text-lg">Sitios y productos</h2>
 
-            {(form.tipo === 'BESS' || form.tipo === 'BESS+MEM') && (
-              <div className="flex flex-col gap-4">
-                {form.tipo === 'BESS+MEM' && (
-                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>Sistema de almacenamiento (BESS)</h3>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Capacidad (MWh) *</label>
-                    <input type="number" min="0" value={form.capacidad_mwh} onChange={e => set('capacidad_mwh', e.target.value)} className={inp} style={borde} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Potencia (MW) *</label>
-                    <input type="number" min="0" value={form.capacidad_mw} onChange={e => set('capacidad_mw', e.target.value)} className={inp} style={borde} placeholder="0" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Tecnología de batería *</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['Li-ion', 'LFP', 'NMC', 'Otra'] as TecnologiaBateria[]).map(t => (
-                      <button key={t} type="button" onClick={() => set('tecnologia_bateria', t)}
-                        className="border py-2 px-3 text-sm font-medium transition-colors"
-                        style={{ borderColor: form.tecnologia_bateria === t ? '#000' : '#CFCFCF', backgroundColor: form.tecnologia_bateria === t ? '#000' : '#fff', color: form.tecnologia_bateria === t ? '#D7FF2F' : '#000' }}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Duración de descarga (hrs) *</label>
-                    <input type="number" min="0" value={form.duracion_descarga_hrs} onChange={e => set('duracion_descarga_hrs', e.target.value)} className={inp} style={borde} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Punto de interconexión *</label>
-                    <input type="text" value={form.punto_interconexion} onChange={e => set('punto_interconexion', e.target.value)} className={inp} style={borde} placeholder="Ej: Subestación Norte" />
-                  </div>
-                </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
+
+              {sitiosCliente.length === 0 && !mostrarNuevoSitio && (
+                <p className="text-sm mb-3" style={{ color: '#888' }}>Este cliente no tiene sitios registrados.</p>
+              )}
+
+              {/* Lista de sitios */}
+              <div className="flex flex-col gap-1 mb-3">
+                {sitiosCliente.map(s => {
+                  const selected = sitiosSeleccionados.includes(s.id)
+                  const productos = productosMap[s.id] ?? []
+                  const isAdding = addingToSitioId === s.id
+
+                  return (
+                    <div key={s.id}>
+                      {/* Fila sitio */}
+                      <div className="flex items-center gap-3 border p-3" style={{
+                        borderColor: selected ? '#000' : '#CFCFCF',
+                        backgroundColor: selected ? '#f5f5f0' : '#fff',
+                      }}>
+                        <input type="checkbox" id={`s-${s.id}`} checked={selected}
+                          onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0" />
+                        <label htmlFor={`s-${s.id}`} className="flex-1 cursor-pointer min-w-0">
+                          <div className="text-sm font-semibold">{s.nombre}</div>
+                          {(s.ciudad || s.ubicacion_estado) && (
+                            <div className="text-xs truncate" style={{ color: '#666' }}>
+                              {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                            </div>
+                          )}
+                        </label>
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button type="button" onClick={() => {
+                            setViendoSitioId(viendoSitioId === s.id ? null : s.id)
+                            setEditandoSitioId(null)
+                          }}
+                            className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                            style={{
+                              borderColor: viendoSitioId === s.id ? '#000' : '#CFCFCF',
+                              backgroundColor: viendoSitioId === s.id ? '#000' : '#fff',
+                              color: viendoSitioId === s.id ? '#D7FF2F' : '#444',
+                            }}>
+                            <Eye size={11} /> Ver
+                          </button>
+                          <button type="button" onClick={() => abrirEditarSitio(s)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                            style={{
+                              borderColor: editandoSitioId === s.id ? '#000' : '#CFCFCF',
+                              backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff',
+                              color: '#444',
+                            }}>
+                            <Pencil size={11} /> Editar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Panel Ver */}
+                      {viendoSitioId === s.id && (
+                        <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                            {s.rpu && <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>}
+                            {(s.ciudad || s.ubicacion_estado) && <div><span style={{ color: '#888' }}>Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
+                            {s.recibo_url && (
+                              <div className="col-span-2">
+                                <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 underline font-medium" style={{ color: '#000' }}>
+                                  <FileText size={11} /> Ver recibo CFE
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Panel Editar sitio */}
+                      {editandoSitioId === s.id && (
+                        <div className="border border-t-0 px-4 py-4" style={{ borderColor: '#000' }}>
+                          <p className="text-xs font-bold mb-3">Editar sitio</p>
+                          <div className="flex flex-col gap-3">
+                            <input type="text" value={editSitioForm.nombre}
+                              onChange={e => setEditSitioForm(f => ({ ...f, nombre: e.target.value }))}
+                              className={inp} style={borde} placeholder="Nombre *" />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
+                              <input type="text" value={editSitioForm.ciudad}
+                                onChange={e => setEditSitioForm(f => ({ ...f, ciudad: e.target.value }))}
+                                className={inp} style={borde} placeholder="Ciudad" />
+                              <select value={editSitioForm.ubicacion_estado}
+                                onChange={e => setEditSitioForm(f => ({ ...f, ubicacion_estado: e.target.value }))}
+                                className={inp} style={borde}>
+                                <option value="">Estado</option>
+                                {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+                              </select>
+                              <input type="text" value={editSitioForm.rpu}
+                                onChange={e => setEditSitioForm(f => ({ ...f, rpu: e.target.value }))}
+                                className={inp} style={borde} placeholder="RPU" />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <input ref={fileRefEdit} type="file" accept=".pdf" onChange={subirPdfEdit} className="hidden" id="edit-recibo-pdf" />
+                              <label htmlFor="edit-recibo-pdf"
+                                className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
+                                style={{ borderColor: '#CFCFCF' }}>
+                                <Upload size={11} />
+                                {subiendoPdfEdit ? 'Subiendo…' : 'Recibo CFE (PDF)'}
+                              </label>
+                              {editSitioReciboUrl && (
+                                <a href={editSitioReciboUrl} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs underline flex items-center gap-1">
+                                  <FileText size={11} /> Ver PDF
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex justify-between mt-3">
+                            <button type="button" onClick={() => setEditandoSitioId(null)}
+                              className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                              Cancelar
+                            </button>
+                            <button type="button" onClick={actualizarSitio}
+                              disabled={guardandoEditSitio || !editSitioForm.nombre.trim()}
+                              className="px-4 py-1.5 text-xs font-bold disabled:opacity-50"
+                              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                              {guardandoEditSitio ? 'Guardando…' : 'Guardar cambios'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Productos — solo cuando el sitio está seleccionado */}
+                      {selected && (
+                        <div className="border border-t-0 px-3 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
+                          <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#666' }}>
+                            Productos del sitio
+                          </p>
+
+                          {/* Tarjetas de productos existentes */}
+                          {productos.length > 0 && (
+                            <div className="flex flex-col gap-2 mb-3">
+                              {productos.map(p => (
+                                <ProductoCard key={p.tempId} p={p}
+                                  onRemove={() => removeProduct(s.id, p.tempId)} />
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Formulario agregar producto */}
+                          {isAdding ? (
+                            <div className="border p-4" style={{ borderColor: '#000', backgroundColor: '#fff' }}>
+                              {/* Selector de tipo */}
+                              {!productTipo ? (
+                                <div>
+                                  <p className="text-xs font-bold mb-3">¿Qué tipo de producto?</p>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <button type="button" onClick={() => setProductTipo('fv')}
+                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black"
+                                      style={{ borderColor: '#CFCFCF' }}>
+                                      <Zap size={20} />
+                                      <span className="text-sm font-bold">Fotovoltaico</span>
+                                      <span className="text-xs text-center" style={{ color: '#666' }}>Paneles solares e inversores</span>
+                                    </button>
+                                    <button type="button" onClick={() => setProductTipo('bess')}
+                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black"
+                                      style={{ borderColor: '#CFCFCF' }}>
+                                      <Battery size={20} />
+                                      <span className="text-sm font-bold">BESS</span>
+                                      <span className="text-xs text-center" style={{ color: '#666' }}>Sistema de almacenamiento</span>
+                                    </button>
+                                  </div>
+                                  <div className="flex justify-end mt-3">
+                                    <button type="button" onClick={() => setAddingToSitioId(null)}
+                                      className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : productTipo === 'fv' ? (
+                                /* Formulario FV */
+                                <div>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <p className="text-sm font-bold flex items-center gap-2"><Zap size={14} /> Fotovoltaico</p>
+                                    <button type="button" onClick={() => setProductTipo(null)}
+                                      className="text-xs underline" style={{ color: '#666' }}>← Cambiar tipo</button>
+                                  </div>
+                                  <div className="flex flex-col gap-3">
+                                    {/* Módulos */}
+                                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#888' }}>Módulos</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">No. Módulos *</label>
+                                        <input type="number" min="0" value={fvForm.num_modulos}
+                                          onChange={e => setFvForm(f => ({ ...f, num_modulos: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Potencia (W) *</label>
+                                        <input type="number" min="0" value={fvForm.potencia_modulos_w}
+                                          onChange={e => setFvForm(f => ({ ...f, potencia_modulos_w: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Marca *</label>
+                                        <input type="text" value={fvForm.marca_modulos}
+                                          onChange={e => setFvForm(f => ({ ...f, marca_modulos: e.target.value }))}
+                                          className={inp} style={borde} placeholder="Jinko, LONGi…" />
+                                      </div>
+                                    </div>
+                                    {/* Calculados módulos */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <CalcField label="kWp sistema" value={fvCalc.kwpSistema} unit="kWp" />
+                                    </div>
+
+                                    {/* Inversores */}
+                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1" style={{ color: '#888' }}>Inversores</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">No. Inversores *</label>
+                                        <input type="number" min="0" value={fvForm.num_inversores}
+                                          onChange={e => setFvForm(f => ({ ...f, num_inversores: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
+                                        <input type="number" min="0" value={fvForm.potencia_inversores_kw}
+                                          onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Marca *</label>
+                                        <input type="text" value={fvForm.marca_inversores}
+                                          onChange={e => setFvForm(f => ({ ...f, marca_inversores: e.target.value }))}
+                                          className={inp} style={borde} placeholder="Huawei, SMA…" />
+                                      </div>
+                                    </div>
+                                    {/* Calculado inversores */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <CalcField label="kWp inversores" value={fvCalc.kwpInversores} unit="kW" />
+                                    </div>
+
+                                    {/* Energía y CAPEX */}
+                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1" style={{ color: '#888' }}>Energía y costos</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Generación anual (kWh) *</label>
+                                        <input type="number" min="0" value={fvForm.generacion_anual_kwh}
+                                          onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
+                                        <input type="number" min="0" value={fvForm.capex}
+                                          onChange={e => setFvForm(f => ({ ...f, capex: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                    </div>
+                                    {/* Precio/Wp calculado */}
+                                    <CalcField label="Precio por Watt" value={fvCalc.precioWatt} unit="$/W" />
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Formulario BESS */
+                                <div>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <p className="text-sm font-bold flex items-center gap-2"><Battery size={14} /> BESS</p>
+                                    <button type="button" onClick={() => setProductTipo(null)}
+                                      className="text-xs underline" style={{ color: '#666' }}>← Cambiar tipo</button>
+                                  </div>
+                                  <div className="flex flex-col gap-3">
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
+                                        <input type="number" min="0" value={bessForm.potencia_kw}
+                                          onChange={e => setBessForm(f => ({ ...f, potencia_kw: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Capacidad (kWh) *</label>
+                                        <input type="number" min="0" value={bessForm.capacidad_kwh}
+                                          onChange={e => setBessForm(f => ({ ...f, capacidad_kwh: e.target.value }))}
+                                          className={inp} style={borde} placeholder="0" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Marca *</label>
+                                        <input type="text" value={bessForm.marca}
+                                          onChange={e => setBessForm(f => ({ ...f, marca: e.target.value }))}
+                                          className={inp} style={borde} placeholder="BYD, Tesla…" />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1">Uso *</label>
+                                      <select value={bessForm.uso}
+                                        onChange={e => setBessForm(f => ({ ...f, uso: e.target.value }))}
+                                        className={inp} style={borde}>
+                                        <option value="">Selecciona el uso</option>
+                                        <option value="load_shifting">Load Shifting</option>
+                                        <option value="ups">UPS</option>
+                                        <option value="load_shifting_ups">Load Shifting + UPS</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
+                                      <input type="number" min="0" value={bessForm.capex}
+                                        onChange={e => setBessForm(f => ({ ...f, capex: e.target.value }))}
+                                        className={inp} style={borde} placeholder="0" />
+                                    </div>
+                                    {/* Precio/kWh calculado */}
+                                    <CalcField label="Precio por kWh" value={bessCalc.precioKwh} unit="$/kWh" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {addProductError && (
+                                <p className="text-xs text-red-600 mt-3">{addProductError}</p>
+                              )}
+
+                              {productTipo && (
+                                <div className="flex justify-between mt-4">
+                                  <button type="button" onClick={() => { setAddingToSitioId(null); setAddProductError('') }}
+                                    className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                                    Cancelar
+                                  </button>
+                                  <button type="button" onClick={addProduct}
+                                    className="px-4 py-1.5 text-xs font-bold"
+                                    style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                                    Agregar producto
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => startAddingProduct(s.id)}
+                              className="flex items-center gap-2 px-3 py-2 text-xs border font-medium w-full justify-center"
+                              style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
+                              <Plus size={12} />
+                              {productos.length === 0 ? 'Agregar producto' : 'Agregar otro producto'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )}
 
-            {form.tipo === 'BESS+MEM' && <hr style={{ borderColor: '#CFCFCF' }} />}
-
-            {(form.tipo === 'MEM' || form.tipo === 'BESS+MEM') && (
-              <div className="flex flex-col gap-4">
-                {form.tipo === 'BESS+MEM' && (
-                  <h3 className="font-semibold text-sm uppercase tracking-wide" style={{ color: '#666' }}>Mercado Eléctrico Mayorista (MEM)</h3>
-                )}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tipo de participación MEM *</label>
-                  <input type="text" value={form.tipo_participacion_mem} onChange={e => set('tipo_participacion_mem', e.target.value)} className={inp} style={borde} placeholder="Ej: Suministrador, Generador" />
+              {/* Agregar nuevo sitio inline */}
+              {mostrarNuevoSitio ? (
+                <div className="border p-4" style={{ borderColor: '#000' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-bold">Nuevo sitio</span>
+                    <button type="button" onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio); setReciboUrlNuevo(null) }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <input type="text" value={nuevoSitio.nombre}
+                      onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
+                      className={inp} style={borde} placeholder="Nombre del sitio *" />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
+                      <input type="text" value={nuevoSitio.ciudad}
+                        onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
+                        className={inp} style={borde} placeholder="Ciudad" />
+                      <select value={nuevoSitio.ubicacion_estado}
+                        onChange={e => setNuevoSitio(f => ({ ...f, ubicacion_estado: e.target.value }))}
+                        className={inp} style={borde}>
+                        <option value="">Estado</option>
+                        {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+                      </select>
+                      <input type="text" value={nuevoSitio.rpu}
+                        onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
+                        className={inp} style={borde} placeholder="RPU" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="nuevo-recibo-pdf" />
+                      <label htmlFor="nuevo-recibo-pdf"
+                        className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
+                        style={{ borderColor: '#CFCFCF' }}>
+                        <Upload size={11} />
+                        {subiendoPdfNuevo ? 'Subiendo…' : 'Recibo CFE (PDF)'}
+                      </label>
+                      {reciboUrlNuevo && (
+                        <a href={reciboUrlNuevo} target="_blank" rel="noopener noreferrer"
+                          className="text-xs underline flex items-center gap-1">
+                          <FileText size={11} /> Ver PDF
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <button type="button" onClick={guardarNuevoSitio}
+                      disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
+                      className="px-4 py-2 text-xs font-bold disabled:opacity-50"
+                      style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                      {guardandoSitio ? 'Guardando…' : 'Agregar sitio'}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Volumen de energía anual (MWh) *</label>
-                  <input type="number" min="0" value={form.volumen_energia_mwh_anual} onChange={e => set('volumen_energia_mwh_anual', e.target.value)} className={inp} style={borde} placeholder="0" />
-                </div>
-              </div>
-            )}
+              ) : (
+                <button type="button"
+                  onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null) }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center"
+                  style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
+                  <Plus size={14} />
+                  {sitiosCliente.length === 0 ? 'Agregar sitio' : 'Agregar otro sitio'}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* ── PASO 3 ── */}
+        {/* ══ PASO 2 — Financiamiento ═══════════════════════════ */}
         {step === 2 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Financiamiento y ubicación</h2>
+            <h2 className="font-bold text-lg">Financiamiento</h2>
 
+            {/* Demanda + MEM */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Demanda contratada del proyecto (kW)</label>
+              <input type="number" min="0" value={form.demanda_kw}
+                onChange={e => {
+                  setF('demanda_kw', e.target.value)
+                  if (Number(e.target.value) <= 1000) setF('incluye_mem', false)
+                }}
+                className={inp} style={borde} placeholder="0" />
+              <p className="text-xs mt-1" style={{ color: '#888' }}>
+                Clientes con más de 1,000 kW de demanda pueden ser candidatos al Mercado Eléctrico Mayorista.
+              </p>
+            </div>
+
+            {demandaKw > 1000 && (
+              <div className="border p-4" style={{ borderColor: '#D7FF2F', backgroundColor: '#fffff0' }}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.incluye_mem}
+                    onChange={e => setF('incluye_mem', e.target.checked)}
+                    className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Considerar alternativa de Mercado Eléctrico Mayorista</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#666' }}>
+                      El analista evaluará si conviene migrar al MEM con base en la demanda de {Number(form.demanda_kw).toLocaleString('es-MX')} kW declarada.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            <hr style={{ borderColor: '#CFCFCF' }} />
+
+            {/* Modalidad */}
             <div>
               <label className="block text-sm font-medium mb-2">Modalidad de financiamiento *</label>
               <div className="grid grid-cols-2 gap-3">
@@ -709,7 +1071,11 @@ export default function NuevoProyectoPage() {
               <div className="mt-3">
                 <button type="button" onClick={() => toggleModalidad('no_sabe')}
                   className="border p-3 text-left w-full transition-colors"
-                  style={{ borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#CFCFCF', backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff', color: '#000' }}>
+                  style={{
+                    borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#CFCFCF',
+                    backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff',
+                    color: '#000',
+                  }}>
                   <div className="font-semibold text-sm">No sé, que el analista recomiende</div>
                   <div className="text-xs mt-0.5" style={{ color: '#666' }}>El analista definirá la modalidad más adecuada</div>
                 </button>
@@ -717,22 +1083,8 @@ export default function NuevoProyectoPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">CAPEX estimado</label>
-              <div className="flex gap-2">
-                <select value={form.moneda} onChange={e => set('moneda', e.target.value as Moneda)}
-                  className="border px-2 py-2 text-sm" style={borde}>
-                  <option value="MXN">MXN</option>
-                  <option value="USD">USD</option>
-                </select>
-                <input type="number" min="0" value={form.capex_estimado}
-                  onChange={e => set('capex_estimado', e.target.value)}
-                  className={`${inp} flex-1`} style={borde} placeholder="0" />
-              </div>
-            </div>
-
-            <div>
               <label className="block text-sm font-medium mb-1">Estado de la República *</label>
-              <select value={form.ubicacion_estado} onChange={e => set('ubicacion_estado', e.target.value)}
+              <select value={form.ubicacion_estado} onChange={e => setF('ubicacion_estado', e.target.value)}
                 className={inp} style={borde}>
                 <option value="">Selecciona un estado</option>
                 {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
@@ -741,8 +1093,8 @@ export default function NuevoProyectoPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1">Notas adicionales</label>
-              <textarea value={form.notas_adicionales} onChange={e => set('notas_adicionales', e.target.value)}
-                rows={4} className={inp} style={borde}
+              <textarea value={form.notas_adicionales} onChange={e => setF('notas_adicionales', e.target.value)}
+                rows={3} className={inp} style={borde}
                 placeholder="Cualquier información adicional relevante para el analista…" />
             </div>
           </div>

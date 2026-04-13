@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio } from '@/lib/types'
-import { Paperclip, Send, ChevronLeft, MapPin } from 'lucide-react'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto } from '@/lib/types'
+import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
@@ -43,15 +43,21 @@ function Campo({ label, value }: { label: string; value?: string | number | null
   )
 }
 
+function n2(v: number | null | undefined, dec = 2) {
+  if (v == null) return '—'
+  return Number(v).toLocaleString('es-MX', { maximumFractionDigits: dec })
+}
+
 interface Props {
   proyecto: Proyecto
   comentarios: Comentario[]
   archivos: Archivo[]
   currentUser: Profile
   sitios?: Sitio[]
+  productos?: ProyectoSitioProducto[]
 }
 
-export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [] }: Props) {
+export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [] }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [proyecto, setProyecto] = useState(initial)
@@ -206,8 +212,126 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Técnico BESS */}
-      {(proyecto.tipo === 'BESS' || proyecto.tipo === 'BESS+MEM') && (
+      {/* Instalación */}
+      {proyecto.tipo_instalacion && (
+        <Seccion title="Tipo de instalación">
+          <div className="flex items-start gap-3">
+            {proyecto.tipo_instalacion === 'nodo_busca'
+              ? <HelpCircle size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
+              : <Wrench size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
+            }
+            <p className="text-sm font-medium">
+              {proyecto.tipo_instalacion === 'nodo_busca'
+                ? 'Quiero que Nodo me ayude a encontrar un instalador'
+                : 'La empresa EPCista realizará la instalación'}
+            </p>
+          </div>
+        </Seccion>
+      )}
+
+      {/* Productos por sitio (nuevo formato) */}
+      {productos.length > 0 && (() => {
+        // Agrupar por sitio
+        const bySitio: Record<string, { nombre: string; items: ProyectoSitioProducto[] }> = {}
+        for (const p of productos) {
+          if (!bySitio[p.sitio_id]) {
+            bySitio[p.sitio_id] = { nombre: p.sitios?.nombre ?? 'Sitio', items: [] }
+          }
+          bySitio[p.sitio_id].items.push(p)
+        }
+        const usoLabel: Record<string, string> = {
+          load_shifting: 'Load Shifting',
+          ups: 'UPS',
+          load_shifting_ups: 'Load Shifting + UPS',
+        }
+        return (
+          <Seccion title="Solución técnica">
+            <div className="flex flex-col gap-6">
+              {Object.entries(bySitio).map(([sitioId, { nombre, items }]) => (
+                <div key={sitioId}>
+                  <p className="text-sm font-bold mb-3 flex items-center gap-2">
+                    <MapPin size={13} style={{ color: '#888' }} /> {nombre}
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {items.map(p => {
+                      const d = p.datos as Record<string, unknown>
+                      if (p.tipo === 'fv') {
+                        const nm = Number(d.num_modulos) || 0
+                        const pw = Number(d.potencia_modulos_w) || 0
+                        const ni = Number(d.num_inversores) || 0
+                        const pi = Number(d.potencia_inversores_kw) || 0
+                        const capex = Number(d.capex) || 0
+                        const kwpSistema = nm > 0 && pw > 0 ? nm * pw / 1000 : null
+                        const kwpInv = ni > 0 && pi > 0 ? ni * pi : null
+                        const precioWatt = capex > 0 && nm > 0 && pw > 0 ? capex / (nm * pw) : null
+                        return (
+                          <div key={p.id} className="border p-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fafff0' }}>
+                            <div className="flex items-center gap-2 font-bold text-sm mb-3">
+                              <Zap size={14} style={{ color: '#888' }} /> Fotovoltaico
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <Campo label="Módulos" value={`${d.num_modulos} × ${d.potencia_modulos_w} W`} />
+                              <Campo label="Marca módulos" value={d.marca_modulos as string} />
+                              <Campo label="kWp sistema" value={kwpSistema !== null ? `${n2(kwpSistema, 1)} kWp` : undefined} />
+                              <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
+                              <Campo label="Marca inversores" value={d.marca_inversores as string} />
+                              <Campo label="kWp inversores" value={kwpInv !== null ? `${n2(kwpInv, 1)} kW` : undefined} />
+                              <Campo label="Generación anual" value={`${Number(d.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año`} />
+                              <Campo label="CAPEX" value={`$${capex.toLocaleString('es-MX')}`} />
+                              <Campo label="Precio por Watt" value={precioWatt !== null ? `$${n2(precioWatt, 4)}/W` : undefined} />
+                            </div>
+                          </div>
+                        )
+                      }
+                      if (p.tipo === 'bess') {
+                        const capacidad = Number(d.capacidad_kwh) || 0
+                        const capex = Number(d.capex) || 0
+                        const precioKwh = capacidad > 0 && capex > 0 ? capex / capacidad : null
+                        return (
+                          <div key={p.id} className="border p-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#f0f8ff' }}>
+                            <div className="flex items-center gap-2 font-bold text-sm mb-3">
+                              <Battery size={14} style={{ color: '#888' }} /> BESS
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <Campo label="Potencia" value={`${d.potencia_kw} kW`} />
+                              <Campo label="Capacidad" value={`${d.capacidad_kwh} kWh`} />
+                              <Campo label="Marca" value={d.marca as string} />
+                              <Campo label="Uso" value={usoLabel[d.uso as string] ?? d.uso as string} />
+                              <Campo label="CAPEX" value={`$${capex.toLocaleString('es-MX')}`} />
+                              <Campo label="Precio por kWh" value={precioKwh !== null ? `$${n2(precioKwh, 2)}/kWh` : undefined} />
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Seccion>
+        )
+      })()}
+
+      {/* MEM */}
+      {proyecto.incluye_mem && (
+        <Seccion title="Mercado Eléctrico Mayorista">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold"
+              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+              Alternativa MEM solicitada
+            </span>
+          </div>
+          {proyecto.demanda_kw && (
+            <p className="text-sm mt-2" style={{ color: '#666' }}>
+              Demanda contratada declarada: <strong>{proyecto.demanda_kw.toLocaleString('es-MX')} kW</strong>
+            </p>
+          )}
+        </Seccion>
+      )}
+
+      {/* Técnico BESS (legacy — proyectos anteriores) */}
+      {(proyecto.tipo === 'BESS' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
         <Seccion title="Datos técnicos — BESS">
           <div className="grid grid-cols-2 gap-4">
             <Campo label="Capacidad" value={proyecto.capacidad_mwh ? `${proyecto.capacidad_mwh} MWh` : null} />
@@ -219,8 +343,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Técnico MEM */}
-      {(proyecto.tipo === 'MEM' || proyecto.tipo === 'BESS+MEM') && (
+      {/* Técnico MEM (legacy) */}
+      {(proyecto.tipo === 'MEM' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
         <Seccion title="Datos técnicos — MEM">
           <div className="grid grid-cols-2 gap-4">
             <Campo label="Tipo de participación MEM" value={proyecto.tipo_participacion_mem} />
