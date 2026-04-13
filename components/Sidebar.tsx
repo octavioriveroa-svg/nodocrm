@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, FolderPlus, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, FolderPlus, Users, LogOut, Settings } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -71,6 +71,17 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
           </p>
           <p className="text-sm font-medium text-white truncate">{nombre}</p>
         </div>
+        <Link
+          href={rol === 'analista' ? '/analista/configuracion' : '/epcista/configuracion'}
+          className="flex items-center gap-3 px-3 py-2.5 rounded text-sm w-full transition-colors hover:bg-white/10"
+          style={{
+            color: pathname.includes('/configuracion') ? '#D7FF2F' : '#888',
+            backgroundColor: pathname.includes('/configuracion') ? 'rgba(215,255,47,0.1)' : 'transparent',
+          }}
+        >
+          <Settings size={16} />
+          Configuración
+        </Link>
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded text-sm w-full transition-colors hover:bg-white/10"
