@@ -83,7 +83,11 @@ export default function AdminProyectosPage() {
   async function eliminarProyecto(id: string) {
     setDeleting(true)
     const { error } = await supabase.rpc('admin_delete_proyecto', { proyecto_id: id })
-    if (!error) setProyectos(prev => prev.filter(p => p.id !== id))
+    if (error) {
+      alert('Error al borrar: ' + error.message)
+    } else {
+      setProyectos(prev => prev.filter(p => p.id !== id))
+    }
     setConfirmDelete(null)
     setDeleting(false)
   }
