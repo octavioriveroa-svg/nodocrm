@@ -2,11 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto } from '@/lib/types'
-import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, TipoArchivo } from '@/lib/types'
+import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload } from 'lucide-react'
 import Link from 'next/link'
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
@@ -15,6 +14,14 @@ const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
   ensaas: 'EnSaaS',
   mem: 'Mercado Eléctrico Mayorista',
   no_sabe: 'Analista define modalidad',
+}
+
+const ESTADO_LABELS: Record<string, string> = {
+  recibido: 'Recibido',
+  en_analisis: 'En análisis',
+  propuesta_lista: 'Propuesta lista',
+  enviada: 'Enviada',
+  cliente_interesado: 'Cliente interesado',
 }
 
 function formatDate(d: string) {
@@ -59,7 +66,6 @@ interface Props {
 
 export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [] }: Props) {
   const supabase = createClient()
-  const router = useRouter()
   const [proyecto, setProyecto] = useState(initial)
   const [comentarios, setComentarios] = useState(initialComentarios)
   const [archivos, setArchivos] = useState(initialArchivos)
@@ -67,16 +73,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const [enviandoComentario, setEnviandoComentario] = useState(false)
   const [subiendoArchivo, setSubiendoArchivo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadTipoRef = useRef<TipoArchivo>('recibo_cfe')
+
   const isAnalista = currentUser.rol === 'analista'
-  const backHref = isAnalista ? '/analista' : '/epcista'
+  const isAdmin = currentUser.rol === 'admin'
+  const isEpcista = currentUser.rol === 'epcista'
+  const canChangeEstado = isAnalista || isAdmin
+  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epcista'
 
   async function cambiarEstado(estado: EstadoProyecto) {
-    const { data } = await supabase
-      .from('proyectos')
-      .update({ estado })
-      .eq('id', proyecto.id)
-      .select()
-      .single()
+    const { data } = await supabase.from('proyectos').update({ estado }).eq('id', proyecto.id).select().single()
     if (data) setProyecto(data as Proyecto)
   }
 
@@ -95,6 +101,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     setEnviandoComentario(false)
   }
 
+  function triggerUpload(tipo: TipoArchivo) {
+    uploadTipoRef.current = tipo
+    fileInputRef.current?.click()
+  }
+
   async function subirArchivo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -106,26 +117,23 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       .from('archivos-proyectos')
       .upload(path, file)
 
-    if (uploadError) {
-      alert('Error al subir archivo: ' + uploadError.message)
+    if (uploadError || !uploadData) {
+      alert('Error al subir archivo: ' + uploadError?.message)
       setSubiendoArchivo(false)
       return
     }
 
     const { data: { publicUrl } } = supabase.storage.from('archivos-proyectos').getPublicUrl(path)
 
-    const tipo = isAnalista ? 'propuesta_analista' : 'adjunto_epcista'
     const { data: archivoData } = await supabase.from('archivos').insert({
       proyecto_id: proyecto.id,
       autor_id: currentUser.id,
       nombre: file.name,
       url: publicUrl,
-      tipo,
+      tipo: uploadTipoRef.current,
     }).select('*, profiles(*)').single()
 
-    if (archivoData) {
-      setArchivos(prev => [archivoData as Archivo, ...prev])
-    }
+    if (archivoData) setArchivos(prev => [archivoData as Archivo, ...prev])
     setSubiendoArchivo(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -133,17 +141,47 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const modalidades = proyecto.modalidad_financiamiento ?? []
   const noSabe = modalidades.includes('no_sabe')
 
+  // Archivos por categoría (incluyendo tipos legacy)
+  const recibos = archivos.filter(a => a.tipo === 'recibo_cfe' || a.tipo === 'adjunto_epcista')
+  const propuestas = archivos.filter(a => a.tipo === 'propuesta' || a.tipo === 'propuesta_analista')
+  const machotes = archivos.filter(a => a.tipo === 'machote_contrato')
+
+  function ArchivoItem({ a }: { a: Archivo }) {
+    return (
+      <div className="flex items-center gap-3 border px-3 py-2.5" style={{ borderColor: '#CFCFCF' }}>
+        <Paperclip size={13} style={{ color: '#888', flexShrink: 0 }} />
+        <div className="flex-1 min-w-0">
+          <a href={a.url} target="_blank" rel="noopener noreferrer"
+            className="text-sm font-medium underline truncate block">{a.nombre}</a>
+          <div className="text-xs mt-0.5" style={{ color: '#888' }}>
+            {formatDate(a.created_at)} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function UploadBtn({ tipo, label, allowed }: { tipo: TipoArchivo; label: string; allowed: boolean }) {
+    if (!allowed) return null
+    return (
+      <button
+        onClick={() => triggerUpload(tipo)}
+        disabled={subiendoArchivo}
+        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium border disabled:opacity-40 transition-colors hover:border-black"
+        style={{ borderColor: '#CFCFCF' }}>
+        <Upload size={11} />
+        {subiendoArchivo && uploadTipoRef.current === tipo ? 'Subiendo…' : label}
+      </button>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1 text-sm mb-4"
-          style={{ color: '#666' }}
-        >
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm mb-4" style={{ color: '#666' }}>
           <ChevronLeft size={14} />
-          Volver al dashboard
+          Volver
         </Link>
         <div className="flex items-start justify-between">
           <div>
@@ -151,24 +189,20 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             <div className="flex items-center gap-3 mt-2">
               <BadgeTipo tipo={proyecto.tipo} />
               <BadgeEstado estado={proyecto.estado} />
-              <span className="text-sm" style={{ color: '#888' }}>
-                {formatDate(proyecto.created_at)}
-              </span>
+              <span className="text-sm" style={{ color: '#888' }}>{formatDate(proyecto.created_at)}</span>
             </div>
           </div>
-
-          {isAnalista && (
+          {canChangeEstado && (
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: '#666' }}>Cambiar estado</label>
               <select
                 value={proyecto.estado}
                 onChange={e => cambiarEstado(e.target.value as EstadoProyecto)}
                 className="border px-3 py-1.5 text-sm font-medium"
-                style={{ borderColor: '#CFCFCF' }}
-              >
-                <option value="recibido">Recibido</option>
-                <option value="en_analisis">En análisis</option>
-                <option value="completado">Completado</option>
+                style={{ borderColor: '#CFCFCF' }}>
+                {Object.entries(ESTADO_LABELS).map(([val, lbl]) => (
+                  <option key={val} value={val}>{lbl}</option>
+                ))}
               </select>
             </div>
           )}
@@ -201,15 +235,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                   )}
                   {s.rpu && <span className="text-xs" style={{ color: '#666' }}>RPU: {s.rpu}</span>}
                   {s.demanda_contratada_kw != null && (
-                    <span className="text-xs" style={{ color: '#666' }}>
-                      Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW
-                    </span>
+                    <span className="text-xs" style={{ color: '#666' }}>Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span>
                   )}
                   {s.recibo_url && (
                     <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs underline" style={{ color: '#000' }}>
-                      Ver recibo CFE
-                    </a>
+                      className="text-xs underline" style={{ color: '#000' }}>Ver recibo CFE</a>
                   )}
                 </div>
               </div>
@@ -224,8 +254,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           <div className="flex items-start gap-3">
             {proyecto.tipo_instalacion === 'nodo_busca'
               ? <HelpCircle size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
-              : <Wrench size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
-            }
+              : <Wrench size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />}
             <p className="text-sm font-medium">
               {proyecto.tipo_instalacion === 'nodo_busca'
                 ? 'Quiero que Nodo me ayude a encontrar un instalador'
@@ -235,20 +264,15 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Productos por sitio (nuevo formato) */}
+      {/* Solución técnica */}
       {productos.length > 0 && (() => {
-        // Agrupar por sitio
         const bySitio: Record<string, { nombre: string; items: ProyectoSitioProducto[] }> = {}
         for (const p of productos) {
-          if (!bySitio[p.sitio_id]) {
-            bySitio[p.sitio_id] = { nombre: p.sitios?.nombre ?? 'Sitio', items: [] }
-          }
+          if (!bySitio[p.sitio_id]) bySitio[p.sitio_id] = { nombre: p.sitios?.nombre ?? 'Sitio', items: [] }
           bySitio[p.sitio_id].items.push(p)
         }
         const usoLabel: Record<string, string> = {
-          load_shifting: 'Load Shifting',
-          ups: 'UPS',
-          load_shifting_ups: 'Load Shifting + UPS',
+          load_shifting: 'Load Shifting', ups: 'UPS', load_shifting_ups: 'Load Shifting + UPS',
         }
         return (
           <Seccion title="Solución técnica">
@@ -322,21 +346,14 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* MEM */}
       {proyecto.incluye_mem && (
         <Seccion title="Mercado Eléctrico Mayorista">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
-              Alternativa MEM solicitada
-            </span>
-          </div>
-          {proyecto.demanda_kw && (
-            <p className="text-sm mt-2" style={{ color: '#666' }}>
-              Demanda contratada declarada: <strong>{proyecto.demanda_kw.toLocaleString('es-MX')} kW</strong>
-            </p>
-          )}
+          <span className="inline-flex items-center px-3 py-1 text-xs font-semibold"
+            style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+            Alternativa MEM solicitada
+          </span>
         </Seccion>
       )}
 
-      {/* Técnico BESS (legacy — proyectos anteriores) */}
+      {/* Técnico legacy */}
       {(proyecto.tipo === 'BESS' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
         <Seccion title="Datos técnicos — BESS">
           <div className="grid grid-cols-2 gap-4">
@@ -348,8 +365,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           </div>
         </Seccion>
       )}
-
-      {/* Técnico MEM (legacy) */}
       {(proyecto.tipo === 'MEM' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
         <Seccion title="Datos técnicos — MEM">
           <div className="grid grid-cols-2 gap-4">
@@ -359,45 +374,28 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Financiero */}
+      {/* Financiamiento */}
       <Seccion title="Financiamiento y ubicación">
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <Campo
-            label="CAPEX estimado"
-            value={proyecto.capex_estimado ? `${proyecto.moneda} ${proyecto.capex_estimado.toLocaleString('es-MX')}` : null}
-          />
+          <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? `${proyecto.moneda} ${proyecto.capex_estimado.toLocaleString('es-MX')}` : null} />
           <Campo label="Estado" value={proyecto.ubicacion_estado} />
         </div>
-
         <div>
           <div className="text-xs font-medium mb-2" style={{ color: '#888' }}>Modalidad de financiamiento</div>
           {noSabe ? (
-            <span
-              className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
-            >
+            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold" style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
               Analista define modalidad
             </span>
           ) : (
             <div className="flex flex-wrap gap-2">
               {modalidades.map(m => (
-                <span
-                  key={m}
-                  className="inline-flex items-center px-3 py-1 border text-xs font-medium rounded"
-                  style={{ borderColor: '#CFCFCF' }}
-                >
+                <span key={m} className="inline-flex items-center px-3 py-1 border text-xs font-medium" style={{ borderColor: '#CFCFCF' }}>
                   {MODALIDAD_LABELS[m]}
                 </span>
               ))}
-              {modalidades.length > 0 && (
-                <span className="text-xs self-center" style={{ color: '#888' }}>
-                  Sugerido por el EPCista
-                </span>
-              )}
             </div>
           )}
         </div>
-
         {proyecto.notas_adicionales && (
           <div className="mt-4">
             <div className="text-xs font-medium mb-1" style={{ color: '#888' }}>Notas adicionales</div>
@@ -406,116 +404,75 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         )}
       </Seccion>
 
-      {/* Archivos */}
+      {/* Archivos — divididos en 3 categorías */}
       <Seccion title="Archivos">
-        <div className="mb-4 flex flex-col gap-2">
-          {archivos.length === 0 && (
-            <p className="text-sm" style={{ color: '#888' }}>No hay archivos adjuntos.</p>
-          )}
-          {archivos.map(a => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between border px-3 py-2"
-              style={{ borderColor: '#CFCFCF' }}
-            >
-              <div className="flex items-center gap-3">
-                <Paperclip size={14} style={{ color: '#888' }} />
-                <div>
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium underline"
-                  >
-                    {a.nombre}
-                  </a>
-                  <div className="text-xs mt-0.5" style={{ color: '#888' }}>
-                    {formatDate(a.created_at)} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
-                  </div>
-                </div>
-              </div>
-              <span
-                className="text-xs px-2 py-0.5 font-semibold"
-                style={{
-                  backgroundColor: a.tipo === 'propuesta_analista' ? '#000' : '#E8E8E8',
-                  color: a.tipo === 'propuesta_analista' ? '#D7FF2F' : '#444',
-                }}
-              >
-                {a.tipo === 'propuesta_analista' ? 'Propuesta analista' : 'Adjunto EPCista'}
-              </span>
-            </div>
-          ))}
+        <input ref={fileInputRef} type="file" onChange={subirArchivo} className="hidden" />
+
+        {/* Recibo CFE */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Recibo CFE</h4>
+            <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista} />
+          </div>
+          {recibos.length === 0
+            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            : <div className="flex flex-col gap-1">{recibos.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
 
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={subirArchivo}
-            className="hidden"
-            id="file-upload"
-          />
-          <label
-            htmlFor="file-upload"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border cursor-pointer transition-colors hover:bg-gray-50"
-            style={{ borderColor: '#CFCFCF' }}
-          >
-            <Paperclip size={14} />
-            {subiendoArchivo ? 'Subiendo...' : isAnalista ? 'Subir propuesta' : 'Adjuntar documento'}
-          </label>
+        <div className="border-t mb-5 pt-5" style={{ borderColor: '#CFCFCF' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Propuesta</h4>
+            <UploadBtn tipo="propuesta" label="Subir propuesta" allowed={isAnalista} />
+          </div>
+          {propuestas.length === 0
+            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            : <div className="flex flex-col gap-1">{propuestas.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
+        </div>
+
+        <div className="border-t pt-5" style={{ borderColor: '#CFCFCF' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Machote de contrato</h4>
+            <UploadBtn tipo="machote_contrato" label="Subir machote" allowed={isAnalista || isAdmin} />
+          </div>
+          {machotes.length === 0
+            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            : <div className="flex flex-col gap-1">{machotes.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
       </Seccion>
 
       {/* Comentarios */}
       <Seccion title="Comentarios internos">
         <div className="flex flex-col gap-3 mb-4 max-h-80 overflow-y-auto">
-          {comentarios.length === 0 && (
-            <p className="text-sm" style={{ color: '#888' }}>Sin comentarios aún.</p>
-          )}
+          {comentarios.length === 0 && <p className="text-sm" style={{ color: '#888' }}>Sin comentarios aún.</p>}
           {comentarios.map(c => (
             <div key={c.id} className="flex gap-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                style={{ backgroundColor: '#000', color: '#D7FF2F' }}
-              >
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ backgroundColor: '#000', color: '#D7FF2F' }}>
                 {((c.profiles as Profile | undefined)?.nombre ?? 'U').charAt(0).toUpperCase()}
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-semibold">
-                    {(c.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
-                  </span>
-                  <span className="text-xs" style={{ color: '#888' }}>
-                    {formatDateTime(c.created_at)}
-                  </span>
+                  <span className="text-sm font-semibold">{(c.profiles as Profile | undefined)?.nombre ?? 'Usuario'}</span>
+                  <span className="text-xs" style={{ color: '#888' }}>{formatDateTime(c.created_at)}</span>
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{c.contenido}</p>
               </div>
             </div>
           ))}
         </div>
-
         <div className="flex gap-2">
           <textarea
             value={nuevoComentario}
             onChange={e => setNuevoComentario(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                enviarComentario()
-              }
-            }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComentario() } }}
             placeholder="Escribe un comentario… (Enter para enviar)"
             rows={2}
             className="flex-1 border px-3 py-2 text-sm resize-none"
             style={{ borderColor: '#CFCFCF' }}
           />
-          <button
-            onClick={enviarComentario}
-            disabled={enviandoComentario || !nuevoComentario.trim()}
+          <button onClick={enviarComentario} disabled={enviandoComentario || !nuevoComentario.trim()}
             className="px-3 py-2 self-end disabled:opacity-40"
-            style={{ backgroundColor: '#D7FF2F', color: '#000' }}
-          >
+            style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
             <Send size={16} />
           </button>
         </div>

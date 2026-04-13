@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Eye } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { Proyecto, EstadoProyecto, TipoProyecto } from '@/lib/types'
@@ -140,7 +140,9 @@ export default function AdminProyectosPage() {
                 <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{formatDate(p.created_at)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <Link href={`/admin/proyectos/${p.id}`} className="text-xs font-semibold underline">Ver</Link>
+                    <Link href={`/admin/proyectos/${p.id}`} className="opacity-60 hover:opacity-100 transition-opacity">
+                      <Eye size={15} />
+                    </Link>
                     {confirmDelete === p.id ? (
                       <span className="flex items-center gap-1.5">
                         <span className="text-xs" style={{ color: '#666' }}>¿Eliminar?</span>

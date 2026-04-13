@@ -5,7 +5,7 @@ export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'e
 export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
 export type ModalidadFinanciamiento = 'credito' | 'arrendamiento' | 'ensaas' | 'mem' | 'no_sabe'
-export type TipoArchivo = 'adjunto_epcista' | 'propuesta_analista'
+export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista'
 
 export interface Profile {
   id: string
