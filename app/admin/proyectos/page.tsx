@@ -27,6 +27,20 @@ export default function AdminProyectosPage() {
   const [filtroTipo, setFiltroTipo] = useState<TipoProyecto | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
 
+  // Realtime: reflect changes made by other admin sessions
+  useEffect(() => {
+    const channel = supabase
+      .channel('proyectos-admin')
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'proyectos' }, payload => {
+        setProyectos(prev => prev.filter(p => p.id !== (payload.old as { id: string }).id))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proyectos' }, payload => {
+        setProyectos(prev => prev.map(p => p.id === payload.new.id ? { ...p, ...payload.new } as ProyectoConEpcista : p))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   useEffect(() => {
     async function load() {
       const { data: prs } = await supabase

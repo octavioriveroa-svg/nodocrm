@@ -43,6 +43,20 @@ export default function EpcistaDashboard() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Realtime: sync changes from admin/analista
+  useEffect(() => {
+    const channel = supabase
+      .channel('proyectos-epcista')
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'proyectos' }, payload => {
+        setProyectos(prev => prev.filter(p => p.id !== (payload.old as { id: string }).id))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proyectos' }, payload => {
+        setProyectos(prev => prev.map(p => p.id === payload.new.id ? { ...p, ...payload.new } as Proyecto : p))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
