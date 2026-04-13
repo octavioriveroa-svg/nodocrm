@@ -412,7 +412,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Recibo CFE</h4>
-            <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista} />
+            <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista || isAdmin} />
           </div>
           {recibos.length === 0
             ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
