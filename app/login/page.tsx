@@ -28,7 +28,11 @@ export default function LoginPage() {
       return
     }
 
-    window.location.href = '/epcista'
+    const { data: profiles } = await supabase.rpc('get_my_profile')
+    const rol = profiles?.[0]?.rol ?? 'epcista'
+    if (rol === 'admin') window.location.href = '/admin'
+    else if (rol === 'analista') window.location.href = '/analista'
+    else window.location.href = '/epcista'
   }
 
   return (

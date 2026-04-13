@@ -22,6 +22,7 @@ export default function EpcistaLayout({ children }: { children: React.ReactNode 
 
       const rol = profile?.rol ?? session.user.user_metadata?.rol ?? 'epcista'
       if (rol === 'analista') { router.replace('/analista'); return }
+      if (rol === 'admin') { router.replace('/admin'); return }
 
       setProfile({
         id: session.user.id,

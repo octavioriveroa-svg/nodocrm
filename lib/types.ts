@@ -1,4 +1,4 @@
-export type Rol = 'epcista' | 'analista'
+export type Rol = 'epcista' | 'analista' | 'admin'
 export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
 export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
 export type EstadoProyecto = 'recibido' | 'en_analisis' | 'completado'

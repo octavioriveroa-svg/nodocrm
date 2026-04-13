@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Folder, FolderPlus, Users, LogOut, Settings } from 'lucide-react'
+import { Folder, FolderPlus, Users, LogOut, Settings, LayoutDashboard, Building2, ShieldCheck } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -27,7 +27,14 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     { href: '/analista', label: 'Proyectos', icon: Folder },
   ]
 
-  const nav = rol === 'analista' ? navAnalista : navEpcista
+  const navAdmin = [
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+    { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
+    { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
+  ]
+
+  const nav = rol === 'admin' ? navAdmin : rol === 'analista' ? navAnalista : navEpcista
 
   type NavItem = { href: string; label: string; icon: React.ElementType; alwaysYellow?: boolean }
 
@@ -48,7 +55,8 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
       <nav className="flex flex-col gap-1 flex-1">
         {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
-          const active = pathname === href || (href !== '/epcista' && href !== '/analista' && pathname.startsWith(href))
+          const isRoot = href === '/epcista' || href === '/analista' || href === '/admin'
+          const active = pathname === href || (!isRoot && pathname.startsWith(href))
           const yellow = alwaysYellow || active
           return (
             <Link
@@ -70,12 +78,12 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
       <div className="mt-auto pt-6 border-t" style={{ borderColor: '#222' }}>
         <div className="mb-3 px-3">
           <p className="text-xs" style={{ color: '#888' }}>
-            {rol === 'analista' ? 'Analista' : 'EPCista'}
+            {rol === 'admin' ? 'Administrador' : rol === 'analista' ? 'Analista' : 'EPCista'}
           </p>
           <p className="text-sm font-medium text-white truncate">{nombre}</p>
         </div>
         <Link
-          href={rol === 'analista' ? '/analista/configuracion' : '/epcista/configuracion'}
+          href={rol === 'admin' ? '/admin/configuracion' : rol === 'analista' ? '/analista/configuracion' : '/epcista/configuracion'}
           className="flex items-center gap-3 px-3 py-2.5 rounded text-sm w-full transition-colors hover:bg-white/10"
           style={{
             color: pathname.includes('/configuracion') ? '#D7FF2F' : '#888',
