@@ -18,7 +18,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const supabase = createClient()
 
   const navEpcista = [
-    { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus, alwaysYellow: true },
+    { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
     { href: '/epcista', label: 'Proyectos', icon: Folder },
     { href: '/epcista/clientes', label: 'Clientes', icon: Users },
   ]

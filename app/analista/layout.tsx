@@ -21,6 +21,7 @@ export default function AnalistaLayout({ children }: { children: React.ReactNode
         .from('profiles').select('*').eq('id', session.user.id).single()
 
       const rol = profileRow?.rol ?? session.user.user_metadata?.rol ?? 'epcista'
+      if (rol === 'pendiente') { router.replace('/pendiente'); return }
       if (rol === 'epcista') { router.replace('/epcista'); return }
       if (rol === 'admin') { router.replace('/admin'); return }
 

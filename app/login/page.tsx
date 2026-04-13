@@ -34,6 +34,7 @@ export default function LoginPage() {
     const rol = profileRow?.rol ?? newSession?.user?.user_metadata?.rol ?? 'epcista'
     if (rol === 'admin') window.location.href = '/admin'
     else if (rol === 'analista') window.location.href = '/analista'
+    else if (rol === 'pendiente') window.location.href = '/pendiente'
     else window.location.href = '/epcista'
   }
 

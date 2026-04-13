@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Users, Folder, Building2, TrendingUp } from 'lucide-react'
+import { Users, Folder, Building2, TrendingUp, Zap, Sun } from 'lucide-react'
 
 interface Stats {
   totalUsuarios: number
@@ -26,8 +26,22 @@ interface RecentProyecto {
   epcista_nombre: string
 }
 
+interface PortafolioStats {
+  bess_kw: number
+  bess_kwh: number
+  bess_capex: number
+  fv_kwp: number
+  fv_capex: number
+}
+
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} M`
+  if (n >= 1_000) return `${(n / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} k`
+  return n.toLocaleString('es-MX', { maximumFractionDigits: 1 })
 }
 
 const estadoLabel: Record<string, string> = {
@@ -44,19 +58,38 @@ const estadoColor: Record<string, { bg: string; color: string }> = {
 export default function AdminDashboard() {
   const supabase = createClient()
   const [stats, setStats] = useState<Stats | null>(null)
+  const [portafolio, setPortafolio] = useState<PortafolioStats | null>(null)
   const [recientes, setRecientes] = useState<RecentProyecto[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: perfiles }, { data: proyectos }, { data: clientes }] = await Promise.all([
+      const [{ data: perfiles }, { data: proyectos }, { data: clientes }, { data: productos }] = await Promise.all([
         supabase.from('profiles').select('rol'),
         supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, created_at, epcista_id').order('created_at', { ascending: false }),
         supabase.from('clientes').select('id'),
+        supabase.from('proyecto_sitio_productos').select('tipo, datos'),
       ])
 
       const p = perfiles ?? []
       const pr = proyectos ?? []
+      const prods = productos ?? []
+
+      // Portafolio técnico aggregates
+      let bess_kw = 0, bess_kwh = 0, bess_capex = 0, fv_kwp = 0, fv_capex = 0
+      for (const prod of prods) {
+        const d = prod.datos as Record<string, unknown> | null
+        if (!d) continue
+        if (prod.tipo === 'bess') {
+          bess_kw += Number(d.potencia_kw) || 0
+          bess_kwh += Number(d.capacidad_kwh) || 0
+          bess_capex += Number(d.capex) || 0
+        } else if (prod.tipo === 'fv') {
+          fv_kwp += ((Number(d.num_modulos) || 0) * (Number(d.potencia_modulos_w) || 0)) / 1000
+          fv_capex += Number(d.capex) || 0
+        }
+      }
+      setPortafolio({ bess_kw, bess_kwh, bess_capex, fv_kwp, fv_capex })
 
       setStats({
         totalUsuarios: p.length,
@@ -147,6 +180,61 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Portafolio técnico */}
+      {portafolio && (portafolio.bess_kw > 0 || portafolio.fv_kwp > 0) && (
+        <div className="mb-8">
+          <h2 className="text-sm font-bold mb-3" style={{ color: '#666' }}>Portafolio técnico</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {/* BESS */}
+            {portafolio.bess_kw > 0 && (
+              <div className="border p-5" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 flex items-center justify-center" style={{ backgroundColor: '#000' }}>
+                    <Zap size={13} style={{ color: '#D7FF2F' }} />
+                  </div>
+                  <span className="text-sm font-bold">BESS — Almacenamiento</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-2xl font-black">{fmt(portafolio.bess_kw)}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#888' }}>kW Potencia</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black">{fmt(portafolio.bess_kwh)}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#888' }}>kWh Capacidad</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black">${fmt(portafolio.bess_capex)}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#888' }}>CAPEX total</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* FV */}
+            {portafolio.fv_kwp > 0 && (
+              <div className="border p-5" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 flex items-center justify-center" style={{ backgroundColor: '#D7FF2F' }}>
+                    <Sun size={13} style={{ color: '#000' }} />
+                  </div>
+                  <span className="text-sm font-bold">FV — Solar fotovoltaico</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-2xl font-black">{fmt(portafolio.fv_kwp)}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#888' }}>kWp instalados</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black">${fmt(portafolio.fv_capex)}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#888' }}>CAPEX total</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Proyectos recientes */}
       {recientes.length > 0 && (

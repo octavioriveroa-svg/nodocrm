@@ -15,7 +15,7 @@ export default function RegistroPage() {
   const [empresa, setEmpresa] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const rol: Rol = 'epcista'
+  const rol: Rol = 'pendiente' as Rol
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -38,14 +38,15 @@ export default function RegistroPage() {
       return
     }
 
-    // Guardar perfil via RPC
-    await supabase.rpc('upsert_profile', {
+    await supabase.rpc('upsert_profile', { p_nombre: nombre, p_empresa: empresa, p_rol: rol })
+    await supabase.rpc('notify_admin_new_user', {
+      p_user_id: data.user.id,
       p_nombre: nombre,
       p_empresa: empresa,
-      p_rol: rol,
+      p_email: email,
     })
 
-    window.location.href = '/epcista'
+    window.location.href = '/pendiente'
   }
 
   return (

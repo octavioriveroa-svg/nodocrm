@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Clock, CheckCircle } from 'lucide-react'
 
 interface Usuario {
   id: string
@@ -16,11 +17,13 @@ const ROL_LABELS: Record<string, string> = {
   epcista: 'EPCista',
   analista: 'Analista',
   admin: 'Admin',
+  pendiente: 'Pendiente',
 }
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
   epcista: { bg: '#E8E8E8', color: '#444' },
   analista: { bg: '#D7FF2F', color: '#000' },
   admin: { bg: '#000', color: '#fff' },
+  pendiente: { bg: '#FFF3CD', color: '#856404' },
 }
 
 function formatDate(d: string) {
@@ -31,16 +34,30 @@ export default function AdminUsuariosPage() {
   const supabase = createClient()
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [filtroRol, setFiltroRol] = useState<string>('todos')
   const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
     async function load() {
-      const { data, error: err } = await supabase.rpc('get_all_users_admin')
-      if (err) { setError(err.message); setLoading(false); return }
-      setUsuarios((data ?? []) as Usuario[])
+      // Intentar RPC primero (incluye emails); si falla, usar profiles directo
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('get_all_users_admin')
+      if (!rpcErr && rpcData) {
+        setUsuarios(rpcData as Usuario[])
+      } else {
+        // Fallback: solo profiles (sin email)
+        const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+        setUsuarios(
+          (profilesData ?? []).map((p: Record<string, unknown>) => ({
+            id: p.id as string,
+            nombre: (p.nombre as string) ?? '',
+            empresa: (p.empresa as string) ?? '',
+            rol: (p.rol as string) ?? '',
+            email: '—',
+            created_at: (p.created_at as string) ?? '',
+          }))
+        )
+      }
       setLoading(false)
     }
     load()
@@ -48,21 +65,19 @@ export default function AdminUsuariosPage() {
 
   async function cambiarRol(userId: string, nuevoRol: string) {
     setUpdatingId(userId)
-    const { error: err } = await supabase.rpc('admin_update_role', { target_id: userId, new_rol: nuevoRol })
-    if (!err) {
+    const { error } = await supabase.rpc('admin_update_role', { target_id: userId, new_rol: nuevoRol })
+    if (!error) {
       setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, rol: nuevoRol } : u))
     }
     setUpdatingId(null)
   }
 
-  const lista = usuarios.filter(u => {
-    if (filtroRol !== 'todos' && u.rol !== filtroRol) return false
-    if (busqueda) {
-      const q = busqueda.toLowerCase()
-      if (!u.nombre?.toLowerCase().includes(q) && !u.empresa?.toLowerCase().includes(q) && !u.email?.toLowerCase().includes(q)) return false
-    }
-    return true
-  })
+  const pendientes = usuarios.filter(u => u.rol === 'pendiente')
+  const activos = usuarios.filter(u => u.rol !== 'pendiente' && (
+    filtroRol === 'todos' || u.rol === filtroRol
+  ) && (
+    !busqueda || [u.nombre, u.empresa, u.email].some(v => v?.toLowerCase().includes(busqueda.toLowerCase()))
+  ))
 
   if (loading) return null
 
@@ -73,18 +88,52 @@ export default function AdminUsuariosPage() {
         <p className="text-sm mt-1" style={{ color: '#666' }}>Gestiona accesos y roles de todos los usuarios</p>
       </div>
 
-      {error && (
-        <div className="border p-4 mb-6 text-sm" style={{ borderColor: '#fcc', backgroundColor: '#fff5f5', color: '#c00' }}>
-          Error al cargar usuarios: {error}
+      {/* Solicitudes pendientes */}
+      {pendientes.length > 0 && (
+        <div className="border mb-8" style={{ borderColor: '#856404', backgroundColor: '#FFFBF0' }}>
+          <div className="px-5 py-3 flex items-center gap-2 border-b" style={{ borderColor: '#F0D070' }}>
+            <Clock size={15} style={{ color: '#856404' }} />
+            <h2 className="font-bold text-sm" style={{ color: '#856404' }}>
+              Solicitudes de acceso pendientes ({pendientes.length})
+            </h2>
+          </div>
+          <div className="divide-y" style={{ borderColor: '#F0D070' }}>
+            {pendientes.map(u => (
+              <div key={u.id} className="px-5 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-sm">{u.nombre || '—'}</p>
+                  <p className="text-xs" style={{ color: '#666' }}>{u.empresa || '—'} {u.email !== '—' ? `· ${u.email}` : ''}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#aaa' }}>{formatDate(u.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs" style={{ color: '#888' }}>Asignar rol:</span>
+                  {['epcista', 'analista'].map(r => (
+                    <button key={r}
+                      onClick={() => cambiarRol(u.id, r)}
+                      disabled={updatingId === u.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border disabled:opacity-40 transition-colors"
+                      style={{ borderColor: '#000', backgroundColor: '#000', color: '#D7FF2F' }}>
+                      {updatingId === u.id ? '…' : <><CheckCircle size={11} /> {ROL_LABELS[r]}</>}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => cambiarRol(u.id, 'admin')}
+                    disabled={updatingId === u.id}
+                    className="px-3 py-1.5 text-xs font-medium border disabled:opacity-40"
+                    style={{ borderColor: '#CFCFCF' }}>
+                    Admin
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Filtros */}
       <div className="flex gap-3 mb-4 flex-wrap items-center">
         <input
-          type="text"
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
+          type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, empresa o correo…"
           className="border px-3 py-1.5 text-sm flex-1 min-w-48"
           style={{ borderColor: '#CFCFCF' }}
@@ -104,6 +153,7 @@ export default function AdminUsuariosPage() {
         </div>
       </div>
 
+      {/* Tabla usuarios activos */}
       <div className="border overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
         <table className="w-full text-sm">
           <thead>
@@ -117,10 +167,10 @@ export default function AdminUsuariosPage() {
             </tr>
           </thead>
           <tbody>
-            {lista.length === 0 && (
+            {activos.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin resultados.</td></tr>
             )}
-            {lista.map((u, i) => {
+            {activos.map((u, i) => {
               const rc = ROL_COLORS[u.rol] ?? ROL_COLORS.epcista
               return (
                 <tr key={u.id} style={{ borderTop: '1px solid #CFCFCF', backgroundColor: i % 2 === 0 ? '#fff' : '#fafaf8' }}>
@@ -152,7 +202,7 @@ export default function AdminUsuariosPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs mt-2" style={{ color: '#888' }}>{lista.length} usuario{lista.length !== 1 ? 's' : ''}</p>
+      <p className="text-xs mt-2" style={{ color: '#888' }}>{activos.length} usuario{activos.length !== 1 ? 's' : ''} activos</p>
     </div>
   )
 }
