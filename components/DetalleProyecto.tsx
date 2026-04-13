@@ -191,6 +191,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             {sitios.map(s => (
               <div key={s.id} className="border p-3" style={{ borderColor: '#CFCFCF' }}>
                 <p className="font-semibold text-sm">{s.nombre}</p>
+                {s.nombre_recibo && <p className="text-xs mt-0.5" style={{ color: '#888' }}>{s.nombre_recibo}</p>}
                 <div className="flex flex-wrap gap-3 mt-1">
                   {(s.ciudad || s.ubicacion_estado) && (
                     <span className="flex items-center gap-1 text-xs" style={{ color: '#666' }}>
@@ -199,6 +200,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     </span>
                   )}
                   {s.rpu && <span className="text-xs" style={{ color: '#666' }}>RPU: {s.rpu}</span>}
+                  {s.demanda_contratada_kw != null && (
+                    <span className="text-xs" style={{ color: '#666' }}>
+                      Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW
+                    </span>
+                  )}
                   {s.recibo_url && (
                     <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
                       className="text-xs underline" style={{ color: '#000' }}>

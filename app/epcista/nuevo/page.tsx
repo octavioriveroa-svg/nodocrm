@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, X, Eye, Pencil, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
+import { Plus, X, Eye, Pencil, Trash2, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
 import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -48,9 +48,7 @@ interface FormData {
   modalidad_financiamiento: ModalidadFinanciamiento[]
   capex_estimado: string
   moneda: Moneda
-  ubicacion_estado: string
   notas_adicionales: string
-  demanda_kw: string
   incluye_mem: boolean
 }
 
@@ -61,11 +59,11 @@ const emptyFv: FVForm = {
   generacion_anual_kwh: '', capex: '',
 }
 const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '' }
-const emptyNuevoSitio = { nombre: '', ciudad: '', ubicacion_estado: '', rpu: '' }
+const emptyNuevoSitio = { nombre: '', nombre_recibo: '', ciudad: '', ubicacion_estado: '', rpu: '', demanda_contratada_kw: '' }
 const initialForm: FormData = {
   nombre_proyecto: '', cliente_id: '', tipo_instalacion: '',
   modalidad_financiamiento: [], capex_estimado: '', moneda: 'MXN',
-  ubicacion_estado: '', notas_adicionales: '', demanda_kw: '', incluye_mem: false,
+  notas_adicionales: '', incluye_mem: false,
 }
 
 // ── Helpers de cálculo ────────────────────────────────────────
@@ -220,9 +218,10 @@ export default function NuevoProyectoPage() {
   const [subiendoPdfNuevo, setSubiendoPdfNuevo] = useState(false)
   const fileRefNuevo = useRef<HTMLInputElement>(null)
 
-  // Ver / editar sitios
+  // Ver / editar / eliminar sitios
   const [viendoSitioId, setViendoSitioId] = useState<string | null>(null)
   const [editandoSitioId, setEditandoSitioId] = useState<string | null>(null)
+  const [deletingSitioId, setDeletingSitioId] = useState<string | null>(null)
   const [editSitioForm, setEditSitioForm] = useState(emptyNuevoSitio)
   const [editSitioReciboUrl, setEditSitioReciboUrl] = useState<string | null>(null)
   const [subiendoPdfEdit, setSubiendoPdfEdit] = useState(false)
@@ -359,9 +358,11 @@ export default function NuevoProyectoPage() {
     if (!session?.user) { setGuardandoSitio(false); return }
     const { data } = await supabase.from('sitios').insert({
       cliente_id: form.cliente_id, epcista_id: session.user.id,
-      nombre: nuevoSitio.nombre, ciudad: nuevoSitio.ciudad || null,
-      ubicacion_estado: nuevoSitio.ubicacion_estado || null,
-      rpu: nuevoSitio.rpu || null, recibo_url: reciboUrlNuevo,
+      nombre: nuevoSitio.nombre, nombre_recibo: nuevoSitio.nombre_recibo || null,
+      ciudad: nuevoSitio.ciudad || null, ubicacion_estado: nuevoSitio.ubicacion_estado || null,
+      rpu: nuevoSitio.rpu || null,
+      demanda_contratada_kw: nuevoSitio.demanda_contratada_kw ? Number(nuevoSitio.demanda_contratada_kw) : null,
+      recibo_url: reciboUrlNuevo,
     }).select().single()
     if (data) {
       const sitio = data as Sitio
@@ -378,9 +379,11 @@ export default function NuevoProyectoPage() {
     if (!editandoSitioId || !editSitioForm.nombre.trim()) return
     setGuardandoEditSitio(true)
     const { data } = await supabase.from('sitios').update({
-      nombre: editSitioForm.nombre, ciudad: editSitioForm.ciudad || null,
-      ubicacion_estado: editSitioForm.ubicacion_estado || null,
-      rpu: editSitioForm.rpu || null, recibo_url: editSitioReciboUrl,
+      nombre: editSitioForm.nombre, nombre_recibo: editSitioForm.nombre_recibo || null,
+      ciudad: editSitioForm.ciudad || null, ubicacion_estado: editSitioForm.ubicacion_estado || null,
+      rpu: editSitioForm.rpu || null,
+      demanda_contratada_kw: editSitioForm.demanda_contratada_kw ? Number(editSitioForm.demanda_contratada_kw) : null,
+      recibo_url: editSitioReciboUrl,
     }).eq('id', editandoSitioId).select().single()
     if (data) setSitiosCliente(prev => prev.map(s => s.id === editandoSitioId ? data as Sitio : s))
     setEditandoSitioId(null)
@@ -391,11 +394,24 @@ export default function NuevoProyectoPage() {
 
   function abrirEditarSitio(s: Sitio) {
     setEditandoSitioId(editandoSitioId === s.id ? null : s.id)
-    setEditSitioForm({ nombre: s.nombre, ciudad: s.ciudad ?? '', ubicacion_estado: s.ubicacion_estado ?? '', rpu: s.rpu ?? '' })
+    setEditSitioForm({
+      nombre: s.nombre, nombre_recibo: s.nombre_recibo ?? '',
+      ciudad: s.ciudad ?? '', ubicacion_estado: s.ubicacion_estado ?? '',
+      rpu: s.rpu ?? '', demanda_contratada_kw: s.demanda_contratada_kw?.toString() ?? '',
+    })
     setEditSitioReciboUrl(s.recibo_url ?? null)
     setViendoSitioId(null)
     setMostrarNuevoSitio(false)
     setAddingToSitioId(null)
+    setDeletingSitioId(null)
+  }
+
+  async function eliminarSitio(id: string) {
+    await supabase.from('sitios').delete().eq('id', id)
+    setSitiosCliente(prev => prev.filter(s => s.id !== id))
+    setSitiosSeleccionados(prev => prev.filter(sid => sid !== id))
+    setProductosMap(prev => { const next = { ...prev }; delete next[id]; return next })
+    setDeletingSitioId(null)
   }
 
   // ── Form helpers ─────────────────────────────────────────────
@@ -430,7 +446,6 @@ export default function NuevoProyectoPage() {
 
   function validarPaso2() {
     if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad de financiamiento.'
-    if (!form.ubicacion_estado) return 'Selecciona el estado.'
     return ''
   }
 
@@ -457,6 +472,8 @@ export default function NuevoProyectoPage() {
     const hasBESS = allProds.some(p => p.tipo === 'bess')
     const tipo = hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS'
 
+    const ubicacion_estado = sitiosCliente.find(s => s.id === sitiosSeleccionados[0])?.ubicacion_estado ?? ''
+
     const payload = {
       epcista_id: session.user.id,
       cliente_id: form.cliente_id,
@@ -465,13 +482,13 @@ export default function NuevoProyectoPage() {
       estado: 'recibido',
       tipo_instalacion: form.tipo_instalacion,
       incluye_mem: form.incluye_mem,
-      demanda_kw: form.demanda_kw ? Number(form.demanda_kw) : null,
+      demanda_kw: null,
       cliente_final_nombre: cliente?.contacto_nombre ?? '',
       cliente_final_empresa: cliente?.razon_social ?? '',
       cliente_final_contacto: cliente?.contacto_email ?? cliente?.contacto_telefono ?? '',
       capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
       moneda: form.moneda,
-      ubicacion_estado: form.ubicacion_estado,
+      ubicacion_estado,
       modalidad_financiamiento: form.modalidad_financiamiento,
       notas_adicionales: form.notas_adicionales || null,
       // Campos legacy — null en proyectos nuevos
@@ -510,7 +527,7 @@ export default function NuevoProyectoPage() {
   const borde = { borderColor: '#CFCFCF' }
   const fvCalc = calcFV(fvForm)
   const bessCalc = calcBESS(bessForm)
-  const demandaKw = Number(form.demanda_kw) || 0
+  const anyHighDemanda = sitiosSeleccionados.some(id => (sitiosCliente.find(s => s.id === id)?.demanda_contratada_kw ?? 0) > 1000)
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -636,33 +653,54 @@ export default function NuevoProyectoPage() {
                           <button type="button" onClick={() => {
                             setViendoSitioId(viendoSitioId === s.id ? null : s.id)
                             setEditandoSitioId(null)
+                            setDeletingSitioId(null)
                           }}
-                            className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                            className="p-1.5 border transition-colors"
                             style={{
                               borderColor: viendoSitioId === s.id ? '#000' : '#CFCFCF',
                               backgroundColor: viendoSitioId === s.id ? '#000' : '#fff',
                               color: viendoSitioId === s.id ? '#D7FF2F' : '#444',
                             }}>
-                            <Eye size={11} /> Ver
+                            <Eye size={13} />
                           </button>
                           <button type="button" onClick={() => abrirEditarSitio(s)}
-                            className="flex items-center gap-1 px-2 py-1 text-xs border font-medium"
+                            className="p-1.5 border transition-colors"
                             style={{
                               borderColor: editandoSitioId === s.id ? '#000' : '#CFCFCF',
                               backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff',
                               color: '#444',
                             }}>
-                            <Pencil size={11} /> Editar
+                            <Pencil size={13} />
+                          </button>
+                          <button type="button" onClick={() => { setDeletingSitioId(s.id); setViendoSitioId(null); setEditandoSitioId(null) }}
+                            className="p-1.5 border transition-colors"
+                            style={{ borderColor: '#CFCFCF', color: '#c00' }}>
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </div>
+
+                      {/* Confirmación eliminar */}
+                      {deletingSitioId === s.id && (
+                        <div className="border border-t-0 px-4 py-3 flex items-center justify-between" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+                          <p className="text-sm">¿Eliminar <strong>{s.nombre}</strong>?</p>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setDeletingSitioId(null)}
+                              className="px-3 py-1 text-xs border" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+                            <button type="button" onClick={() => eliminarSitio(s.id)}
+                              className="px-3 py-1 text-xs font-bold text-white" style={{ backgroundColor: '#c00' }}>Eliminar</button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Panel Ver */}
                       {viendoSitioId === s.id && (
                         <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                            {s.rpu && <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>}
+                            {s.nombre_recibo && <div><span style={{ color: '#888' }}>Nombre en recibo: </span><span className="font-medium">{s.nombre_recibo}</span></div>}
                             {(s.ciudad || s.ubicacion_estado) && <div><span style={{ color: '#888' }}>Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
+                            {s.rpu && <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>}
+                            {s.demanda_contratada_kw != null && <div><span style={{ color: '#888' }}>Demanda: </span><span className="font-medium">{s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span></div>}
                             {s.recibo_url && (
                               <div className="col-span-2">
                                 <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
@@ -682,8 +720,11 @@ export default function NuevoProyectoPage() {
                           <div className="flex flex-col gap-3">
                             <input type="text" value={editSitioForm.nombre}
                               onChange={e => setEditSitioForm(f => ({ ...f, nombre: e.target.value }))}
-                              className={inp} style={borde} placeholder="Nombre *" />
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
+                              className={inp} style={borde} placeholder="Nombre del sitio *" />
+                            <input type="text" value={editSitioForm.nombre_recibo}
+                              onChange={e => setEditSitioForm(f => ({ ...f, nombre_recibo: e.target.value }))}
+                              className={inp} style={borde} placeholder="Nombre como aparece en el recibo" />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <input type="text" value={editSitioForm.ciudad}
                                 onChange={e => setEditSitioForm(f => ({ ...f, ciudad: e.target.value }))}
                                 className={inp} style={borde} placeholder="Ciudad" />
@@ -693,9 +734,14 @@ export default function NuevoProyectoPage() {
                                 <option value="">Estado</option>
                                 {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
                               </select>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '12px' }}>
                               <input type="text" value={editSitioForm.rpu}
                                 onChange={e => setEditSitioForm(f => ({ ...f, rpu: e.target.value }))}
                                 className={inp} style={borde} placeholder="RPU" />
+                              <input type="number" min="0" value={editSitioForm.demanda_contratada_kw}
+                                onChange={e => setEditSitioForm(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
+                                className={inp} style={borde} placeholder="Demanda contratada (kW)" />
                             </div>
                             <div className="flex items-center gap-3">
                               <input ref={fileRefEdit} type="file" accept=".pdf" onChange={subirPdfEdit} className="hidden" id="edit-recibo-pdf" />
@@ -956,7 +1002,10 @@ export default function NuevoProyectoPage() {
                     <input type="text" value={nuevoSitio.nombre}
                       onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
                       className={inp} style={borde} placeholder="Nombre del sitio *" />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: '12px' }}>
+                    <input type="text" value={nuevoSitio.nombre_recibo}
+                      onChange={e => setNuevoSitio(f => ({ ...f, nombre_recibo: e.target.value }))}
+                      className={inp} style={borde} placeholder="Nombre como aparece en el recibo" />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <input type="text" value={nuevoSitio.ciudad}
                         onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
                         className={inp} style={borde} placeholder="Ciudad" />
@@ -966,9 +1015,14 @@ export default function NuevoProyectoPage() {
                         <option value="">Estado</option>
                         {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
                       </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '12px' }}>
                       <input type="text" value={nuevoSitio.rpu}
                         onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
                         className={inp} style={borde} placeholder="RPU" />
+                      <input type="number" min="0" value={nuevoSitio.demanda_contratada_kw}
+                        onChange={e => setNuevoSitio(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
+                        className={inp} style={borde} placeholder="Demanda contratada (kW)" />
                     </div>
                     <div className="flex items-center gap-3">
                       <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="nuevo-recibo-pdf" />
@@ -1013,21 +1067,7 @@ export default function NuevoProyectoPage() {
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Financiamiento</h2>
 
-            {/* Demanda + MEM */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Demanda contratada del proyecto (kW)</label>
-              <input type="number" min="0" value={form.demanda_kw}
-                onChange={e => {
-                  setF('demanda_kw', e.target.value)
-                  if (Number(e.target.value) <= 1000) setF('incluye_mem', false)
-                }}
-                className={inp} style={borde} placeholder="0" />
-              <p className="text-xs mt-1" style={{ color: '#888' }}>
-                Clientes con más de 1,000 kW de demanda pueden ser candidatos al Mercado Eléctrico Mayorista.
-              </p>
-            </div>
-
-            {demandaKw > 1000 && (
+            {anyHighDemanda && (
               <div className="border p-4" style={{ borderColor: '#D7FF2F', backgroundColor: '#fffff0' }}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.incluye_mem}
@@ -1036,7 +1076,7 @@ export default function NuevoProyectoPage() {
                   <div>
                     <p className="text-sm font-semibold">Considerar alternativa de Mercado Eléctrico Mayorista</p>
                     <p className="text-xs mt-0.5" style={{ color: '#666' }}>
-                      El analista evaluará si conviene migrar al MEM con base en la demanda de {Number(form.demanda_kw).toLocaleString('es-MX')} kW declarada.
+                      Uno o más sitios seleccionados tienen más de 1,000 kW de demanda contratada. El analista evaluará si conviene migrar al MEM.
                     </p>
                   </div>
                 </label>
@@ -1055,12 +1095,11 @@ export default function NuevoProyectoPage() {
                   { value: 'ensaas', label: 'EnSaaS', desc: 'Energy Storage as a Service' },
                   { value: 'mem', label: 'Mercado Eléctrico Mayorista', desc: 'Ingresos por participación MEM' },
                 ] as { value: ModalidadFinanciamiento; label: string; desc: string }[]).map(opt => {
-                  const noSabe = form.modalidad_financiamiento.includes('no_sabe')
                   const selected = form.modalidad_financiamiento.includes(opt.value)
                   return (
-                    <button key={opt.value} type="button" disabled={noSabe}
+                    <button key={opt.value} type="button"
                       onClick={() => toggleModalidad(opt.value)}
-                      className="border p-3 text-left transition-colors disabled:opacity-40"
+                      className="border p-3 text-left transition-colors"
                       style={{ borderColor: selected ? '#000' : '#CFCFCF', backgroundColor: selected ? '#000' : '#fff', color: selected ? '#D7FF2F' : '#000' }}>
                       <div className="font-semibold text-sm">{opt.label}</div>
                       <div className="text-xs mt-0.5 opacity-70">{opt.desc}</div>
@@ -1076,19 +1115,10 @@ export default function NuevoProyectoPage() {
                     backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff',
                     color: '#000',
                   }}>
-                  <div className="font-semibold text-sm">No sé, que el analista recomiende</div>
+                  <div className="font-semibold text-sm">Prefiero que Nodo me recomiende las mejores alternativas para este cliente</div>
                   <div className="text-xs mt-0.5" style={{ color: '#666' }}>El analista definirá la modalidad más adecuada</div>
                 </button>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Estado de la República *</label>
-              <select value={form.ubicacion_estado} onChange={e => setF('ubicacion_estado', e.target.value)}
-                className={inp} style={borde}>
-                <option value="">Selecciona un estado</option>
-                {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
-              </select>
             </div>
 
             <div>

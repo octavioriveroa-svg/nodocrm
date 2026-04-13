@@ -68,9 +68,11 @@ export interface Sitio {
   cliente_id: string
   epcista_id: string
   nombre: string
+  nombre_recibo: string | null
   ciudad: string | null
   ubicacion_estado: string | null
   rpu: string | null
+  demanda_contratada_kw: number | null
   recibo_url: string | null
   notas: string | null
   created_at: string
