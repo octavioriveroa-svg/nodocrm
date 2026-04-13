@@ -17,19 +17,19 @@ export default function EpcistaLayout({ children }: { children: React.ReactNode 
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { router.replace('/login'); return }
 
-      const { data: profiles } = await supabase.rpc('get_my_profile')
-      const profile = profiles?.[0] as { id: string; nombre: string; empresa: string; rol: string; created_at: string } | undefined
+      const { data: profileRow } = await supabase
+        .from('profiles').select('*').eq('id', session.user.id).single()
 
-      const rol = profile?.rol ?? session.user.user_metadata?.rol ?? 'epcista'
+      const rol = profileRow?.rol ?? session.user.user_metadata?.rol ?? 'epcista'
       if (rol === 'analista') { router.replace('/analista'); return }
       if (rol === 'admin') { router.replace('/admin'); return }
 
       setProfile({
         id: session.user.id,
-        nombre: profile?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
-        empresa: profile?.empresa ?? session.user.user_metadata?.empresa ?? '',
+        nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
+        empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
         rol,
-        created_at: session.user.created_at,
+        created_at: profileRow?.created_at ?? session.user.created_at,
       })
       setLoading(false)
     }

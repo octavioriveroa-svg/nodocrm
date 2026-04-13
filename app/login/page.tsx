@@ -28,8 +28,10 @@ export default function LoginPage() {
       return
     }
 
-    const { data: profiles } = await supabase.rpc('get_my_profile')
-    const rol = profiles?.[0]?.rol ?? 'epcista'
+    const { data: { session: newSession } } = await supabase.auth.getSession()
+    const { data: profileRow } = await supabase
+      .from('profiles').select('rol').eq('id', newSession?.user?.id ?? '').single()
+    const rol = profileRow?.rol ?? newSession?.user?.user_metadata?.rol ?? 'epcista'
     if (rol === 'admin') window.location.href = '/admin'
     else if (rol === 'analista') window.location.href = '/analista'
     else window.location.href = '/epcista'
