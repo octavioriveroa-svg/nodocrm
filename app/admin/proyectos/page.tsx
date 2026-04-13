@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { Trash2 } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { Proyecto, EstadoProyecto, TipoProyecto } from '@/lib/types'
@@ -20,6 +21,8 @@ export default function AdminProyectosPage() {
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<ProyectoConEpcista[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos')
   const [filtroTipo, setFiltroTipo] = useState<TipoProyecto | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
@@ -62,6 +65,14 @@ export default function AdminProyectosPage() {
     }
     return true
   })
+
+  async function eliminarProyecto(id: string) {
+    setDeleting(true)
+    const { error } = await supabase.from('proyectos').delete().eq('id', id)
+    if (!error) setProyectos(prev => prev.filter(p => p.id !== id))
+    setConfirmDelete(null)
+    setDeleting(false)
+  }
 
   if (loading) return null
 
@@ -128,7 +139,28 @@ export default function AdminProyectosPage() {
                 <td className="px-4 py-3"><BadgeEstado estado={p.estado} /></td>
                 <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{formatDate(p.created_at)}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/proyectos/${p.id}`} className="text-xs font-semibold underline">Ver</Link>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/admin/proyectos/${p.id}`} className="text-xs font-semibold underline">Ver</Link>
+                    {confirmDelete === p.id ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-xs" style={{ color: '#666' }}>¿Eliminar?</span>
+                        <button
+                          onClick={() => eliminarProyecto(p.id)}
+                          disabled={deleting}
+                          className="text-xs font-bold px-2 py-0.5 disabled:opacity-50"
+                          style={{ backgroundColor: '#ef4444', color: '#fff' }}>
+                          {deleting ? '…' : 'Sí'}
+                        </button>
+                        <button onClick={() => setConfirmDelete(null)} className="text-xs underline" style={{ color: '#666' }}>
+                          No
+                        </button>
+                      </span>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(p.id)} className="opacity-40 hover:opacity-100 transition-opacity">
+                        <Trash2 size={14} style={{ color: '#ef4444' }} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
