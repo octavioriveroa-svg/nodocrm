@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, FolderPlus, Users, LogOut, Settings } from 'lucide-react'
+import { Folder, FolderPlus, Users, LogOut, Settings } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -18,16 +18,18 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const supabase = createClient()
 
   const navEpcista = [
-    { href: '/epcista', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/epcista', label: 'Proyectos', icon: Folder, alwaysYellow: true },
     { href: '/epcista/clientes', label: 'Clientes', icon: Users },
     { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
   ]
 
   const navAnalista = [
-    { href: '/analista', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/analista', label: 'Proyectos', icon: Folder, alwaysYellow: true },
   ]
 
   const nav = rol === 'analista' ? navAnalista : navEpcista
+
+  type NavItem = { href: string; label: string; icon: React.ElementType; alwaysYellow?: boolean }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -45,16 +47,17 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
       </div>
 
       <nav className="flex flex-col gap-1 flex-1">
-        {nav.map(({ href, label, icon: Icon }) => {
+        {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
           const active = pathname === href || (href !== '/epcista' && href !== '/analista' && pathname.startsWith(href))
+          const yellow = alwaysYellow || active
           return (
             <Link
               key={href}
               href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors"
               style={{
-                backgroundColor: active ? '#D7FF2F' : 'transparent',
-                color: active ? '#000000' : '#ffffff',
+                backgroundColor: yellow ? '#D7FF2F' : 'transparent',
+                color: yellow ? '#000000' : '#ffffff',
               }}
             >
               <Icon size={16} />
