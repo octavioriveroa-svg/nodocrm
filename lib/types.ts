@@ -1,7 +1,7 @@
 export type Rol = 'epcista' | 'analista' | 'admin'
 export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
 export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
-export type EstadoProyecto = 'recibido' | 'en_analisis' | 'completado'
+export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'enviada' | 'cliente_interesado'
 export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
 export type ModalidadFinanciamiento = 'credito' | 'arrendamiento' | 'ensaas' | 'mem' | 'no_sabe'

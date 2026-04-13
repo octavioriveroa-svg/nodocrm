@@ -87,7 +87,9 @@ export default function AdminProyectosPage() {
           <option value="todos">Todos los estados</option>
           <option value="recibido">Recibido</option>
           <option value="en_analisis">En análisis</option>
-          <option value="completado">Completado</option>
+          <option value="propuesta_lista">Propuesta lista</option>
+          <option value="enviada">Enviada</option>
+          <option value="cliente_interesado">Cliente interesado</option>
         </select>
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoProyecto | 'todos')}
           className="border px-2 py-1.5 text-sm" style={{ borderColor: '#CFCFCF' }}>

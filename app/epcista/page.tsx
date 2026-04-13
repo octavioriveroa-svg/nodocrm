@@ -86,7 +86,7 @@ export default function EpcistaDashboard() {
 
   const total = proyectos.length
   const enAnalisis = proyectos.filter(p => p.estado === 'en_analisis').length
-  const completados = proyectos.filter(p => p.estado === 'completado').length
+  const clienteInteresado = proyectos.filter(p => p.estado === 'cliente_interesado').length
 
   if (loading) return null
 
@@ -113,7 +113,7 @@ export default function EpcistaDashboard() {
         {[
           { label: 'Total proyectos', value: total },
           { label: 'En análisis', value: enAnalisis },
-          { label: 'Completados', value: completados },
+          { label: 'Cliente interesado', value: clienteInteresado },
         ].map(m => (
           <div key={m.label} className="border p-5" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
             <div className="text-3xl font-black">{m.value}</div>

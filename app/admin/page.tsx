@@ -11,10 +11,8 @@ interface Stats {
   analistas: number
   admins: number
   totalProyectos: number
-  proyectosRecibidos: number
-  proyectosEnAnalisis: number
-  proyectosCompletados: number
   totalClientes: number
+  byEstado: Record<string, number>
 }
 
 interface RecentProyecto {
@@ -47,11 +45,17 @@ function fmt(n: number) {
 const estadoLabel: Record<string, string> = {
   recibido: 'Recibido',
   en_analisis: 'En análisis',
+  propuesta_lista: 'Propuesta lista',
+  enviada: 'Enviada',
+  cliente_interesado: 'Cliente interesado',
   completado: 'Completado',
 }
 const estadoColor: Record<string, { bg: string; color: string }> = {
   recibido: { bg: '#E8E8E8', color: '#444' },
   en_analisis: { bg: '#D7FF2F', color: '#000' },
+  propuesta_lista: { bg: '#DBEAFE', color: '#1e40af' },
+  enviada: { bg: '#FDE68A', color: '#92400e' },
+  cliente_interesado: { bg: '#D1FAE5', color: '#065f46' },
   completado: { bg: '#000', color: '#fff' },
 }
 
@@ -91,16 +95,20 @@ export default function AdminDashboard() {
       }
       setPortafolio({ bess_kw, bess_kwh, bess_capex, fv_kwp, fv_capex })
 
+      const byEstado: Record<string, number> = {}
+      for (const x of pr) {
+        const e = (x as { estado: string }).estado
+        byEstado[e] = (byEstado[e] ?? 0) + 1
+      }
+
       setStats({
         totalUsuarios: p.length,
         epcistas: p.filter((u: { rol: string }) => u.rol === 'epcista').length,
         analistas: p.filter((u: { rol: string }) => u.rol === 'analista').length,
         admins: p.filter((u: { rol: string }) => u.rol === 'admin').length,
         totalProyectos: pr.length,
-        proyectosRecibidos: pr.filter((x: { estado: string }) => x.estado === 'recibido').length,
-        proyectosEnAnalisis: pr.filter((x: { estado: string }) => x.estado === 'en_analisis').length,
-        proyectosCompletados: pr.filter((x: { estado: string }) => x.estado === 'completado').length,
         totalClientes: (clientes ?? []).length,
+        byEstado,
       })
 
       // Enrich recent projects with epcista names from profiles
@@ -135,7 +143,7 @@ export default function AdminDashboard() {
           { label: 'Usuarios totales', value: stats!.totalUsuarios, icon: Users, href: '/admin/usuarios' },
           { label: 'Proyectos', value: stats!.totalProyectos, icon: Folder, href: '/admin/proyectos' },
           { label: 'Clientes', value: stats!.totalClientes, icon: Building2, href: '/admin/clientes' },
-          { label: 'Completados', value: stats!.proyectosCompletados, icon: TrendingUp, href: '/admin/proyectos' },
+          { label: 'Cliente interesado', value: stats!.byEstado['cliente_interesado'] ?? 0, icon: TrendingUp, href: '/admin/proyectos' },
         ].map(({ label, value, icon: Icon, href }) => (
           <Link key={label} href={href}
             className="border p-5 hover:border-black transition-colors"
@@ -167,18 +175,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Proyectos por estado */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { label: 'Recibidos', value: stats!.proyectosRecibidos },
-          { label: 'En análisis', value: stats!.proyectosEnAnalisis },
-          { label: 'Completados', value: stats!.proyectosCompletados },
-        ].map(({ label, value }) => (
-          <div key={label} className="border p-4 flex items-center justify-between"
-            style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-            <span className="text-sm font-medium">{label}</span>
-            <span className="text-xl font-black px-3 py-0.5" style={{ backgroundColor: '#f0f0f0' }}>{value}</span>
-          </div>
-        ))}
+      <div className="grid grid-cols-5 gap-3 mb-8">
+        {(['recibido', 'en_analisis', 'propuesta_lista', 'enviada', 'cliente_interesado'] as const).map(estado => {
+          const ec = estadoColor[estado]
+          return (
+            <div key={estado} className="border p-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+              <div className="text-2xl font-black mb-2">{stats!.byEstado[estado] ?? 0}</div>
+              <span className="text-xs font-semibold px-1.5 py-0.5" style={{ backgroundColor: ec.bg, color: ec.color }}>
+                {estadoLabel[estado]}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Portafolio técnico */}

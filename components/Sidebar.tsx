@@ -32,6 +32,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
     { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
     { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
+    { href: '/admin/configuracion/roles', label: 'Roles', icon: ShieldCheck },
   ]
 
   const nav = rol === 'admin' ? navAdmin : rol === 'analista' ? navAnalista : navEpcista
