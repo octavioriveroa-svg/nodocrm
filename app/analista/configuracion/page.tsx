@@ -13,9 +13,18 @@ export default function ConfiguracionAnalistaPage() {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
-      const { data: profiles } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-      if (!profiles) return
-      setData({ profile: profiles as Profile, email: session.user.email ?? '' })
+
+      const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+
+      const profile: Profile = {
+        id: session.user.id,
+        nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
+        empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
+        rol: profileRow?.rol ?? session.user.user_metadata?.rol ?? 'analista',
+        created_at: profileRow?.created_at ?? session.user.created_at,
+      }
+
+      setData({ profile, email: session.user.email ?? '' })
     }
     load()
   }, [])

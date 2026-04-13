@@ -18,13 +18,13 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const supabase = createClient()
 
   const navEpcista = [
-    { href: '/epcista', label: 'Proyectos', icon: Folder, alwaysYellow: true },
+    { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus, alwaysYellow: true },
+    { href: '/epcista', label: 'Proyectos', icon: Folder },
     { href: '/epcista/clientes', label: 'Clientes', icon: Users },
-    { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
   ]
 
   const navAnalista = [
-    { href: '/analista', label: 'Proyectos', icon: Folder, alwaysYellow: true },
+    { href: '/analista', label: 'Proyectos', icon: Folder },
   ]
 
   const nav = rol === 'analista' ? navAnalista : navEpcista
