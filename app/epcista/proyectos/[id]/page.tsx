@@ -33,7 +33,7 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
           { data: ps },
           { data: prods },
         ] = await Promise.all([
-          supabase.from('proyectos').select('*, profiles(*)').eq('id', id).single(),
+          supabase.from('proyectos').select('*').eq('id', id).single(),
           supabase.from('comentarios').select('*, profiles(*)').eq('proyecto_id', id).order('created_at', { ascending: true }),
           supabase.from('archivos').select('*, profiles(*)').eq('proyecto_id', id).order('created_at', { ascending: false }),
           supabase.from('profiles').select('*').eq('id', session.user.id).single(),
