@@ -96,23 +96,23 @@ export default function AdminProyectosPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black">Proyectos</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Todos los proyectos de la plataforma</p>
+      <div className="mb-8 relative">
+        <p className="text-sm text-gray-400 mb-1">Directorio</p>
+        <h1 className="text-2xl font-black tracking-tight mt-1">Proyectos</h1>
+        <p className="text-sm mt-1.5 text-gray-500">Todos los proyectos de la plataforma</p>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-4 flex-wrap items-center">
+      <div className="flex gap-4 mb-6 flex-wrap items-center">
         <input
           type="text"
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por proyecto, EPCista o cliente…"
-          className="border px-3 py-1.5 text-sm flex-1 min-w-48"
-          style={{ borderColor: '#CFCFCF' }}
+          className="rounded-lg border border-borde px-4 py-2.5 text-sm flex-1 min-w-48 bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all shadow-sm"
         />
         <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoProyecto | 'todos')}
-          className="border px-2 py-1.5 text-sm" style={{ borderColor: '#CFCFCF' }}>
+          className="rounded-lg border border-borde px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all shadow-sm font-medium">
           <option value="todos">Todos los estados</option>
           <option value="recibido">Recibido</option>
           <option value="en_analisis">En análisis</option>
@@ -121,7 +121,7 @@ export default function AdminProyectosPage() {
           <option value="cliente_interesado">Cliente interesado</option>
         </select>
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoProyecto | 'todos')}
-          className="border px-2 py-1.5 text-sm" style={{ borderColor: '#CFCFCF' }}>
+          className="rounded-lg border border-borde px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all shadow-sm font-medium">
           <option value="todos">Todos los tipos</option>
           <option value="FV">FV</option>
           <option value="BESS">BESS</option>
@@ -131,53 +131,52 @@ export default function AdminProyectosPage() {
         </select>
       </div>
 
-      <div className="border overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: '#000', color: '#fff' }}>
-              <th className="text-left px-4 py-3 font-semibold">Proyecto</th>
-              <th className="text-left px-4 py-3 font-semibold">Cliente</th>
-              <th className="text-left px-4 py-3 font-semibold">EPCista</th>
-              <th className="text-left px-4 py-3 font-semibold">Tipo</th>
-              <th className="text-left px-4 py-3 font-semibold">Estado</th>
-              <th className="text-left px-4 py-3 font-semibold">Fecha</th>
-              <th className="text-left px-4 py-3 font-semibold"></th>
+      <div className="rounded-xl border border-borde overflow-hidden bg-white shadow-sm">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-[#fafafa] border-b border-borde text-[#444]">
+            <tr>
+              <th className="px-5 py-4 font-semibold">Proyecto</th>
+              <th className="px-5 py-4 font-semibold">Cliente</th>
+              <th className="px-5 py-4 font-semibold">EPCista</th>
+              <th className="px-5 py-4 font-semibold">Tipo</th>
+              <th className="px-5 py-4 font-semibold">Estado</th>
+              <th className="px-5 py-4 font-semibold">Fecha</th>
+              <th className="px-5 py-4 font-semibold"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin proyectos.</td></tr>
             )}
             {lista.map((p, i) => (
-              <tr key={p.id} style={{ borderTop: '1px solid #CFCFCF', backgroundColor: i % 2 === 0 ? '#fff' : '#fafaf8' }}>
-                <td className="px-4 py-3 font-medium">{p.nombre_proyecto}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{p.cliente_final_empresa || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{p.epcista_nombre}</td>
-                <td className="px-4 py-3"><BadgeTipo tipo={p.tipo} /></td>
-                <td className="px-4 py-3"><BadgeEstado estado={p.estado} /></td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{formatDate(p.created_at)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Link href={`/admin/proyectos/${p.id}`} className="opacity-60 hover:opacity-100 transition-opacity">
-                      <Eye size={15} />
+              <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-5 py-3 font-bold text-principal">{p.nombre_proyecto}</td>
+                <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.cliente_final_empresa || '—'}</td>
+                <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.epcista_nombre}</td>
+                <td className="px-5 py-3"><BadgeTipo tipo={p.tipo} /></td>
+                <td className="px-5 py-3"><BadgeEstado estado={p.estado} /></td>
+                <td className="px-5 py-3 text-xs font-medium text-gray-400">{formatDate(p.created_at)}</td>
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-2 justify-end">
+                    <Link href={`/admin/proyectos/${p.id}`} className="p-2 rounded-lg text-gray-400 hover:text-principal hover:bg-gray-100 transition-all">
+                      <Eye size={16} />
                     </Link>
                     {confirmDelete === p.id ? (
-                      <span className="flex items-center gap-1.5">
-                        <span className="text-xs" style={{ color: '#666' }}>¿Eliminar?</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500">¿Eliminar?</span>
                         <button
                           onClick={() => eliminarProyecto(p.id)}
                           disabled={deleting}
-                          className="text-xs font-bold px-2 py-0.5 disabled:opacity-50"
-                          style={{ backgroundColor: '#ef4444', color: '#fff' }}>
+                          className="text-xs font-semibold px-2.5 py-1 rounded-md disabled:opacity-50 transition-colors bg-red-500 text-white hover:bg-red-600">
                           {deleting ? '…' : 'Sí'}
                         </button>
-                        <button onClick={() => setConfirmDelete(null)} className="text-xs underline" style={{ color: '#666' }}>
-                          No
+                        <button onClick={() => setConfirmDelete(null)} className="text-xs font-medium hover:underline text-gray-500 hover:text-gray-700 transition-colors">
+                          Cancelar
                         </button>
                       </span>
                     ) : (
-                      <button onClick={() => setConfirmDelete(p.id)} className="opacity-40 hover:opacity-100 transition-opacity">
-                        <Trash2 size={14} style={{ color: '#ef4444' }} />
+                      <button onClick={() => setConfirmDelete(p.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                        <Trash2 size={16} />
                       </button>
                     )}
                   </div>

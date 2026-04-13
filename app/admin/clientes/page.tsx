@@ -59,51 +59,51 @@ export default function AdminClientesPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black">Clientes</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Todos los clientes registrados en la plataforma</p>
+      <div className="mb-8 relative">
+        <p className="text-sm text-gray-400 mb-1">Directorio</p>
+        <h1 className="text-2xl font-black tracking-tight mt-1">Clientes</h1>
+        <p className="text-sm mt-1.5 text-gray-500">Todos los clientes registrados en la plataforma</p>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div className="flex gap-4 mb-6">
         <input
           type="text"
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por razón social, EPCista, RFC o contacto…"
-          className="border px-3 py-1.5 text-sm flex-1"
-          style={{ borderColor: '#CFCFCF' }}
+          className="rounded-lg border border-borde px-4 py-2.5 text-sm flex-1 max-w-lg bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all shadow-sm"
         />
       </div>
 
-      <div className="border overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: '#000', color: '#fff' }}>
-              <th className="text-left px-4 py-3 font-semibold">Razón social</th>
-              <th className="text-left px-4 py-3 font-semibold">RFC</th>
-              <th className="text-left px-4 py-3 font-semibold">Industria</th>
-              <th className="text-left px-4 py-3 font-semibold">Contacto</th>
-              <th className="text-left px-4 py-3 font-semibold">EPCista</th>
-              <th className="text-left px-4 py-3 font-semibold">Estado</th>
-              <th className="text-left px-4 py-3 font-semibold">Registro</th>
+      <div className="rounded-xl border border-borde overflow-hidden bg-white shadow-sm">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-[#fafafa] border-b border-borde text-[#444]">
+            <tr>
+              <th className="px-5 py-4 font-semibold">Razón social</th>
+              <th className="px-5 py-4 font-semibold">RFC</th>
+              <th className="px-5 py-4 font-semibold">Industria</th>
+              <th className="px-5 py-4 font-semibold">Contacto</th>
+              <th className="px-5 py-4 font-semibold">EPCista</th>
+              <th className="px-5 py-4 font-semibold">Estado</th>
+              <th className="px-5 py-4 font-semibold">Registro</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin clientes.</td></tr>
             )}
             {lista.map((c, i) => (
-              <tr key={c.id} style={{ borderTop: '1px solid #CFCFCF', backgroundColor: i % 2 === 0 ? '#fff' : '#fafaf8' }}>
-                <td className="px-4 py-3 font-medium">{c.razon_social}</td>
-                <td className="px-4 py-3 text-xs font-mono" style={{ color: '#666' }}>{c.rfc || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{c.industria || '—'}</td>
-                <td className="px-4 py-3 text-xs">
-                  <div className="font-medium">{c.contacto_nombre}</div>
-                  {c.contacto_email && <div style={{ color: '#888' }}>{c.contacto_email}</div>}
+              <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-5 py-3 font-bold text-principal">{c.razon_social}</td>
+                <td className="px-5 py-3 text-xs font-mono text-gray-400">{c.rfc || '—'}</td>
+                <td className="px-5 py-3 text-xs font-medium text-gray-500">{c.industria || '—'}</td>
+                <td className="px-5 py-3 text-xs">
+                  <div className="font-semibold">{c.contacto_nombre}</div>
+                  {c.contacto_email && <div className="text-gray-400">{c.contacto_email}</div>}
                 </td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{c.epcista_nombre}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{c.ubicacion_estado || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{formatDate(c.created_at)}</td>
+                <td className="px-5 py-3 text-xs font-medium text-gray-500">{c.epcista_nombre}</td>
+                <td className="px-5 py-3 text-xs font-medium text-gray-500">{c.ubicacion_estado || '—'}</td>
+                <td className="px-5 py-3 text-xs font-medium text-gray-400">{formatDate(c.created_at)}</td>
               </tr>
             ))}
           </tbody>

@@ -40,18 +40,18 @@ export default function ClientesPage() {
   if (loading) return null
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-black">Clientes</h1>
-          <p className="text-sm mt-1" style={{ color: '#666' }}>
+          <p className="text-sm text-gray-400 mb-1">Directorio</p>
+          <h1 className="text-2xl font-black tracking-tight">Clientes</h1>
+          <p className="text-sm mt-1.5 text-gray-500">
             {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} registrado{clientes.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Link
           href="/epcista/clientes/nuevo"
-          className="flex items-center gap-2 px-4 py-2.5 font-bold text-sm"
-          style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+          className="flex items-center gap-2 px-5 py-2.5 font-semibold text-sm bg-acento text-principal rounded-lg shadow-sm hover:shadow-md hover:bg-acento-hover transition-all active:scale-[0.97]"
         >
           <Plus size={16} />
           Nuevo cliente
@@ -60,17 +60,15 @@ export default function ClientesPage() {
 
       {clientes.length === 0 ? (
         <div
-          className="border p-16 flex flex-col items-center text-center"
-          style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}
+          className="rounded-xl border-2 border-dashed border-borde p-16 flex flex-col items-center text-center"
         >
-          <p className="font-semibold">Aún no tienes clientes</p>
-          <p className="text-sm mt-1 mb-5" style={{ color: '#666' }}>
+          <p className="font-semibold text-lg">Aún no tienes clientes</p>
+          <p className="text-sm mt-2 mb-6 text-gray-400">
             Registra tu primer cliente para asociarlo a proyectos
           </p>
           <Link
             href="/epcista/clientes/nuevo"
-            className="flex items-center gap-2 px-4 py-2.5 font-bold text-sm"
-            style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+            className="flex items-center gap-2 px-5 py-2.5 font-semibold text-sm bg-acento text-principal rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.97]"
           >
             <Plus size={16} />
             Nuevo cliente
@@ -84,8 +82,7 @@ export default function ClientesPage() {
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar por empresa, contacto o industria…"
-              className="w-full border px-3 py-2 text-sm"
-              style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}
+              className="w-full rounded-lg border border-borde px-4 py-3 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all shadow-sm"
             />
           </div>
 
@@ -99,22 +96,20 @@ export default function ClientesPage() {
                 <Link
                   key={c.id}
                   href={`/epcista/clientes/${c.id}`}
-                  className="border p-5 flex items-start justify-between hover:border-black transition-colors"
-                  style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}
+                  className="rounded-xl border border-borde p-6 flex items-start justify-between hover:shadow-md hover:border-gray-300 transition-all bg-white group"
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-bold text-base">{c.razon_social}</h3>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-bold text-lg">{c.razon_social}</h3>
                       {c.industria && (
                         <span
-                          className="text-xs px-2 py-0.5 border"
-                          style={{ borderColor: '#CFCFCF', color: '#666' }}
+                          className="text-xs px-2.5 py-1 rounded-full border border-borde text-gray-500 font-medium"
                         >
                           {c.industria}
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-4 mt-2">
+                    <div className="flex flex-wrap gap-5 mt-3">
                       <span className="flex items-center gap-1.5 text-sm" style={{ color: '#666' }}>
                         <Building2 size={13} />
                         {c.contacto_nombre}

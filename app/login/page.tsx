@@ -49,34 +49,34 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="border p-8"
-          style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}
+          className="rounded-2xl border border-borde p-8 shadow-xl bg-white"
         >
-          <h1 className="text-xl font-bold mb-6">Iniciar sesión</h1>
+          <div className="mb-8 flex flex-col items-center">
+            <h1 className="text-xl font-bold text-center tracking-tight">Bienvenido a Nodo</h1>
+            <p className="text-sm text-gray-400 mt-1">Inicia sesión en tu cuenta</p>
+          </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Correo electrónico</label>
+              <label className="block text-sm font-medium mb-1.5 text-gray-700">Correo electrónico</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full rounded-lg border border-borde px-4 py-2.5 text-sm transition-all focus:border-acento focus:ring-2 focus:ring-acento/30"
                 placeholder="tu@correo.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Contraseña</label>
+              <label className="block text-sm font-medium mb-1.5 text-gray-700">Contraseña</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full rounded-lg border border-borde px-4 py-2.5 text-sm transition-all focus:border-acento focus:ring-2 focus:ring-acento/30"
                 placeholder="••••••••"
               />
             </div>
@@ -88,17 +88,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 font-bold text-sm transition-opacity disabled:opacity-50"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+              className="mt-2 w-full rounded-lg bg-acento py-3 font-semibold text-sm text-principal shadow-sm transition-all hover:bg-acento-hover hover:shadow-md disabled:opacity-50 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-acento/50"
             >
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm mt-6" style={{ color: '#666' }}>
+        <p className="text-center text-sm mt-8 text-gray-500">
           ¿No tienes cuenta?{' '}
-          <Link href="/registro" className="font-semibold underline" style={{ color: '#000' }}>
+          <Link href="/registro" className="font-semibold text-principal hover:underline transition-all">
             Regístrate
           </Link>
         </p>

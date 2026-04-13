@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import TopBar from '@/components/TopBar'
 import type { Profile } from '@/lib/types'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -40,8 +41,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F6EF' }}>
-        <div className="text-sm" style={{ color: '#888' }}>Cargando…</div>
+      <div className="min-h-screen flex items-center justify-center bg-fondo">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-acento border-t-transparent animate-spin" />
+          <span className="text-sm text-gray-400">Cargando…</span>
+        </div>
       </div>
     )
   }
@@ -49,9 +53,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen">
       <Sidebar rol={profile!.rol} nombre={profile!.nombre} />
-      <main className="flex-1 p-8" style={{ backgroundColor: '#F9F6EF' }}>
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col">
+        <TopBar nombre={profile!.nombre} />
+        <main className="flex-1 p-8 bg-fondo">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

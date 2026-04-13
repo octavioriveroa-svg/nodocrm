@@ -45,12 +45,16 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     router.refresh()
   }
 
+  const initials = nombre
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
   return (
-    <aside
-      className="flex flex-col w-64 min-h-screen px-5 py-7"
-      style={{ backgroundColor: '#000000' }}
-    >
-      <div className="mb-10">
+    <aside className="flex flex-col w-[260px] min-h-screen px-4 py-6 bg-[#0F0F0F] shadow-xl">
+      <div className="mb-8 px-3">
         <Logo inverted size="sm" />
       </div>
 
@@ -63,11 +67,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: yellow ? '#D7FF2F' : 'transparent',
-                color: yellow ? '#000000' : '#ffffff',
-              }}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
             >
               <Icon size={16} />
               {label}
@@ -76,28 +76,28 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
         })}
       </nav>
 
-      <div className="mt-auto pt-6 border-t" style={{ borderColor: '#222' }}>
-        <div className="mb-3 px-3">
-          <p className="text-xs" style={{ color: '#888' }}>
-            {rol === 'admin' ? 'Administrador' : rol === 'analista' ? 'Analista' : 'EPCista'}
-          </p>
-          <p className="text-sm font-medium text-white truncate">{nombre}</p>
+      <div className="mt-auto pt-6 border-t border-white/10">
+        <div className="mb-3 px-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-acento flex items-center justify-center text-xs font-bold text-principal flex-shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wider">
+              {rol === 'admin' ? 'Admin' : rol === 'analista' ? 'Analista' : 'EPCista'}
+            </p>
+            <p className="text-sm font-medium text-white truncate">{nombre}</p>
+          </div>
         </div>
         <Link
           href={rol === 'admin' ? '/admin/configuracion' : rol === 'analista' ? '/analista/configuracion' : '/epcista/configuracion'}
-          className="flex items-center gap-3 px-3 py-2.5 rounded text-sm w-full transition-colors hover:bg-white/10"
-          style={{
-            color: pathname.includes('/configuracion') ? '#D7FF2F' : '#888',
-            backgroundColor: pathname.includes('/configuracion') ? 'rgba(215,255,47,0.1)' : 'transparent',
-          }}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
         >
           <Settings size={16} />
           Configuración
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded text-sm w-full transition-colors hover:bg-white/10"
-          style={{ color: '#888' }}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all text-gray-500 hover:text-white hover:bg-white/5"
         >
           <LogOut size={16} />
           Cerrar sesión

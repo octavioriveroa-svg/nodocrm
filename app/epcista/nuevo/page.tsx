@@ -523,8 +523,8 @@ export default function NuevoProyectoPage() {
     router.push(`/epcista/proyectos/${proyecto.id}`)
   }
 
-  const inp = "w-full border px-3 py-2 text-sm bg-white"
-  const borde = { borderColor: '#CFCFCF' }
+  const inp = "w-full rounded-lg border border-borde px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all"
+  const borde = {}
   const fvCalc = calcFV(fvForm)
   const bessCalc = calcBESS(bessForm)
   const anyHighDemanda = sitiosSeleccionados.some(id => (sitiosCliente.find(s => s.id === id)?.demanda_contratada_kw ?? 0) > 1000)
@@ -539,7 +539,7 @@ export default function NuevoProyectoPage() {
 
       <StepIndicator current={step} />
 
-      <div className="border p-8" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+      <div className="rounded-2xl border border-borde p-8 shadow-sm bg-white">
 
         {/* ══ PASO 0 — Información básica ══════════════════════ */}
         {step === 0 && (
@@ -588,10 +588,11 @@ export default function NuevoProyectoPage() {
                   return (
                     <button key={opt.value} type="button"
                       onClick={() => setF('tipo_instalacion', opt.value)}
-                      className="flex items-start gap-4 border p-4 text-left w-full transition-colors"
+                      className="flex items-start gap-4 rounded-xl border p-4 text-left w-full transition-all duration-200"
                       style={{
-                        borderColor: selected ? '#000' : '#CFCFCF',
+                        borderColor: selected ? '#000' : '#E5E5E5',
                         backgroundColor: selected ? '#000' : '#fff',
+                        boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)'
                       }}>
                       <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
                         style={{ borderColor: selected ? '#D7FF2F' : '#CFCFCF' }}>
@@ -601,7 +602,7 @@ export default function NuevoProyectoPage() {
                         <div className="font-semibold text-sm" style={{ color: selected ? '#D7FF2F' : '#000' }}>
                           {opt.title}
                         </div>
-                        <div className="text-xs mt-1" style={{ color: selected ? '#aaa' : '#666' }}>
+                        <div className="text-xs mt-1.5" style={{ color: selected ? '#aaa' : '#666' }}>
                           {opt.desc}
                         </div>
                       </div>
@@ -635,9 +636,9 @@ export default function NuevoProyectoPage() {
                   return (
                     <div key={s.id}>
                       {/* Fila sitio */}
-                      <div className="flex items-center gap-3 border p-3" style={{
-                        borderColor: selected ? '#000' : '#CFCFCF',
-                        backgroundColor: selected ? '#f5f5f0' : '#fff',
+                      <div className="flex items-center gap-3 border rounded-xl p-3 shadow-sm transition-all" style={{
+                        borderColor: selected ? '#000' : '#E5E5E5',
+                        backgroundColor: selected ? '#fafafa' : '#fff',
                       }}>
                         <input type="checkbox" id={`s-${s.id}`} checked={selected}
                           onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0" />
@@ -655,26 +656,26 @@ export default function NuevoProyectoPage() {
                             setEditandoSitioId(null)
                             setDeletingSitioId(null)
                           }}
-                            className="p-1.5 border transition-colors"
+                            className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: viendoSitioId === s.id ? '#000' : '#CFCFCF',
+                              borderColor: viendoSitioId === s.id ? '#000' : '#E5E5E5',
                               backgroundColor: viendoSitioId === s.id ? '#000' : '#fff',
                               color: viendoSitioId === s.id ? '#D7FF2F' : '#444',
                             }}>
                             <Eye size={13} />
                           </button>
                           <button type="button" onClick={() => abrirEditarSitio(s)}
-                            className="p-1.5 border transition-colors"
+                            className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: editandoSitioId === s.id ? '#000' : '#CFCFCF',
+                              borderColor: editandoSitioId === s.id ? '#000' : '#E5E5E5',
                               backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff',
                               color: '#444',
                             }}>
                             <Pencil size={13} />
                           </button>
                           <button type="button" onClick={() => { setDeletingSitioId(s.id); setViendoSitioId(null); setEditandoSitioId(null) }}
-                            className="p-1.5 border transition-colors"
-                            style={{ borderColor: '#CFCFCF', color: '#c00' }}>
+                            className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
+                            style={{ borderColor: '#E5E5E5', color: '#dc2626' }}>
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -1099,8 +1100,13 @@ export default function NuevoProyectoPage() {
                   return (
                     <button key={opt.value} type="button"
                       onClick={() => toggleModalidad(opt.value)}
-                      className="border p-3 text-left transition-colors"
-                      style={{ borderColor: selected ? '#000' : '#CFCFCF', backgroundColor: selected ? '#000' : '#fff', color: selected ? '#D7FF2F' : '#000' }}>
+                      className="border rounded-xl p-4 text-left transition-all duration-200"
+                      style={{ 
+                        borderColor: selected ? '#000' : '#E5E5E5', 
+                        backgroundColor: selected ? '#000' : '#fff', 
+                        color: selected ? '#D7FF2F' : '#000',
+                        boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)'
+                      }}>
                       <div className="font-semibold text-sm">{opt.label}</div>
                       <div className="text-xs mt-0.5 opacity-70">{opt.desc}</div>
                     </button>
@@ -1109,10 +1115,11 @@ export default function NuevoProyectoPage() {
               </div>
               <div className="mt-3">
                 <button type="button" onClick={() => toggleModalidad('no_sabe')}
-                  className="border p-3 text-left w-full transition-colors"
+                  className="border rounded-xl p-4 text-left w-full transition-all duration-200"
                   style={{
-                    borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#CFCFCF',
+                    borderColor: form.modalidad_financiamiento.includes('no_sabe') ? '#000' : '#E5E5E5',
                     backgroundColor: form.modalidad_financiamiento.includes('no_sabe') ? '#D7FF2F' : '#fff',
+                    boxShadow: form.modalidad_financiamiento.includes('no_sabe') ? '0 4px 12px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.02)',
                     color: '#000',
                   }}>
                   <div className="font-semibold text-sm">Prefiero que Nodo me recomiende las mejores alternativas para este cliente</div>
@@ -1132,21 +1139,20 @@ export default function NuevoProyectoPage() {
 
         {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
 
-        <div className="flex justify-between mt-8">
+        <div className="flex justify-between mt-10">
           <button type="button" onClick={() => { setError(''); setStep(s => s - 1) }}
-            disabled={step === 0} className="px-5 py-2 text-sm font-medium border disabled:opacity-30"
-            style={{ borderColor: '#CFCFCF' }}>
+            disabled={step === 0} className="px-5 py-2.5 text-sm font-medium border border-borde rounded-lg hover:bg-gray-50 transition-all disabled:opacity-30">
             Anterior
           </button>
           {step < 2 ? (
             <button type="button" onClick={handleNext}
-              className="px-5 py-2 text-sm font-bold"
+              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
               style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
               Siguiente
             </button>
           ) : (
             <button type="button" onClick={handleSubmit} disabled={loading}
-              className="px-5 py-2 text-sm font-bold disabled:opacity-50"
+              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50 hover:bg-[#1a1a1a]"
               style={{ backgroundColor: '#000', color: '#D7FF2F' }}>
               {loading ? 'Enviando...' : 'Enviar proyecto'}
             </button>

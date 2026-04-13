@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
+import { Button } from './ui/Button'
+import { Card, CardTitle } from './ui/Card'
 import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, TipoArchivo } from '@/lib/types'
 import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload } from 'lucide-react'
 import Link from 'next/link'
@@ -33,10 +35,10 @@ function formatDateTime(d: string) {
 
 function Seccion({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border p-6 mb-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-      <h3 className="font-bold text-sm uppercase tracking-wide mb-4" style={{ color: '#666' }}>{title}</h3>
+    <Card className="mb-4">
+      <CardTitle>{title}</CardTitle>
       {children}
-    </div>
+    </Card>
   )
 }
 
@@ -44,7 +46,7 @@ function Campo({ label, value }: { label: string; value?: string | number | null
   if (!value && value !== 0) return null
   return (
     <div>
-      <div className="text-xs font-medium mb-0.5" style={{ color: '#888' }}>{label}</div>
+      <div className="text-xs font-medium mb-0.5 text-gray-400">{label}</div>
       <div className="text-sm font-medium">{value}</div>
     </div>
   )
@@ -148,12 +150,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   function ArchivoItem({ a }: { a: Archivo }) {
     return (
-      <div className="flex items-center gap-3 border px-3 py-2.5" style={{ borderColor: '#CFCFCF' }}>
-        <Paperclip size={13} style={{ color: '#888', flexShrink: 0 }} />
+      <div className="flex items-center gap-3 border border-borde rounded-lg px-4 py-3 bg-white hover:border-gray-300 hover:shadow-sm transition-all group">
+        <div className="p-2 bg-gray-50 rounded-md group-hover:bg-gray-100 transition-colors">
+          <Paperclip size={16} className="text-gray-500 flex-shrink-0" />
+        </div>
         <div className="flex-1 min-w-0">
           <a href={a.url} target="_blank" rel="noopener noreferrer"
-            className="text-sm font-medium underline truncate block">{a.nombre}</a>
-          <div className="text-xs mt-0.5" style={{ color: '#888' }}>
+            className="text-sm font-semibold hover:underline truncate block text-principal transition-all">
+            {a.nombre}
+          </a>
+          <div className="text-xs mt-0.5 text-gray-500">
             {formatDate(a.created_at)} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
           </div>
         </div>
@@ -164,14 +170,15 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   function UploadBtn({ tipo, label, allowed }: { tipo: TipoArchivo; label: string; allowed: boolean }) {
     if (!allowed) return null
     return (
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => triggerUpload(tipo)}
         disabled={subiendoArchivo}
-        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium border disabled:opacity-40 transition-colors hover:border-black"
-        style={{ borderColor: '#CFCFCF' }}>
+      >
         <Upload size={11} />
         {subiendoArchivo && uploadTipoRef.current === tipo ? 'Subiendo…' : label}
-      </button>
+      </Button>
     )
   }
 
@@ -179,7 +186,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link href={backHref} className="inline-flex items-center gap-1 text-sm mb-4" style={{ color: '#666' }}>
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm mb-4 text-gray-500">
           <ChevronLeft size={14} />
           Volver
         </Link>
@@ -189,17 +196,17 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             <div className="flex items-center gap-3 mt-2">
               <BadgeTipo tipo={proyecto.tipo} />
               <BadgeEstado estado={proyecto.estado} />
-              <span className="text-sm" style={{ color: '#888' }}>{formatDate(proyecto.created_at)}</span>
+              <span className="text-sm text-gray-400">{formatDate(proyecto.created_at)}</span>
             </div>
           </div>
           {canChangeEstado && (
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#666' }}>Cambiar estado</label>
+              <label className="block text-xs font-semibold mb-1.5 text-gray-500 uppercase tracking-wide">Cambiar estado</label>
               <select
                 value={proyecto.estado}
                 onChange={e => cambiarEstado(e.target.value as EstadoProyecto)}
-                className="border px-3 py-1.5 text-sm font-medium"
-                style={{ borderColor: '#CFCFCF' }}>
+                className="w-full rounded-lg border border-borde px-3 py-2 text-sm font-medium focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white"
+              >
                 {Object.entries(ESTADO_LABELS).map(([val, lbl]) => (
                   <option key={val} value={val}>{lbl}</option>
                 ))}
@@ -223,23 +230,23 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         <Seccion title="Sitios del proyecto">
           <div className="flex flex-col gap-3">
             {sitios.map(s => (
-              <div key={s.id} className="border p-3" style={{ borderColor: '#CFCFCF' }}>
-                <p className="font-semibold text-sm">{s.nombre}</p>
-                {s.nombre_recibo && <p className="text-xs mt-0.5" style={{ color: '#888' }}>{s.nombre_recibo}</p>}
-                <div className="flex flex-wrap gap-3 mt-1">
+              <div key={s.id} className="border border-borde rounded-xl p-4 shadow-sm bg-[#fafafa]">
+                <p className="font-bold text-sm text-principal">{s.nombre}</p>
+                {s.nombre_recibo && <p className="text-xs mt-0.5 text-gray-500">{s.nombre_recibo}</p>}
+                <div className="flex flex-wrap gap-4 mt-2 pt-2 border-t border-gray-200/60">
                   {(s.ciudad || s.ubicacion_estado) && (
-                    <span className="flex items-center gap-1 text-xs" style={{ color: '#666' }}>
-                      <MapPin size={11} />
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                      <MapPin size={12} />
                       {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
                     </span>
                   )}
-                  {s.rpu && <span className="text-xs" style={{ color: '#666' }}>RPU: {s.rpu}</span>}
+                  {s.rpu && <span className="text-xs font-medium text-gray-500">RPU: {s.rpu}</span>}
                   {s.demanda_contratada_kw != null && (
-                    <span className="text-xs" style={{ color: '#666' }}>Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span>
+                    <span className="text-xs font-medium text-gray-500">Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span>
                   )}
                   {s.recibo_url && (
                     <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs underline" style={{ color: '#000' }}>Ver recibo CFE</a>
+                      className="text-xs font-semibold underline text-principal hover:text-gray-700 transition-colors">Ver recibo CFE</a>
                   )}
                 </div>
               </div>
@@ -253,8 +260,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         <Seccion title="Tipo de instalación">
           <div className="flex items-start gap-3">
             {proyecto.tipo_instalacion === 'nodo_busca'
-              ? <HelpCircle size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
-              : <Wrench size={16} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />}
+              ? <HelpCircle size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
+              : <Wrench size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />}
             <p className="text-sm font-medium">
               {proyecto.tipo_instalacion === 'nodo_busca'
                 ? 'Quiero que Nodo me ayude a encontrar un instalador'
@@ -280,7 +287,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               {Object.entries(bySitio).map(([sitioId, { nombre, items }]) => (
                 <div key={sitioId}>
                   <p className="text-sm font-bold mb-3 flex items-center gap-2">
-                    <MapPin size={13} style={{ color: '#888' }} /> {nombre}
+                    <MapPin size={13} className="text-gray-400" /> {nombre}
                   </p>
                   <div className="flex flex-col gap-3">
                     {items.map(p => {
@@ -295,11 +302,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                         const kwpInv = ni > 0 && pi > 0 ? ni * pi : null
                         const precioWatt = capex > 0 && nm > 0 && pw > 0 ? capex / (nm * pw) : null
                         return (
-                          <div key={p.id} className="border p-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fafff0' }}>
-                            <div className="flex items-center gap-2 font-bold text-sm mb-3">
-                              <Zap size={14} style={{ color: '#888' }} /> Fotovoltaico
+                          <div key={p.id} className="border border-borde rounded-xl p-5 bg-[#fafff0] shadow-sm">
+                            <div className="flex items-center gap-2 font-bold text-sm mb-4 text-[#4a5e1e]">
+                              <Zap size={16} /> Fotovoltaico
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-y-4 gap-x-2">
                               <Campo label="Módulos" value={`${d.num_modulos} × ${d.potencia_modulos_w} W`} />
                               <Campo label="Marca módulos" value={d.marca_modulos as string} />
                               <Campo label="kWp sistema" value={kwpSistema !== null ? `${n2(kwpSistema, 1)} kWp` : undefined} />
@@ -318,11 +325,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                         const capex = Number(d.capex) || 0
                         const precioKwh = capacidad > 0 && capex > 0 ? capex / capacidad : null
                         return (
-                          <div key={p.id} className="border p-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#f0f8ff' }}>
-                            <div className="flex items-center gap-2 font-bold text-sm mb-3">
-                              <Battery size={14} style={{ color: '#888' }} /> BESS
+                          <div key={p.id} className="border border-borde rounded-xl p-5 bg-[#f0f8ff] shadow-sm">
+                            <div className="flex items-center gap-2 font-bold text-sm mb-4 text-[#1a5a8f]">
+                              <Battery size={16} /> BESS
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-y-4 gap-x-2">
                               <Campo label="Potencia" value={`${d.potencia_kw} kW`} />
                               <Campo label="Capacidad" value={`${d.capacidad_kwh} kWh`} />
                               <Campo label="Marca" value={d.marca as string} />
@@ -346,8 +353,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* MEM */}
       {proyecto.incluye_mem && (
         <Seccion title="Mercado Eléctrico Mayorista">
-          <span className="inline-flex items-center px-3 py-1 text-xs font-semibold"
-            style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+          <span className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-acento text-principal">
             Alternativa MEM solicitada
           </span>
         </Seccion>
@@ -381,15 +387,15 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           <Campo label="Estado" value={proyecto.ubicacion_estado} />
         </div>
         <div>
-          <div className="text-xs font-medium mb-2" style={{ color: '#888' }}>Modalidad de financiamiento</div>
+          <div className="text-xs font-medium mb-2 text-gray-400">Modalidad de financiamiento</div>
           {noSabe ? (
-            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold" style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-acento text-principal">
               Analista define modalidad
             </span>
           ) : (
             <div className="flex flex-wrap gap-2">
               {modalidades.map(m => (
-                <span key={m} className="inline-flex items-center px-3 py-1 border text-xs font-medium" style={{ borderColor: '#CFCFCF' }}>
+                <span key={m} className="inline-flex items-center px-3 py-1 border border-borde text-xs font-medium">
                   {MODALIDAD_LABELS[m]}
                 </span>
               ))}
@@ -398,7 +404,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </div>
         {proyecto.notas_adicionales && (
           <div className="mt-4">
-            <div className="text-xs font-medium mb-1" style={{ color: '#888' }}>Notas adicionales</div>
+            <div className="text-xs font-medium mb-1 text-gray-400">Notas adicionales</div>
             <p className="text-sm whitespace-pre-wrap">{proyecto.notas_adicionales}</p>
           </div>
         )}
@@ -411,31 +417,31 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         {/* Recibo CFE */}
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Recibo CFE</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Recibo CFE</h4>
             <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista || isAdmin} />
           </div>
           {recibos.length === 0
-            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            ? <p className="text-xs text-gray-300">Sin archivos.</p>
             : <div className="flex flex-col gap-1">{recibos.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
 
-        <div className="border-t mb-5 pt-5" style={{ borderColor: '#CFCFCF' }}>
+        <div className="border-t border-borde mb-5 pt-5">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Propuesta</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Propuesta</h4>
             <UploadBtn tipo="propuesta" label="Subir propuesta" allowed={isAnalista} />
           </div>
           {propuestas.length === 0
-            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            ? <p className="text-xs text-gray-300">Sin archivos.</p>
             : <div className="flex flex-col gap-1">{propuestas.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
 
-        <div className="border-t pt-5" style={{ borderColor: '#CFCFCF' }}>
+        <div className="border-t border-borde pt-5">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#444' }}>Machote de contrato</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Machote de contrato</h4>
             <UploadBtn tipo="machote_contrato" label="Subir machote" allowed={isAnalista || isAdmin} />
           </div>
           {machotes.length === 0
-            ? <p className="text-xs" style={{ color: '#aaa' }}>Sin archivos.</p>
+            ? <p className="text-xs text-gray-300">Sin archivos.</p>
             : <div className="flex flex-col gap-1">{machotes.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
       </Seccion>
@@ -443,17 +449,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* Comentarios */}
       <Seccion title="Comentarios internos">
         <div className="flex flex-col gap-3 mb-4 max-h-80 overflow-y-auto">
-          {comentarios.length === 0 && <p className="text-sm" style={{ color: '#888' }}>Sin comentarios aún.</p>}
+          {comentarios.length === 0 && <p className="text-sm text-gray-400">Sin comentarios aún.</p>}
           {comentarios.map(c => (
             <div key={c.id} className="flex gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                style={{ backgroundColor: '#000', color: '#D7FF2F' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 bg-principal text-acento">
                 {((c.profiles as Profile | undefined)?.nombre ?? 'U').charAt(0).toUpperCase()}
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-sm font-semibold">{(c.profiles as Profile | undefined)?.nombre ?? 'Usuario'}</span>
-                  <span className="text-xs" style={{ color: '#888' }}>{formatDateTime(c.created_at)}</span>
+                  <span className="text-xs text-gray-400">{formatDateTime(c.created_at)}</span>
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{c.contenido}</p>
               </div>
@@ -467,14 +472,12 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComentario() } }}
             placeholder="Escribe un comentario… (Enter para enviar)"
             rows={2}
-            className="flex-1 border px-3 py-2 text-sm resize-none"
-            style={{ borderColor: '#CFCFCF' }}
+            className="flex-1 rounded-lg border border-borde px-4 py-3 text-sm resize-none focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white"
           />
-          <button onClick={enviarComentario} disabled={enviandoComentario || !nuevoComentario.trim()}
-            className="px-3 py-2 self-end disabled:opacity-40"
-            style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+          <Button onClick={enviarComentario} disabled={enviandoComentario || !nuevoComentario.trim()}
+            className="self-end">
             <Send size={16} />
-          </button>
+          </Button>
         </div>
       </Seccion>
     </div>
