@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ChevronDown, ChevronUp, MapPin, FileText, Zap, Sun } from 'lucide-react'
+import { Plus, Search, MapPin, Zap, Sun, Building2, Calendar, ArrowRight, SlidersHorizontal } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
-import type { Proyecto } from '@/lib/types'
+import type { Proyecto, EstadoProyecto } from '@/lib/types'
 
 interface PortafolioStats {
   bess_kw: number
@@ -36,6 +36,20 @@ function formatDate(dateStr: string) {
   })
 }
 
+/** Segment tabs configuration */
+type Segment = 'todos' | EstadoProyecto
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: 'todos', label: 'Todos' },
+  { key: 'recibido', label: 'Recibido' },
+  { key: 'en_analisis', label: 'En análisis' },
+  { key: 'propuesta_lista', label: 'Propuesta lista' },
+  { key: 'enviada', label: 'Enviada' },
+  { key: 'cliente_interesado', label: 'Cliente interesado' },
+]
+
+/** Type filter options */
+const TYPE_OPTIONS = ['BESS', 'MEM', 'BESS+MEM', 'FV', 'FV+BESS'] as const
+
 interface Props {
   initialProyectos: Proyecto[]
   initialPortafolio: PortafolioStats | null
@@ -45,7 +59,12 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<Proyecto[]>(initialProyectos)
   const [portafolio] = useState<PortafolioStats | null>(initialPortafolio)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // Filters
+  const [segment, setSegment] = useState<Segment>('todos')
+  const [search, setSearch] = useState('')
+  const [tipoFilter, setTipoFilter] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   // Realtime: sync changes from admin/analista
   useEffect(() => {
@@ -61,12 +80,48 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  /** Filtered & searched projects */
+  const filtered = useMemo(() => {
+    let result = proyectos
+    // Segment filter
+    if (segment !== 'todos') {
+      result = result.filter(p => p.estado === segment)
+    }
+    // Type filter
+    if (tipoFilter) {
+      result = result.filter(p => p.tipo === tipoFilter)
+    }
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(p =>
+        p.nombre_proyecto.toLowerCase().includes(q) ||
+        p.cliente_final_empresa?.toLowerCase().includes(q) ||
+        p.cliente_final_nombre?.toLowerCase().includes(q) ||
+        p.ubicacion_estado?.toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [proyectos, segment, search, tipoFilter])
+
+  /** Segment counts */
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { todos: proyectos.length }
+    for (const s of SEGMENTS) {
+      if (s.key !== 'todos') {
+        c[s.key] = proyectos.filter(p => p.estado === s.key).length
+      }
+    }
+    return c
+  }, [proyectos])
+
   const total = proyectos.length
   const enAnalisis = proyectos.filter(p => p.estado === 'en_analisis').length
   const clienteInteresado = proyectos.filter(p => p.estado === 'cliente_interesado').length
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <p className="text-sm text-gray-400 mb-1">Bienvenido de vuelta</p>
@@ -81,6 +136,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
         </Link>
       </div>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-5 mb-8">
         {[
           { label: 'Total proyectos', value: total },
@@ -147,6 +203,94 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
         </div>
       )}
 
+      {/* Segment Tabs + Search Bar */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-1 bg-white border border-borde rounded-xl p-1 shadow-sm overflow-x-auto">
+            {SEGMENTS.map(s => {
+              const count = counts[s.key] ?? 0
+              const active = segment === s.key
+              // Hide tabs with 0 count (except "todos")
+              if (s.key !== 'todos' && count === 0) return null
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setSegment(s.key)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    active
+                      ? 'bg-principal text-acento shadow-sm'
+                      : 'text-gray-500 hover:text-principal hover:bg-gray-50'
+                  }`}
+                >
+                  {s.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    active ? 'bg-acento text-principal' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Search + Filter Controls */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar proyecto..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 w-56 text-xs rounded-lg border border-borde bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all placeholder:text-gray-400"
+              />
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                showFilters || tipoFilter
+                  ? 'border-acento bg-acento/10 text-principal'
+                  : 'border-borde bg-white text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              <SlidersHorizontal size={13} />
+              Filtros
+              {tipoFilter && (
+                <span className="w-1.5 h-1.5 rounded-full bg-acento" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Dropdown */}
+        {showFilters && (
+          <div className="flex items-center gap-2 px-1 mb-4 animate-in fade-in slide-in-from-top-1">
+            <span className="text-xs text-gray-400 font-medium mr-1">Tipo:</span>
+            <button
+              onClick={() => setTipoFilter(null)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                !tipoFilter ? 'bg-principal text-acento' : 'bg-white border border-borde text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              Todos
+            </button>
+            {TYPE_OPTIONS.map(t => (
+              <button
+                key={t}
+                onClick={() => setTipoFilter(tipoFilter === t ? null : t)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  tipoFilter === t ? 'bg-principal text-acento' : 'bg-white border border-borde text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Projects Grid */}
       {proyectos.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-borde p-16 flex flex-col items-center text-center">
           <p className="font-semibold text-lg">Aún no tienes proyectos</p>
@@ -156,118 +300,98 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
             Nuevo proyecto
           </Link>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-borde bg-white p-12 text-center shadow-sm">
+          <p className="text-sm text-gray-500">No se encontraron proyectos con los filtros aplicados.</p>
+          <button
+            onClick={() => { setSegment('todos'); setSearch(''); setTipoFilter(null) }}
+            className="mt-3 text-xs font-semibold text-principal underline underline-offset-4 hover:text-acento-hover transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        </div>
       ) : (
-        <div className="rounded-xl border border-borde overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-borde">
-                <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-gray-400">Proyecto</th>
-                <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-gray-400">Tipo</th>
-                <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-gray-400">Estado</th>
-                <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-gray-400">Fecha</th>
-                <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-gray-400"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyectos.map((p, i) => {
-                const isExpanded = expandedId === p.id
-                const modalidades = p.modalidad_financiamiento ?? []
-                const noSabe = modalidades.includes('no_sabe')
-                return (
-                  <>
-                    <tr
-                      key={p.id}
-                      className={`border-t border-borde cursor-pointer hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-fondo' : i % 2 === 0 ? 'bg-white' : 'bg-fondo/50'}`}
-                      onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                    >
-                      <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium hover:underline">{p.nombre_proyecto}</span>
-                          {isExpanded
-                            ? <ChevronUp size={13} className="text-gray-400 flex-shrink-0" />
-                            : <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3.5"><BadgeTipo tipo={p.tipo} /></td>
-                      <td className="px-6 py-3.5"><BadgeEstado estado={p.estado} /></td>
-                      <td className="px-6 py-3.5 text-gray-400 text-xs">{formatDate(p.created_at)}</td>
-                      <td className="px-6 py-3.5" onClick={e => e.stopPropagation()}>
-                        <Link href={`/epcista/proyectos/${p.id}`} className="font-semibold text-xs text-gray-400 hover:text-principal transition-colors">Ver detalle →</Link>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr key={`${p.id}-detail`} className="border-t border-borde">
-                        <td colSpan={5} className="px-6 py-4 bg-[#f5f5f0]">
-                          <div className="grid grid-cols-3 gap-x-8 gap-y-3 text-sm">
-                            {p.cliente_final_empresa && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Empresa</div>
-                                <div className="font-medium">{p.cliente_final_empresa}</div>
-                              </div>
-                            )}
-                            {p.cliente_final_nombre && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Contacto</div>
-                                <div className="font-medium">{p.cliente_final_nombre}</div>
-                              </div>
-                            )}
-                            {p.ubicacion_estado && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Estado</div>
-                                <div className="font-medium flex items-center gap-1">
-                                  <MapPin size={11} className="text-gray-400" />
-                                  {p.ubicacion_estado}
-                                </div>
-                              </div>
-                            )}
-                            {p.tipo_instalacion && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Instalación</div>
-                                <div className="font-medium">{p.tipo_instalacion === 'nodo_busca' ? 'Nodo busca instalador' : 'EPCista instala'}</div>
-                              </div>
-                            )}
-                            {p.capex_estimado != null && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">CAPEX estimado</div>
-                                <div className="font-medium">{p.moneda} {p.capex_estimado.toLocaleString('es-MX')}</div>
-                              </div>
-                            )}
-                            {modalidades.length > 0 && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Financiamiento</div>
-                                <div className="font-medium">
-                                  {noSabe ? 'Analista define' : modalidades.map(m => MODALIDAD_LABELS[m] ?? m).join(', ')}
-                                </div>
-                              </div>
-                            )}
-                            {p.incluye_mem && (
-                              <div>
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">MEM</div>
-                                <div className="font-medium">Alternativa solicitada</div>
-                              </div>
-                            )}
-                            {p.notas_adicionales && (
-                              <div className="col-span-3">
-                                <div className="text-xs font-medium mb-0.5 text-gray-400">Notas</div>
-                                <div className="text-sm whitespace-pre-wrap">{p.notas_adicionales}</div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="mt-4 pt-4 flex justify-end border-t border-borde">
-                            <Link href={`/epcista/proyectos/${p.id}`}
-                              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-principal text-acento rounded-lg hover:bg-[#1a1a1a] transition-colors">
-                              <FileText size={12} />
-                              Ver detalle completo
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(p => {
+            const modalidades = p.modalidad_financiamiento ?? []
+            const noSabe = modalidades.includes('no_sabe')
+            return (
+              <Link
+                key={p.id}
+                href={`/epcista/proyectos/${p.id}`}
+                className="rounded-xl border border-borde bg-white p-5 shadow-sm hover:shadow-lg hover:border-gray-300 transition-all group flex flex-col h-full"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-sm text-principal truncate" title={p.nombre_proyecto}>
+                      {p.nombre_proyecto}
+                    </h3>
+                    {p.cliente_final_empresa && (
+                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 truncate">
+                        <Building2 size={12} className="text-gray-400 shrink-0" />
+                        {p.cliente_final_empresa}
+                      </p>
                     )}
-                  </>
-                )
-              })}
-            </tbody>
-          </table>
+                  </div>
+                  <BadgeEstado estado={p.estado} />
+                </div>
+
+                {/* Card Body — Metadata */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <BadgeTipo tipo={p.tipo} />
+                  {p.ubicacion_estado && (
+                    <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-50 px-2 py-1 rounded-full">
+                      <MapPin size={11} className="text-gray-400" />
+                      {p.ubicacion_estado}
+                    </span>
+                  )}
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs flex-1">
+                  {p.capex_estimado != null && (
+                    <div>
+                      <span className="text-gray-400 block">CAPEX</span>
+                      <span className="font-semibold text-principal">{p.moneda} {p.capex_estimado.toLocaleString('es-MX')}</span>
+                    </div>
+                  )}
+                  {modalidades.length > 0 && (
+                    <div>
+                      <span className="text-gray-400 block">Financiamiento</span>
+                      <span className="font-semibold text-principal truncate">
+                        {noSabe ? 'Analista define' : modalidades.map(m => MODALIDAD_LABELS[m] ?? m).join(', ')}
+                      </span>
+                    </div>
+                  )}
+                  {p.cliente_final_nombre && (
+                    <div>
+                      <span className="text-gray-400 block">Contacto</span>
+                      <span className="font-semibold text-principal truncate">{p.cliente_final_nombre}</span>
+                    </div>
+                  )}
+                  {p.tipo_instalacion && (
+                    <div>
+                      <span className="text-gray-400 block">Instalación</span>
+                      <span className="font-semibold text-principal">{p.tipo_instalacion === 'nodo_busca' ? 'Nodo busca' : 'EPCista'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer */}
+                <div className="mt-auto pt-4 border-t border-borde flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                    <Calendar size={11} />
+                    {formatDate(p.created_at)}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-principal group-hover:text-acento-hover transition-colors">
+                    Ver detalle
+                    <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
