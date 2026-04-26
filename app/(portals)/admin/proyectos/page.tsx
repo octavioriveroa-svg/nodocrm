@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Trash2, Eye } from 'lucide-react'
+import { Trash2, Eye, Plus } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { Proyecto, EstadoProyecto, TipoProyecto } from '@/lib/types'

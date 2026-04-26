@@ -270,6 +270,79 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </div>
       </Seccion>
 
+      {/* Accesos al Portal */}
+      <Seccion title="Accesos al Portal">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
+            <p className="font-bold text-sm text-principal mb-1">Portal de Cliente</p>
+            {proyecto.cliente_id ? (
+              <p className="text-xs font-semibold text-green-600 bg-green-100 inline-block px-2 py-1 rounded-md">Usuario vinculado</p>
+            ) : (
+              <div>
+                <p className="text-xs text-gray-500 mb-3">El cliente no tiene acceso al portal para ver su Gantt ni sus documentos.</p>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    const email = prompt('Correo del cliente a invitar:', proyecto.cliente_final_contacto?.trim())
+                    if (!email) return
+                    const { invitarUsuario } = await import('@/app/actions/invitar')
+                    const res = await invitarUsuario({
+                      email,
+                      nombre: proyecto.cliente_final_nombre || 'Cliente',
+                      empresa: proyecto.cliente_final_empresa || 'Empresa',
+                      rol: 'cliente_final',
+                      proyecto_id: proyecto.id
+                    })
+                    if (res.error) alert(res.error)
+                    else {
+                      alert('¡Invitación enviada con éxito al cliente!')
+                      window.location.reload()
+                    }
+                  }}
+                >
+                  <Send size={12} className="mr-1.5" /> Invitar Cliente
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
+            <p className="font-bold text-sm text-principal mb-1">Portal Financiero</p>
+            {proyecto.financiero_id ? (
+              <p className="text-xs font-semibold text-green-600 bg-green-100 inline-block px-2 py-1 rounded-md">Inversionista vinculado</p>
+            ) : (
+              <div>
+                <p className="text-xs text-gray-500 mb-3">El proyecto no está vinculado al portafolio de ningún usuario financiero.</p>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    const email = prompt('Correo del financiero a invitar:')
+                    if (!email) return
+                    const { invitarUsuario } = await import('@/app/actions/invitar')
+                    const res = await invitarUsuario({
+                      email,
+                      nombre: 'Inversionista',
+                      empresa: 'Fondo de Inversión',
+                      rol: 'financiero',
+                      proyecto_id: proyecto.id
+                    })
+                    if (res.error) alert(res.error)
+                    else {
+                      alert('¡Invitación enviada con éxito al financiero!')
+                      window.location.reload()
+                    }
+                  }}
+                >
+                  <Send size={12} className="mr-1.5" /> Invitar Financiero
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Seccion>
+
       {/* Sitios */}
       {sitios.length > 0 && (
         <Seccion title="Sitios del proyecto">

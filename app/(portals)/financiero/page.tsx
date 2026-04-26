@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { TrendingUp, Activity, DollarSign, Briefcase } from 'lucide-react'
+import { TrendingUp, Activity, DollarSign, Briefcase, ChevronRight } from 'lucide-react'
+import EnergyChart from '@/components/telemetry/EnergyChart'
+import Link from 'next/link'
 
 interface PortfolioMetrics {
   activeProjectsCount: number
@@ -11,9 +13,21 @@ interface PortfolioMetrics {
   batteryCycles: number
 }
 
+interface ProjectMetric {
+  id: string
+  nombre_proyecto: string
+  cliente_final_empresa: string
+  capex_estimado: number | null
+  estado: string
+  totalGeneratedKwh: number
+  estimatedSavingsMxn: number
+}
+
 export default function FinancieroDashboard() {
   const supabase = createClient()
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
+  const [projectMetrics, setProjectMetrics] = useState<ProjectMetric[]>([])
+  const [chartData, setChartData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -24,7 +38,7 @@ export default function FinancieroDashboard() {
       // 1. Fetch all projects assigned to this financier
       const { data: projs, error: pErr } = await supabase
         .from('proyectos')
-        .select('id')
+        .select('id, nombre_proyecto, cliente_final_empresa, capex_estimado, estado')
         .eq('financiero_id', session.user.id)
       
       if (pErr) {
@@ -44,12 +58,13 @@ export default function FinancieroDashboard() {
       // 2. Fetch all telemetry for these projects to aggregate
       const { data: teleData, error: tErr } = await supabase
         .from('telemetria_egauge')
-        .select('solar_produccion_kwh')
+        .select('*')
         .in('proyecto_id', projectIds)
+        .order('timestamp', { ascending: true })
 
       if (tErr) console.error(tErr)
 
-      const totalGenerated = teleData ? teleData.reduce((acc, row) => acc + row.solar_produccion_kwh, 0) : 0
+      const totalGenerated = teleData ? teleData.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0) : 0
       
       setMetrics({
         activeProjectsCount: projs.length,
@@ -58,6 +73,47 @@ export default function FinancieroDashboard() {
         batteryCycles: Math.floor(totalGenerated / 100) // Rough estimation of cycles based on energy
       })
 
+      // Aggregate chart data by timestamp across portfolio
+      const timeMap = new Map<string, { solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number }>()
+
+      if (teleData) {
+        teleData.forEach(t => {
+          const key = t.timestamp
+          const exist = timeMap.get(key) || { solarProductionKwh: 0, gridConsumptionKwh: 0, batteryDischargeKwh: 0 }
+          
+          exist.solarProductionKwh += t.solar_produccion_kwh || 0
+          exist.gridConsumptionKwh += t.consumo_red_kwh || 0
+          exist.batteryDischargeKwh += t.bateria_descarga_kwh || 0
+          
+          timeMap.set(key, exist)
+        })
+      }
+
+      const cData = Array.from(timeMap.entries()).map(([timestamp, data]) => ({
+        timestamp,
+        solarProductionKwh: data.solarProductionKwh,
+        gridConsumptionKwh: data.gridConsumptionKwh,
+        batteryDischargeKwh: data.batteryDischargeKwh
+      })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      
+      setChartData(cData)
+
+      // Calculate project breakdown
+      const pMetrics = projs.map(p => {
+        const pTele = teleData?.filter(t => t.proyecto_id === p.id) || []
+        const pGen = pTele.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0)
+        return {
+          id: p.id,
+          nombre_proyecto: p.nombre_proyecto,
+          cliente_final_empresa: p.cliente_final_empresa,
+          capex_estimado: p.capex_estimado,
+          estado: p.estado,
+          totalGeneratedKwh: pGen,
+          estimatedSavingsMxn: pGen * 3.9
+        }
+      })
+
+      setProjectMetrics(pMetrics)
       setLoading(false)
     }
 
@@ -126,12 +182,63 @@ export default function FinancieroDashboard() {
             </div>
           </div>
 
-          <div className="p-8 glass-card shadow-sm">
+          {/* Aggregate Telemetry Chart */}
+          {chartData.length > 0 && (
+            <div className="mt-8">
+              <EnergyChart data={chartData} />
+            </div>
+          )}
+
+          {/* Breakdown Table */}
+          <div className="p-8 glass-card shadow-sm mt-8">
             <h3 className="text-lg font-bold text-principal mb-4">Desglose de Proyectos</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 mb-6">
               Listado de activos individuales operando bajo tu portafolio de inversión.
             </p>
-            {/* Future list of individual projects can go here */}
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-borde/50 text-xs uppercase tracking-wider text-gray-400 font-semibold">
+                    <th className="py-3 px-4">Proyecto</th>
+                    <th className="py-3 px-4">Cliente</th>
+                    <th className="py-3 px-4">CAPEX</th>
+                    <th className="py-3 px-4">Generado</th>
+                    <th className="py-3 px-4">Retorno Est.</th>
+                    <th className="py-3 px-4">Estado</th>
+                    <th className="py-3 px-4"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectMetrics.map(p => (
+                    <tr key={p.id} className="border-b border-borde/50 hover:bg-black/5 transition-colors group">
+                      <td className="py-4 px-4 font-bold text-principal">{p.nombre_proyecto}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{p.cliente_final_empresa}</td>
+                      <td className="py-4 px-4 font-mono text-sm">
+                        ${(p.capex_estimado || 0).toLocaleString('es-MX')}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm">
+                        {p.totalGeneratedKwh.toLocaleString('es-MX', { maximumFractionDigits: 1 })} kWh
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-green-600 font-medium">
+                        ${p.estimatedSavingsMxn.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${p.estado === 'operativo' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {p.estado.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <Link href={`/financiero/proyectos/${p.id}`} className="text-gray-400 hover:text-acento transition-colors flex items-center justify-end">
+                          <span className="text-sm font-medium mr-1 opacity-0 group-hover:opacity-100 transition-opacity">Ver</span>
+                          <ChevronRight size={18} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
