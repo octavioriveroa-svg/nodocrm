@@ -85,9 +85,9 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTipoRef = useRef<TipoArchivo>('recibo_cfe')
 
-  const isAnalista = currentUser.rol === 'analista'
-  const isAdmin = currentUser.rol === 'admin'
-  const isEpcista = currentUser.rol === 'epcista'
+  const isAnalista = currentUser.rol === 'nodo_analista'
+  const isAdmin = currentUser.rol === 'nodo_admin'
+  const isEpcista = currentUser.rol === 'epc'
   const canChangeEstado = isAnalista || isAdmin
   const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epc'
 

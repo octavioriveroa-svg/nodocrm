@@ -59,9 +59,9 @@ export default async function AnalistaDashboard() {
   const initialOfertas: OfertaRow[] = (ofertasData ?? []).map(o => ({
     id: o.id,
     proyecto_id: o.proyecto_id,
-    proyecto_nombre: Array.isArray(o.proyectos) ? o.proyectos[0]?.nombre_proyecto : o.proyectos?.nombre_proyecto || '—',
+    proyecto_nombre: Array.isArray(o.proyectos) ? (o.proyectos as any)[0]?.nombre_proyecto : (o.proyectos as any)?.nombre_proyecto || '—',
     suministrador_id: o.suministrador_id,
-    suministrador_nombre: Array.isArray(o.profiles) ? o.profiles[0]?.nombre : o.profiles?.nombre || '—',
+    suministrador_nombre: Array.isArray(o.profiles) ? (o.profiles as any)[0]?.nombre : (o.profiles as any)?.nombre || '—',
     precio_kwh: o.precio_kwh,
     vigencia_meses: o.vigencia_meses,
     estado: o.estado,

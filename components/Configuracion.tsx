@@ -247,7 +247,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Rol en la plataforma</label>
                   <input type="text"
-                    value={initialProfile.rol === 'analista' ? 'Analista' : 'EPCista'}
+                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : 'EPCista'}
                     disabled className={inp} style={inpDisabled} />
                 </div>
               </div>
