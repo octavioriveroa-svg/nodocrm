@@ -72,7 +72,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     .slice(0, 2)
 
   return (
-    <aside className="flex flex-col w-[260px] m-4 mr-0 p-5 rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-10">
+    <aside className="sticky top-4 h-[calc(100vh-2rem)] flex flex-col w-[260px] m-4 mr-0 p-5 rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-10">
       <div className="mb-8 px-1">
         <Logo inverted size="sm" />
       </div>
