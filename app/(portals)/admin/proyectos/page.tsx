@@ -98,10 +98,16 @@ export default function AdminProyectosPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8 relative">
-        <p className="text-sm text-gray-400 mb-1">Directorio</p>
-        <h1 className="text-2xl font-black tracking-tight mt-1">Proyectos</h1>
-        <p className="text-sm mt-1.5 text-gray-500">Todos los proyectos de la plataforma</p>
+      <div className="mb-8 relative flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-400 mb-1">Directorio</p>
+          <h1 className="text-2xl font-black tracking-tight mt-1">Proyectos</h1>
+          <p className="text-sm mt-1.5 text-gray-500">Todos los proyectos de la plataforma</p>
+        </div>
+        <Link href="/admin/proyectos/nuevo" className="flex items-center gap-2 bg-acento text-principal px-4 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity shadow-sm">
+          <Plus size={18} />
+          Nuevo Proyecto
+        </Link>
       </div>
 
       {/* Filtros */}

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import BatteryStatus from '@/components/telemetry/BatteryStatus'
-import { ChevronLeft, Zap, DollarSign, Battery, MapPin, Briefcase } from 'lucide-react'
+import { ChevronLeft, Zap, MapPin, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto } from '@/lib/types'
 

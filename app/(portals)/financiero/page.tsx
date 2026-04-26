@@ -27,7 +27,7 @@ export default function FinancieroDashboard() {
   const supabase = createClient()
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectMetrics, setProjectMetrics] = useState<ProjectMetric[]>([])
-  const [chartData, setChartData] = useState<any[]>([])
+  const [chartData, setChartData] = useState<{timestamp: string, solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number}[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
