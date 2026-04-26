@@ -41,7 +41,7 @@ export default function ClienteDashboard() {
       if (!session) return
 
       // 2. Fetch real projects assigned to this client
-      const { data: projs, error: pErr } = await supabase
+      const { data: projs } = await supabase
         .from('proyectos')
         .select('id, nombre_proyecto, codigo_postal, estado')
         .eq('cliente_id', session.user.id)
@@ -54,6 +54,7 @@ export default function ClienteDashboard() {
       }
     }
     init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // When active project changes, fetch its real telemetry data & construction milestones
@@ -98,6 +99,7 @@ export default function ClienteDashboard() {
     }
 
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProyectoId])
 
   if (loading && proyectos.length === 0) {

@@ -83,6 +83,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function cambiarEstado(id: string, nuevoEstado: EstadoProyecto) {

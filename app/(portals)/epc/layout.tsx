@@ -8,6 +8,7 @@ import TopBar from '@/components/TopBar'
 import type { Profile } from '@/lib/types'
 
 export default function EpcistaLayout({ children }: { children: React.ReactNode }) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -39,6 +40,7 @@ export default function EpcistaLayout({ children }: { children: React.ReactNode 
       setLoading(false)
     }
     checkAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {

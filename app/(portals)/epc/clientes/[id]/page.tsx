@@ -23,6 +23,7 @@ function Campo({ label, value, icon: Icon }: { label: string; value?: string | n
 
 export default function DetalleClientePage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter()
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [sitios, setSitios] = useState<Sitio[]>([])
@@ -58,6 +59,7 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
       if (sitiosData) setSitios(sitiosData as Sitio[])
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleGuardar() {

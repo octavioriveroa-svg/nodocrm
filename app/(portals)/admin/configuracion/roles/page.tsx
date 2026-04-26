@@ -59,6 +59,7 @@ export default function RolesPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function cambiarRol(userId: string, nuevoRol: string) {

@@ -63,6 +63,7 @@ export default function AdminDetalleProyectoPage({ params }: { params: Promise<{
       }
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loadError) return (

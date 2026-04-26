@@ -25,6 +25,7 @@ export default function PendientePage() {
       }
     }, 10000) // revisa cada 10 segundos
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

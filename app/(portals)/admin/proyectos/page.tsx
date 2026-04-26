@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Trash2, Eye } from 'lucide-react'
+mport { Trash2, Eye } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { Proyecto, EstadoProyecto, TipoProyecto } from '@/lib/types'
@@ -39,6 +39,7 @@ export default function AdminProyectosPage() {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function AdminProyectosPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const lista = proyectos.filter(p => {

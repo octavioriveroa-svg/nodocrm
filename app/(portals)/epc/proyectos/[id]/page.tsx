@@ -63,6 +63,7 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
       }
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loadError) return (

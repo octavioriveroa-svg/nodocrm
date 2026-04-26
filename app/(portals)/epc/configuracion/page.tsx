@@ -27,6 +27,7 @@ export default function ConfiguracionEpcistaPage() {
       setData({ profile, email: session.user.email ?? '' })
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!data) return null

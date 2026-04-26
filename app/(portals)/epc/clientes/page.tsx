@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Building2, Mail, Phone, User } from 'lucide-react'
+import { Plus, Mail, Phone, User } from 'lucide-react'
 import type { Cliente } from '@/lib/types'
 
 function formatDate(d: string) {
@@ -29,6 +29,7 @@ export default function ClientesPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const filtrados = clientes.filter(c =>

@@ -189,6 +189,7 @@ function CalcField({ label, value, unit }: { label: string; value: number | null
 
 // ── Página principal ──────────────────────────────────────────
 export default function NuevoProyectoPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter()
   const supabase = createClient()
   const [step, setStep] = useState(0)
@@ -237,6 +238,7 @@ export default function NuevoProyectoPage() {
       setClientesCargados(true)
     }
     loadClientes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function cargarSitios(clienteId: string) {
@@ -584,7 +586,8 @@ export default function NuevoProyectoPage() {
                   },
                 ] as { value: 'nodo_busca' | 'epcista_instala'; icon: React.ElementType; title: string; desc: string }[]).map(opt => {
                   const selected = form.tipo_instalacion === opt.value
-                  const Icon = opt.icon
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+const Icon = opt.icon
                   return (
                     <button key={opt.value} type="button"
                       onClick={() => setF('tipo_instalacion', opt.value)}

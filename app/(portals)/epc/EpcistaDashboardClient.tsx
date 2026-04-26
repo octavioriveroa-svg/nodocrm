@@ -78,6 +78,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /** Filtered & searched projects */
@@ -102,6 +103,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
       )
     }
     return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectos, segment, search, tipoFilter])
 
   /** Segment counts */
@@ -113,6 +115,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
       }
     }
     return c
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectos])
 
   const total = proyectos.length

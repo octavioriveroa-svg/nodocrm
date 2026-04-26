@@ -53,6 +53,7 @@ export default function GanttChart({ hitos, onHitoClick, readOnly = true }: Gant
     maxDate.setDate(maxDate.getDate() + 7)
 
     return { globalStart: minDate, globalEnd: maxDate }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedHitos])
 
   const totalWeeks = getWeeksBetween(globalStart, globalEnd)
@@ -121,7 +122,7 @@ export default function GanttChart({ hitos, onHitoClick, readOnly = true }: Gant
           </div>
 
           <div className="relative z-10 flex flex-col">
-            {sortedHitos.map((hito, index) => {
+            {sortedHitos.map((hito) => {
               const startPct = getPercentage(hito.fecha_estimada_inicio)
               const endPct = getPercentage(hito.fecha_estimada_fin)
               const hasEstimates = startPct !== null && endPct !== null

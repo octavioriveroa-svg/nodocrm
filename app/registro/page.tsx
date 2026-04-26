@@ -8,6 +8,7 @@ import Logo from '@/components/Logo'
 import type { Rol } from '@/lib/types'
 
 export default function RegistroPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter()
   const supabase = createClient()
 

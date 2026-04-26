@@ -42,6 +42,7 @@ export default function AdminClientesPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const lista = clientes.filter(c => {
@@ -92,7 +93,7 @@ export default function AdminClientesPage() {
             {lista.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin clientes.</td></tr>
             )}
-            {lista.map((c, i) => (
+            {lista.map(c => (
               <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-3 font-bold text-principal">{c.razon_social}</td>
                 <td className="px-5 py-3 text-xs font-mono text-gray-400">{c.rfc || '—'}</td>

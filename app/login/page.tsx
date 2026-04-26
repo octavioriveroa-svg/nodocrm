@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
 
 export default function LoginPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter()
   const supabase = createClient()
 

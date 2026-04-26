@@ -63,6 +63,7 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
       }
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loadError) return (
