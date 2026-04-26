@@ -50,63 +50,38 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  // Routing basado en subdominios
   const url = request.nextUrl
-  const hostname = request.headers.get('host') || 'localhost:3000'
+  const path = url.pathname
 
-  // Remover puertos y dominio principal para obtener el subdominio
-  const cleanHostname = hostname.replace(/:\d+$/, '') // remover puerto
-  
-  let subdomain = ''
-  if (cleanHostname.endsWith('.nodo.energy')) {
-    subdomain = cleanHostname.replace('.nodo.energy', '')
-  } else if (cleanHostname.endsWith('.localhost')) {
-    subdomain = cleanHostname.replace('.localhost', '')
+  // Protected portals list
+  const isProtectedPath = path.startsWith('/admin') || path.startsWith('/epc') || 
+                          path.startsWith('/analista') || path.startsWith('/cliente') || 
+                          path.startsWith('/financiero') || path.startsWith('/mem')
+
+  // Si no hay sesión y tratan de entrar a un portal privado, redirigir a login
+  if (isProtectedPath && !session) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si no hay sesión y tratan de entrar a un subdominio privado, redirigir a login
-  if (subdomain && subdomain !== 'www' && !session) {
-    if (url.pathname !== '/login') {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-
-  // Si hay sesión y están en login, redirigirlos a su subdominio
-  if (session && url.pathname === '/login') {
-    // Obtener rol del perfil para saber a qué subdominio mandarlos
+  // Si hay sesión y están en login/registro/home, redirigirlos a su portal
+  if (session && (path === '/login' || path === '/registro' || path === '/')) {
+    // Obtener rol del perfil para saber a qué portal mandarlos
     const { data: profile } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single()
     const rol = profile?.rol || session.user.user_metadata?.rol
     
-    let targetSubdomain = ''
+    let targetPath = ''
     switch(rol) {
-      case 'epc': targetSubdomain = 'epc'; break;
-      case 'nodo_analista': targetSubdomain = 'analista'; break;
-      case 'nodo_admin': targetSubdomain = 'admin'; break;
-      case 'cliente_final': targetSubdomain = 'cliente'; break;
-      case 'financiero': targetSubdomain = 'financiero'; break;
-      case 'suministrador': targetSubdomain = 'mem'; break;
+      case 'epc': targetPath = 'epc'; break;
+      case 'nodo_analista': targetPath = 'analista'; break;
+      case 'nodo_admin': targetPath = 'admin'; break;
+      case 'cliente_final': targetPath = 'cliente'; break;
+      case 'financiero': targetPath = 'financiero'; break;
+      case 'suministrador': targetPath = 'mem'; break;
     }
 
-    const isNodoEnergy = hostname.endsWith('nodo.energy')
-
-    if (targetSubdomain && targetSubdomain !== subdomain) {
-      if (isNodoEnergy) {
-        // Production: Redirect to the proper subdomain
-        const port = hostname.includes(':') ? `:${hostname.split(':')[1]}` : ''
-        return NextResponse.redirect(new URL(`https://${targetSubdomain}.nodo.energy${port}/`))
-      } else {
-        // Localhost, Vercel, Staging: Redirect to path
-        return NextResponse.redirect(new URL(`/${targetSubdomain}`, request.url))
-      }
+    if (targetPath && !path.startsWith(`/${targetPath}`)) {
+      return NextResponse.redirect(new URL(`/${targetPath}`, request.url))
     }
-  }
-
-  // Reescribir la ruta internamente si estamos en un subdominio
-  // Ej: cliente.nodo.energy/ -> /cliente/
-  // Evitamos reescribir archivos estáticos y rutas especiales
-  if (subdomain && subdomain !== 'www' && !url.pathname.startsWith(`/${subdomain}`)) {
-    url.pathname = `/${subdomain}${url.pathname === '/' ? '' : url.pathname}`
-    return NextResponse.rewrite(url)
   }
 
   return response

@@ -58,16 +58,7 @@ export default function LoginPage() {
     else if (rol === 'financiero') sub = 'financiero'
     else if (rol === 'suministrador') sub = 'mem'
 
-    const hostname = window.location.hostname
-    const isNodoEnergy = hostname.endsWith('nodo.energy')
-    
-    if (!isNodoEnergy) {
-      // Localhost, Vercel, or any other staging environment: Use path-based routing
-      window.location.href = `/${sub}`
-    } else {
-      // Production: Use subdomain-based routing
-      window.location.href = `https://${sub}.nodo.energy/`
-    }
+    window.location.href = `/${sub}`
   }
 
   return (
