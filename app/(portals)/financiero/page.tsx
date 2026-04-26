@@ -27,7 +27,7 @@ export default function FinancieroDashboard() {
   const supabase = createClient()
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectMetrics, setProjectMetrics] = useState<ProjectMetric[]>([])
-  const [chartData, setChartData] = useState<{timestamp: string, solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number}[]>([])
+  const [chartData, setChartData] = useState<{timestamp: string, solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number, batteryChargePct: number}[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -74,16 +74,18 @@ export default function FinancieroDashboard() {
       })
 
       // Aggregate chart data by timestamp across portfolio
-      const timeMap = new Map<string, { solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number }>()
+      const timeMap = new Map<string, { solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number, batteryChargePctSum: number, count: number }>()
 
       if (teleData) {
         teleData.forEach(t => {
           const key = t.timestamp
-          const exist = timeMap.get(key) || { solarProductionKwh: 0, gridConsumptionKwh: 0, batteryDischargeKwh: 0 }
+          const exist = timeMap.get(key) || { solarProductionKwh: 0, gridConsumptionKwh: 0, batteryDischargeKwh: 0, batteryChargePctSum: 0, count: 0 }
           
           exist.solarProductionKwh += t.solar_produccion_kwh || 0
           exist.gridConsumptionKwh += t.consumo_red_kwh || 0
           exist.batteryDischargeKwh += t.bateria_descarga_kwh || 0
+          exist.batteryChargePctSum += t.bateria_porcentaje || 0
+          exist.count += 1
           
           timeMap.set(key, exist)
         })
@@ -93,7 +95,8 @@ export default function FinancieroDashboard() {
         timestamp,
         solarProductionKwh: data.solarProductionKwh,
         gridConsumptionKwh: data.gridConsumptionKwh,
-        batteryDischargeKwh: data.batteryDischargeKwh
+        batteryDischargeKwh: data.batteryDischargeKwh,
+        batteryChargePct: data.count > 0 ? Math.round(data.batteryChargePctSum / data.count) : 0
       })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       
       setChartData(cData)
