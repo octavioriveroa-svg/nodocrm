@@ -9,14 +9,11 @@ interface BatteryStatusProps {
 
 export default function BatteryStatus({ chargePct, isCharging }: BatteryStatusProps) {
   // Determine color based on charge percentage
-  let colorClass = 'bg-green-500'
   let textColor = 'text-green-500'
   
   if (chargePct <= 20) {
-    colorClass = 'bg-red-500'
     textColor = 'text-red-500'
   } else if (chargePct <= 50) {
-    colorClass = 'bg-yellow-500'
     textColor = 'text-yellow-500'
   }
 

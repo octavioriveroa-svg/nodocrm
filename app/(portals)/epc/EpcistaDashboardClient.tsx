@@ -103,7 +103,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
       )
     }
     return result
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [proyectos, segment, search, tipoFilter])
 
   /** Segment counts */
@@ -115,7 +115,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
       }
     }
     return c
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [proyectos])
 
   const total = proyectos.length

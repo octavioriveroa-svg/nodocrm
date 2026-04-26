@@ -278,7 +278,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
 
                     {oferta.notas && (
                       <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 border border-gray-100 italic">
-                        "{oferta.notas}"
+                        &quot;{oferta.notas}&quot;
                       </div>
                     )}
                   </div>

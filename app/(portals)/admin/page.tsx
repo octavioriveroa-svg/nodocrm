@@ -4,14 +4,7 @@ import BadgeTipo from '@/components/BadgeTipo'
 import BadgeEstado from '@/components/BadgeEstado'
 import { Users, Folder, Building2, TrendingUp, Zap, Sun } from 'lucide-react'
 
-const estadoLabel: Record<string, string> = {
-  recibido: 'Recibido',
-  en_analisis: 'En análisis',
-  propuesta_lista: 'Propuesta lista',
-  enviada: 'Enviada',
-  cliente_interesado: 'Cliente interesado',
-  completado: 'Completado',
-}
+
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })

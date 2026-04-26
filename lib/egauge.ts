@@ -18,7 +18,8 @@ export interface FinancialMetrics {
 }
 
 // Generate realistic daily curve (24 hours)
-export async function getDailyTelemetry(proyectoId: string): Promise<TelemetryDataPoint[]> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getDailyTelemetry(_proyectoId: string): Promise<TelemetryDataPoint[]> {
   const data: TelemetryDataPoint[] = [];
   const now = new Date();
   
@@ -72,7 +73,8 @@ export async function getDailyTelemetry(proyectoId: string): Promise<TelemetryDa
   return data;
 }
 
-export async function getFinancialMetrics(proyectoId: string): Promise<FinancialMetrics> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getFinancialMetrics(_proyectoId: string): Promise<FinancialMetrics> {
   // Mock data representing monthly savings
   await new Promise(resolve => setTimeout(resolve, 500));
   

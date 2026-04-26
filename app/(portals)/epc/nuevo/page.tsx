@@ -189,7 +189,7 @@ function CalcField({ label, value, unit }: { label: string; value: number | null
 
 // ── Página principal ──────────────────────────────────────────
 export default function NuevoProyectoPage() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const router = useRouter()
   const supabase = createClient()
   const [step, setStep] = useState(0)

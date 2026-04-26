@@ -53,7 +53,7 @@ export default function GanttChart({ hitos, onHitoClick, readOnly = true }: Gant
     maxDate.setDate(maxDate.getDate() + 7)
 
     return { globalStart: minDate, globalEnd: maxDate }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [sortedHitos])
 
   const totalWeeks = getWeeksBetween(globalStart, globalEnd)

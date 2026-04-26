@@ -8,7 +8,7 @@ import TopBar from '@/components/TopBar'
 import type { Profile } from '@/lib/types'
 
 export default function AnalistaLayout({ children }: { children: React.ReactNode }) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-mport { Trash2, Eye } from 'lucide-react'
+import { Trash2, Eye } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { Proyecto, EstadoProyecto, TipoProyecto } from '@/lib/types'
@@ -150,7 +150,7 @@ export default function AdminProyectosPage() {
             {lista.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin proyectos.</td></tr>
             )}
-            {lista.map((p, i) => (
+            {lista.map(p => (
               <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-3 font-bold text-principal">{p.nombre_proyecto}</td>
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.cliente_final_empresa || '—'}</td>
