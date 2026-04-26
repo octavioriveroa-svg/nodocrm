@@ -29,19 +29,50 @@ export default function LoginPage() {
     }
 
     const { data: { session: newSession } } = await supabase.auth.getSession()
-    const { data: profileRow } = await supabase
+    const { data: profileRow, error: profileError } = await supabase
       .from('profiles').select('rol').eq('id', newSession?.user?.id ?? '').single()
-    const rol = profileRow?.rol ?? newSession?.user?.user_metadata?.rol ?? 'epcista'
-    if (rol === 'admin') window.location.href = '/admin'
-    else if (rol === 'analista') window.location.href = '/analista'
-    else if (rol === 'pendiente') window.location.href = '/pendiente'
-    else window.location.href = '/epcista'
+
+    if (profileError) {
+      setError('Error obteniendo el perfil del usuario. Verifica la base de datos o contacta soporte.')
+      setLoading(false)
+      return
+    }
+
+    const rol = profileRow?.rol ?? newSession?.user?.user_metadata?.rol
+    if (!rol) {
+      setError('El usuario no tiene un rol asignado.')
+      setLoading(false)
+      return
+    }
+    
+    if (rol === 'pendiente') {
+      window.location.href = '/pendiente'
+      return
+    }
+
+    let sub = 'epc'
+    if (rol === 'nodo_admin') sub = 'admin'
+    else if (rol === 'nodo_analista') sub = 'analista'
+    else if (rol === 'cliente_final') sub = 'cliente'
+    else if (rol === 'financiero') sub = 'financiero'
+    else if (rol === 'suministrador') sub = 'mem'
+
+    const hostname = window.location.hostname
+    const isNodoEnergy = hostname.endsWith('nodo.energy')
+    
+    if (!isNodoEnergy) {
+      // Localhost, Vercel, or any other staging environment: Use path-based routing
+      window.location.href = `/${sub}`
+    } else {
+      // Production: Use subdomain-based routing
+      window.location.href = `https://${sub}.nodo.energy/`
+    }
   }
 
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ backgroundColor: '#F9F6EF' }}
+      style={{ backgroundColor: 'transparent' }}
     >
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-10">
@@ -49,7 +80,7 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="rounded-2xl border border-borde p-8 shadow-xl bg-white"
+          className="glass-card p-8"
         >
           <div className="mb-8 flex flex-col items-center">
             <h1 className="text-xl font-bold text-center tracking-tight">Bienvenido a Nodo</h1>

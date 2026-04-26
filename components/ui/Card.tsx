@@ -1,7 +1,7 @@
 import React from 'react'
 
 export const Card = ({ className = '', children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`rounded-xl border border-borde bg-white shadow-sm ${className}`} {...props}>
+  <div className={`glass-card ${className}`} {...props}>
     {children}
   </div>
 )

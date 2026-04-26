@@ -17,10 +17,10 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const router = useRouter()
   const supabase = createClient()
 
-  const navEpcista = [
-    { href: '/epcista/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
-    { href: '/epcista', label: 'Proyectos', icon: Folder },
-    { href: '/epcista/clientes', label: 'Clientes', icon: Users },
+  const navEpc = [
+    { href: '/epc/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
+    { href: '/epc', label: 'Proyectos', icon: Folder },
+    { href: '/epc/clientes', label: 'Clientes', icon: Users },
   ]
 
   const navAnalista = [
@@ -35,7 +35,26 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     { href: '/admin/configuracion/roles', label: 'Roles', icon: ShieldCheck },
   ]
 
-  const nav = rol === 'admin' ? navAdmin : rol === 'analista' ? navAnalista : navEpcista
+  const navCliente = [
+    { href: '/cliente', label: 'Mis Proyectos', icon: Folder },
+  ]
+
+  const navFinanciero = [
+    { href: '/financiero', label: 'Portafolio', icon: LayoutDashboard },
+    { href: '/financiero/proyectos', label: 'Proyectos', icon: Folder },
+  ]
+
+  const navMem = [
+    { href: '/mem', label: 'Marketplace', icon: LayoutDashboard },
+  ]
+
+  let nav: typeof navEpc = []
+  if (rol === 'nodo_admin') nav = navAdmin
+  else if (rol === 'nodo_analista') nav = navAnalista
+  else if (rol === 'cliente_final') nav = navCliente
+  else if (rol === 'financiero') nav = navFinanciero
+  else if (rol === 'suministrador') nav = navMem
+  else nav = navEpc
 
   type NavItem = { href: string; label: string; icon: React.ElementType; alwaysYellow?: boolean }
 
@@ -53,21 +72,21 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     .slice(0, 2)
 
   return (
-    <aside className="flex flex-col w-[260px] min-h-screen px-4 py-6 bg-[#0F0F0F] shadow-xl">
-      <div className="mb-8 px-3">
+    <aside className="flex flex-col w-[260px] m-4 mr-0 p-5 rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-10">
+      <div className="mb-8 px-1">
         <Logo inverted size="sm" />
       </div>
 
       <nav className="flex flex-col gap-1 flex-1">
         {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
-          const isRoot = href === '/epcista' || href === '/analista' || href === '/admin'
+          const isRoot = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem'].includes(href)
           const active = pathname === href || (!isRoot && pathname.startsWith(href))
           const yellow = alwaysYellow || active
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
             >
               <Icon size={16} />
               {label}
@@ -82,22 +101,22 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
             {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wider">
-              {rol === 'admin' ? 'Admin' : rol === 'analista' ? 'Analista' : 'EPCista'}
+            <p className="text-[11px] text-white/50 uppercase tracking-wider">
+              {rol.replace('nodo_', '').replace('_', ' ')}
             </p>
             <p className="text-sm font-medium text-white truncate">{nombre}</p>
           </div>
         </div>
         <Link
-          href={rol === 'admin' ? '/admin/configuracion' : rol === 'analista' ? '/analista/configuracion' : '/epcista/configuracion'}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+          href={`/${rol.replace('nodo_analista', 'analista').replace('nodo_admin', 'admin')}/configuracion`}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
         >
           <Settings size={16} />
           Configuración
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all text-gray-500 hover:text-white hover:bg-white/5"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all text-white/70 hover:text-white hover:bg-white/5"
         >
           <LogOut size={16} />
           Cerrar sesión

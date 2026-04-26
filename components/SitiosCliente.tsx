@@ -125,7 +125,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
 
   function FormSitio() {
     return (
-      <div className="rounded-xl border border-borde bg-white p-6 shadow-sm">
+      <div className="glass-card p-6 shadow-sm">
         <h4 className="font-bold text-sm mb-5">{editandoId ? 'Editar sitio' : 'Nuevo sitio'}</h4>
         <div className="flex flex-col gap-4">
           <div>
@@ -208,7 +208,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
   }
 
   return (
-    <div className="rounded-xl border border-borde bg-white p-6 mt-6 shadow-sm">
+    <div className="glass-card p-6 mt-6 shadow-sm">
       <div className="flex items-center justify-between mb-5">
         <h3 className="font-bold text-sm uppercase tracking-wide text-gray-500">Sitios</h3>
         <Button variant="primary" size="sm" onClick={abrirNuevo}>

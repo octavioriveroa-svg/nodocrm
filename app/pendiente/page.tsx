@@ -20,7 +20,7 @@ export default function PendientePage() {
       const { data: p } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single()
       if (p?.rol && p.rol !== 'pendiente') {
         clearInterval(interval)
-        const dest = p.rol === 'admin' ? '/admin' : p.rol === 'analista' ? '/analista' : '/epcista'
+        const dest = p.rol === 'admin' ? '/admin' : p.rol === 'analista' ? '/analista' : '/epc'
         window.location.href = dest
       }
     }, 10000) // revisa cada 10 segundos

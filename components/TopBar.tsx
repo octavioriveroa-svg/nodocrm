@@ -15,14 +15,14 @@ export default function TopBar({ nombre }: TopBarProps) {
     .slice(0, 2)
 
   return (
-    <header className="flex items-center justify-between h-16 px-8 border-b border-borde bg-white/80 backdrop-blur-sm sticky top-0 z-30">
+    <header className="flex items-center justify-between h-16 px-8 mx-4 mt-4 mb-2 rounded-2xl glass-panel sticky top-4 z-30">
       {/* Search */}
       <div className="relative w-80">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           placeholder="Buscar proyectos, clientes…"
-          className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-borde bg-fondo placeholder:text-gray-400 focus:bg-white"
+          className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-white/40 bg-white/40 backdrop-blur-md placeholder:text-gray-500 focus:bg-white/80 focus:border-acento transition-all"
         />
       </div>
 

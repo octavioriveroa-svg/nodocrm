@@ -1,11 +1,11 @@
-export type Rol = 'epcista' | 'analista' | 'admin'
+export type Rol = 'epc' | 'nodo_analista' | 'nodo_admin' | 'cliente_final' | 'financiero' | 'suministrador' | 'pendiente'
 export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
 export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
-export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'enviada' | 'cliente_interesado'
+export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'enviada' | 'negociacion' | 'aprobado' | 'en_construccion' | 'operativo' | 'completado' | 'cliente_interesado'
 export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
 export type ModalidadFinanciamiento = 'credito' | 'arrendamiento' | 'ensaas' | 'mem' | 'no_sabe'
-export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista'
+export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista' | 'evidencia_hito' | 'oferta_suministrador'
 
 export interface Profile {
   id: string
@@ -18,6 +18,8 @@ export interface Profile {
 export interface Proyecto {
   id: string
   epcista_id: string
+  cliente_id: string | null
+  financiero_id: string | null
   tipo: TipoProyecto
   nombre_proyecto: string
   estado: EstadoProyecto
@@ -111,4 +113,36 @@ export interface Archivo {
   tipo: TipoArchivo
   created_at: string
   profiles?: Profile
+}
+
+export type EstadoHito = 'pendiente' | 'en_progreso' | 'completado' | 'retrasado'
+
+export interface HitoConstruccion {
+  id: string
+  proyecto_id: string
+  nombre: string
+  descripcion: string | null
+  fecha_estimada_inicio: string | null
+  fecha_estimada_fin: string | null
+  fecha_real_inicio: string | null
+  fecha_real_fin: string | null
+  estado: EstadoHito
+  orden: number
+  created_at: string
+  updated_at: string
+}
+
+export type EstadoOferta = 'enviada' | 'en_revision' | 'aceptada' | 'rechazada'
+
+export interface OfertaMem {
+  id: string
+  proyecto_id: string
+  suministrador_id: string
+  precio_kwh: number
+  vigencia_meses: number
+  notas: string | null
+  estado: EstadoOferta
+  created_at: string
+  updated_at: string
+  suministrador?: Profile
 }

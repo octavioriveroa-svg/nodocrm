@@ -10,6 +10,9 @@ import { Card, CardTitle } from './ui/Card'
 import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, TipoArchivo } from '@/lib/types'
 import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload } from 'lucide-react'
 import Link from 'next/link'
+import GanttChart from './gantt/GanttChart'
+import ModalHito from './gantt/ModalHito'
+import type { HitoConstruccion } from '@/lib/types'
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
   credito: 'Crédito',
@@ -65,13 +68,17 @@ interface Props {
   currentUser: Profile
   sitios?: Sitio[]
   productos?: ProyectoSitioProducto[]
+  hitos?: import('@/lib/types').HitoConstruccion[]
 }
 
-export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [] }: Props) {
+export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [], hitos = [] }: Props) {
   const supabase = createClient()
   const [proyecto, setProyecto] = useState(initial)
   const [comentarios, setComentarios] = useState(initialComentarios)
   const [archivos, setArchivos] = useState(initialArchivos)
+  const [hitosLocales, setHitosLocales] = useState<HitoConstruccion[]>(hitos)
+  const [hitoSeleccionado, setHitoSeleccionado] = useState<HitoConstruccion | null>(null)
+  const [generandoCronograma, setGenerandoCronograma] = useState(false)
   const [nuevoComentario, setNuevoComentario] = useState('')
   const [enviandoComentario, setEnviandoComentario] = useState(false)
   const [subiendoArchivo, setSubiendoArchivo] = useState(false)
@@ -82,7 +89,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const isAdmin = currentUser.rol === 'admin'
   const isEpcista = currentUser.rol === 'epcista'
   const canChangeEstado = isAnalista || isAdmin
-  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epcista'
+  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epc'
 
   async function cambiarEstado(estado: EstadoProyecto) {
     const { data } = await supabase.from('proyectos').update({ estado }).eq('id', proyecto.id).select().single()
@@ -141,6 +148,43 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  async function generarCronograma() {
+    setGenerandoCronograma(true)
+    const baseHitos = [
+      { nombre: 'Ingenierías', orden: 1, duracion_semanas: 3 },
+      { nombre: 'Permisos y Trámites', orden: 2, duracion_semanas: 4 },
+      { nombre: 'Suministro de Equipos', orden: 3, duracion_semanas: 8 },
+      { nombre: 'Obra Civil e Instalación Mecánica', orden: 4, duracion_semanas: 4 },
+      { nombre: 'Instalación Eléctrica', orden: 5, duracion_semanas: 3 },
+      { nombre: 'Pruebas y Comisionamiento', orden: 6, duracion_semanas: 2 },
+    ]
+
+    const hitosToInsert = baseHitos.map((h, i) => {
+      const fechaInicio = new Date()
+      // Incrementar semanas basado en el orden de manera simplificada (cascada básica)
+      fechaInicio.setDate(fechaInicio.getDate() + (i * 14)) 
+      const fechaFin = new Date(fechaInicio)
+      fechaFin.setDate(fechaFin.getDate() + (h.duracion_semanas * 7))
+      
+      return {
+        proyecto_id: proyecto.id,
+        nombre: h.nombre,
+        orden: h.orden,
+        fecha_estimada_inicio: fechaInicio.toISOString().split('T')[0],
+        fecha_estimada_fin: fechaFin.toISOString().split('T')[0],
+        estado: 'pendiente'
+      }
+    })
+
+    const { data, error } = await supabase.from('hitos_construccion').insert(hitosToInsert).select()
+    if (data) {
+      setHitosLocales(data as HitoConstruccion[])
+    } else {
+      alert('Error al generar cronograma')
+    }
+    setGenerandoCronograma(false)
+  }
+
   const modalidades = proyecto.modalidad_financiamiento ?? []
   const noSabe = modalidades.includes('no_sabe')
 
@@ -151,8 +195,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   function ArchivoItem({ a }: { a: Archivo }) {
     return (
-      <div className="flex items-center gap-3 border border-borde rounded-lg px-4 py-3 bg-white hover:border-gray-300 hover:shadow-sm transition-all group">
-        <div className="p-2 bg-gray-50 rounded-md group-hover:bg-gray-100 transition-colors">
+      <div className="flex items-center gap-3 border border-white/40 rounded-lg px-4 py-3 bg-white/60 backdrop-blur-md hover:border-gray-300 hover:shadow-sm transition-all group">
+        <div className="p-2 bg-white/40 rounded-md group-hover:bg-gray-100 transition-colors">
           <Paperclip size={16} className="text-gray-500 flex-shrink-0" />
         </div>
         <div className="flex-1 min-w-0">
@@ -206,7 +250,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               <select
                 value={proyecto.estado}
                 onChange={e => cambiarEstado(e.target.value as EstadoProyecto)}
-                className="w-full rounded-lg border border-borde px-3 py-2 text-sm font-medium focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white"
+                className="w-full rounded-lg border border-white/40 px-3 py-2 text-sm font-medium focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white/60 backdrop-blur-md"
               >
                 {Object.entries(ESTADO_LABELS).map(([val, lbl]) => (
                   <option key={val} value={val}>{lbl}</option>
@@ -231,7 +275,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         <Seccion title="Sitios del proyecto">
           <div className="flex flex-col gap-3">
             {sitios.map(s => (
-              <div key={s.id} className="border border-borde rounded-xl p-4 shadow-sm bg-[#fafafa]">
+              <div key={s.id} className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
                 <p className="font-bold text-sm text-principal">{s.nombre}</p>
                 {s.nombre_recibo && <p className="text-xs mt-0.5 text-gray-500">{s.nombre_recibo}</p>}
                 <div className="flex flex-wrap gap-4 mt-2 pt-2 border-t border-gray-200/60">
@@ -303,7 +347,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                         const kwpInv = ni > 0 && pi > 0 ? ni * pi : null
                         const precioWatt = capex > 0 && nm > 0 && pw > 0 ? capex / (nm * pw) : null
                         return (
-                          <div key={p.id} className="border border-borde rounded-xl p-5 bg-[#fafff0] shadow-sm">
+                          <div key={p.id} className="border border-white/40 rounded-xl p-5 bg-[#fafff0] shadow-sm">
                             <div className="flex items-center gap-2 font-bold text-sm mb-4 text-[#4a5e1e]">
                               <Zap size={16} /> Fotovoltaico
                             </div>
@@ -326,7 +370,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                         const capex = Number(d.capex) || 0
                         const precioKwh = capacidad > 0 && capex > 0 ? capex / capacidad : null
                         return (
-                          <div key={p.id} className="border border-borde rounded-xl p-5 bg-[#f0f8ff] shadow-sm">
+                          <div key={p.id} className="border border-white/40 rounded-xl p-5 bg-[#f0f8ff] shadow-sm">
                             <div className="flex items-center gap-2 font-bold text-sm mb-4 text-[#1a5a8f]">
                               <Battery size={16} /> BESS
                             </div>
@@ -396,7 +440,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           ) : (
             <div className="flex flex-wrap gap-2">
               {modalidades.map(m => (
-                <span key={m} className="inline-flex items-center px-3 py-1 border border-borde text-xs font-medium">
+                <span key={m} className="inline-flex items-center px-3 py-1 border border-white/40 text-xs font-medium">
                   {MODALIDAD_LABELS[m]}
                 </span>
               ))}
@@ -411,12 +455,41 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         )}
       </Seccion>
 
+      {/* Cronograma Gantt */}
+      {['aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
+        <Seccion title="Cronograma de Construcción">
+          {hitosLocales.length === 0 && (isEpcista || isAdmin) ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white/40 border border-dashed border-borde rounded-xl">
+              <p className="text-sm font-medium text-gray-500 mb-4">Aún no se ha definido el cronograma de obra.</p>
+              <Button onClick={generarCronograma} disabled={generandoCronograma}>
+                {generandoCronograma ? 'Generando...' : 'Generar Cronograma Base'}
+              </Button>
+            </div>
+          ) : (
+            <GanttChart 
+              hitos={hitosLocales} 
+              readOnly={!isEpcista && !isAdmin} 
+              onHitoClick={(hito) => setHitoSeleccionado(hito)}
+            />
+          )}
+        </Seccion>
+      )}
+
       {/* Archivos — divididos en 3 categorías */}
       <Seccion title="Archivos">
         <input ref={fileInputRef} type="file" onChange={subirArchivo} className="hidden" />
 
-        {/* Recibo CFE */}
         <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Evidencia de Instalación</h4>
+            <UploadBtn tipo="evidencia_hito" label="Subir evidencia" allowed={isEpcista || isAdmin} />
+          </div>
+          {archivos.filter(a => a.tipo === 'evidencia_hito').length === 0
+            ? <p className="text-xs text-gray-300">Sin archivos.</p>
+            : <div className="flex flex-col gap-1">{archivos.filter(a => a.tipo === 'evidencia_hito').map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
+        </div>
+
+        <div className="border-t border-white/20 pt-5 mb-5">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Recibo CFE</h4>
             <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista || isAdmin} />
@@ -426,7 +499,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             : <div className="flex flex-col gap-1">{recibos.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
 
-        <div className="border-t border-borde mb-5 pt-5">
+        <div className="border-t border-white/20 mb-5 pt-5">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Propuesta</h4>
             <UploadBtn tipo="propuesta" label="Subir propuesta" allowed={isAnalista} />
@@ -436,7 +509,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             : <div className="flex flex-col gap-1">{propuestas.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
         </div>
 
-        <div className="border-t border-borde pt-5">
+        <div className="border-t border-white/20 pt-5">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Machote de contrato</h4>
             <UploadBtn tipo="machote_contrato" label="Subir machote" allowed={isAnalista || isAdmin} />
@@ -473,7 +546,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComentario() } }}
             placeholder="Escribe un comentario… (Enter para enviar)"
             rows={2}
-            className="flex-1 rounded-lg border border-borde px-4 py-3 text-sm resize-none focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white"
+            className="flex-1 rounded-lg border border-white/40 px-4 py-3 text-sm resize-none focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white/60 backdrop-blur-md"
           />
           <Button onClick={enviarComentario} disabled={enviandoComentario || !nuevoComentario.trim()}
             className="self-end">
@@ -481,6 +554,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           </Button>
         </div>
       </Seccion>
+
+      {hitoSeleccionado && (
+        <ModalHito 
+          hito={hitoSeleccionado}
+          onClose={() => setHitoSeleccionado(null)}
+          onUpdate={(updated) => {
+            setHitosLocales(prev => prev.map(h => h.id === updated.id ? updated : h))
+          }}
+        />
+      )}
     </div>
   )
 }
