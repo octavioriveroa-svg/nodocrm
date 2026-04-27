@@ -8,8 +8,9 @@ import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
 import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, TipoArchivo } from '@/lib/types'
-import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload } from 'lucide-react'
+import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload, Trash2, Pencil } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import GanttChart from './gantt/GanttChart'
 import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
@@ -82,6 +83,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const [nuevoComentario, setNuevoComentario] = useState('')
   const [enviandoComentario, setEnviandoComentario] = useState(false)
   const [subiendoArchivo, setSubiendoArchivo] = useState(false)
+  
+  const router = useRouter()
+  const [editando, setEditando] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [form, setForm] = useState<Partial<Proyecto>>(initial)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTipoRef = useRef<TipoArchivo>('recibo_cfe')
 
@@ -109,6 +117,36 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       setNuevoComentario('')
     }
     setEnviandoComentario(false)
+  }
+
+  async function handleGuardar() {
+    setGuardando(true)
+    const { data } = await supabase.from('proyectos').update({
+      nombre_proyecto: form.nombre_proyecto,
+      cliente_final_nombre: form.cliente_final_nombre,
+      cliente_final_empresa: form.cliente_final_empresa,
+      cliente_final_contacto: form.cliente_final_contacto,
+      capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
+      ubicacion_estado: form.ubicacion_estado,
+      notas_adicionales: form.notas_adicionales
+    }).eq('id', proyecto.id).select().single()
+    if (data) {
+      setProyecto(data as Proyecto)
+      setForm(data as Proyecto)
+    }
+    setEditando(false)
+    setGuardando(false)
+  }
+
+  async function handleEliminarProyecto() {
+    await supabase.from('proyectos').delete().eq('id', proyecto.id)
+    router.push(backHref)
+  }
+
+  async function eliminarArchivo(id: string) {
+    if (!confirm('¿Eliminar este archivo?')) return
+    await supabase.from('archivos').delete().eq('id', id)
+    setArchivos(prev => prev.filter(a => a.id !== id))
   }
 
   function triggerUpload(tipo: TipoArchivo) {
@@ -194,6 +232,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const machotes = archivos.filter(a => a.tipo === 'machote_contrato')
 
   function ArchivoItem({ a }: { a: Archivo }) {
+    const canDelete = isAdmin || a.autor_id === currentUser.id
     return (
       <div className="flex items-center gap-3 border border-white/40 rounded-lg px-4 py-3 bg-white/60 backdrop-blur-md hover:border-gray-300 hover:shadow-sm transition-all group">
         <div className="p-2 bg-white/40 rounded-md group-hover:bg-gray-100 transition-colors">
@@ -208,6 +247,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             {formatDate(a.created_at)} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
           </div>
         </div>
+        {canDelete && (
+          <button onClick={() => eliminarArchivo(a.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     )
   }
@@ -237,38 +281,109 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Link>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-black">{proyecto.nombre_proyecto}</h1>
+            {editando ? (
+              <input 
+                type="text" 
+                value={form.nombre_proyecto || ''} 
+                onChange={e => setForm(f => ({...f, nombre_proyecto: e.target.value}))}
+                className="text-2xl font-black w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-acento/50"
+              />
+            ) : (
+              <h1 className="text-2xl font-black">{proyecto.nombre_proyecto}</h1>
+            )}
             <div className="flex items-center gap-3 mt-2">
               <BadgeTipo tipo={proyecto.tipo} />
               <BadgeEstado estado={proyecto.estado} />
               <span className="text-sm text-gray-400">{formatDate(proyecto.created_at)}</span>
             </div>
           </div>
-          {canChangeEstado && (
-            <div>
-              <label className="block text-xs font-semibold mb-1.5 text-gray-500 uppercase tracking-wide">Cambiar estado</label>
-              <select
-                value={proyecto.estado}
-                onChange={e => cambiarEstado(e.target.value as EstadoProyecto)}
-                className="w-full rounded-lg border border-white/40 px-3 py-2 text-sm font-medium focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white/60 backdrop-blur-md"
-              >
-                {Object.entries(ESTADO_LABELS).map(([val, lbl]) => (
-                  <option key={val} value={val}>{lbl}</option>
-                ))}
-              </select>
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex gap-2">
+              {!editando && (
+                <>
+                  <button onClick={() => setEditando(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
+                    <Pencil size={13} /> Editar
+                  </button>
+                  {(isAdmin || isEpcista) && (
+                    <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50">
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  )}
+                </>
+              )}
             </div>
-          )}
+            {canChangeEstado && !editando && (
+              <div className="w-40">
+                <label className="block text-xs font-semibold mb-1.5 text-gray-500 uppercase tracking-wide">Cambiar estado</label>
+                <select
+                  value={proyecto.estado}
+                  onChange={e => cambiarEstado(e.target.value as EstadoProyecto)}
+                  className="w-full rounded-lg border border-white/40 px-3 py-2 text-sm font-medium focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all bg-white/60 backdrop-blur-md"
+                >
+                  {Object.entries(ESTADO_LABELS).map(([val, lbl]) => (
+                    <option key={val} value={val}>{lbl}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
+        
+        {confirmDelete && (
+          <div className="border p-4 mt-4 flex items-center justify-between rounded-lg" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+            <p className="text-sm font-medium text-red-800">¿Eliminar este proyecto? Esta acción no se puede deshacer e involucrará borrar sus datos asociados.</p>
+            <div className="flex gap-2 ml-4 shrink-0">
+              <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border rounded-md" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+              <button onClick={handleEliminarProyecto} className="px-3 py-1.5 text-sm font-bold text-white rounded-md" style={{ backgroundColor: '#c00' }}>Eliminar proyecto</button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Cliente final */}
-      <Seccion title="Cliente final">
-        <div className="grid grid-cols-3 gap-4">
-          <Campo label="Nombre" value={proyecto.cliente_final_nombre} />
-          <Campo label="Empresa" value={proyecto.cliente_final_empresa} />
-          <Campo label="Contacto" value={proyecto.cliente_final_contacto} />
-        </div>
-      </Seccion>
+      {editando && (
+        <Seccion title="Modo edición">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium mb-1">Nombre contacto final</label>
+              <input type="text" value={form.cliente_final_nombre || ''} onChange={e => setForm(f => ({...f, cliente_final_nombre: e.target.value}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Empresa cliente final</label>
+              <input type="text" value={form.cliente_final_empresa || ''} onChange={e => setForm(f => ({...f, cliente_final_empresa: e.target.value}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Email / Teléfono de contacto</label>
+              <input type="text" value={form.cliente_final_contacto || ''} onChange={e => setForm(f => ({...f, cliente_final_contacto: e.target.value}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">CAPEX estimado ({proyecto.moneda})</label>
+              <input type="number" value={form.capex_estimado || ''} onChange={e => setForm(f => ({...f, capex_estimado: e.target.value ? Number(e.target.value) : undefined}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Estado (Ubicación)</label>
+              <input type="text" value={form.ubicacion_estado || ''} onChange={e => setForm(f => ({...f, ubicacion_estado: e.target.value}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1">Notas adicionales</label>
+              <textarea rows={3} value={form.notas_adicionales || ''} onChange={e => setForm(f => ({...f, notas_adicionales: e.target.value}))} className="w-full border rounded p-2 text-sm" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+            <Button variant="outline" size="sm" onClick={() => { setEditando(false); setForm(proyecto) }}>Cancelar</Button>
+            <Button size="sm" onClick={handleGuardar} disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar cambios'}</Button>
+          </div>
+        </Seccion>
+      )}
+
+      {!editando && (
+        <Seccion title="Cliente final">
+          <div className="grid grid-cols-3 gap-4">
+            <Campo label="Nombre" value={proyecto.cliente_final_nombre} />
+            <Campo label="Empresa" value={proyecto.cliente_final_empresa} />
+            <Campo label="Contacto" value={proyecto.cliente_final_contacto} />
+          </div>
+        </Seccion>
+      )}
 
       {/* Accesos al Portal */}
       <Seccion title="Accesos al Portal">
@@ -499,34 +614,36 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       )}
 
       {/* Financiamiento */}
-      <Seccion title="Financiamiento y ubicación">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? `${proyecto.moneda} ${proyecto.capex_estimado.toLocaleString('es-MX')}` : null} />
-          <Campo label="Estado" value={proyecto.ubicacion_estado} />
-        </div>
-        <div>
-          <div className="text-xs font-medium mb-2 text-gray-400">Modalidad de financiamiento</div>
-          {noSabe ? (
-            <span className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-acento text-principal">
-              Analista define modalidad
-            </span>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {modalidades.map(m => (
-                <span key={m} className="inline-flex items-center px-3 py-1 border border-white/40 text-xs font-medium">
-                  {MODALIDAD_LABELS[m]}
-                </span>
-              ))}
+      {!editando && (
+        <Seccion title="Financiamiento y ubicación">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? `${proyecto.moneda} ${proyecto.capex_estimado.toLocaleString('es-MX')}` : null} />
+            <Campo label="Estado" value={proyecto.ubicacion_estado} />
+          </div>
+          <div>
+            <div className="text-xs font-medium mb-2 text-gray-400">Modalidad de financiamiento</div>
+            {noSabe ? (
+              <span className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-acento text-principal">
+                Analista define modalidad
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {modalidades.map(m => (
+                  <span key={m} className="inline-flex items-center px-3 py-1 border border-white/40 text-xs font-medium">
+                    {MODALIDAD_LABELS[m]}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          {proyecto.notas_adicionales && (
+            <div className="mt-4">
+              <div className="text-xs font-medium mb-1 text-gray-400">Notas adicionales</div>
+              <p className="text-sm whitespace-pre-wrap">{proyecto.notas_adicionales}</p>
             </div>
           )}
-        </div>
-        {proyecto.notas_adicionales && (
-          <div className="mt-4">
-            <div className="text-xs font-medium mb-1 text-gray-400">Notas adicionales</div>
-            <p className="text-sm whitespace-pre-wrap">{proyecto.notas_adicionales}</p>
-          </div>
-        )}
-      </Seccion>
+        </Seccion>
+      )}
 
       {/* Cronograma Gantt */}
       {['aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
