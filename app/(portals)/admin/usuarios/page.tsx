@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Clock, CheckCircle, Edit2, X, UserPlus, Mail, Key, Eye, EyeOff, Save } from 'lucide-react'
+import { Clock, CheckCircle, Edit2, X, UserPlus, Mail, Key, Eye, EyeOff, Save, KeyRound } from 'lucide-react'
 import { crearUsuarioAdmin } from '@/app/actions/crearUsuario'
 import { adminUpdateEmail } from '@/app/actions/adminUpdateEmail'
+import { adminResetPassword } from '@/app/actions/adminResetPassword'
 
 interface Usuario {
   id: string
@@ -55,7 +56,9 @@ export default function AdminUsuariosPage() {
   const [editingUser, setEditingUser] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editEmail, setEditEmail] = useState('')
-  const [savingEmail, setSavingEmail] = useState(false)
+  const [editPassword, setEditPassword] = useState('')
+  const [showEditPassword, setShowEditPassword] = useState(false)
+  const [savingUser, setSavingUser] = useState(false)
 
   // Create/Invite form state
   const [newEmail, setNewEmail] = useState('')
@@ -274,75 +277,29 @@ export default function AdminUsuariosPage() {
                 const isEditing = editingUser === u.id
 
                 return (
-                  <tr key={u.id} className="group border-t border-borde hover:bg-gray-50 transition-colors">
+                  <React.Fragment key={u.id}>
+                  <tr className="group border-t border-borde hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-4 font-medium">{u.nombre || '—'}</td>
                     <td className="px-5 py-4 text-gray-600">{u.empresa || '—'}</td>
+                    <td className="px-5 py-4 text-xs text-gray-500">{u.email}</td>
                     <td className="px-5 py-4">
-                      {isEditing ? (
-                        <input
-                          type="email"
-                          value={editEmail}
-                          onChange={e => setEditEmail(e.target.value)}
-                          className="border border-borde rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-black outline-none w-full min-w-[180px]"
-                          placeholder="nuevo@email.com"
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-500">{u.email}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      {isEditing ? (
-                        <select
-                          className="border border-borde rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-black outline-none font-medium"
-                          defaultValue={u.rol}
-                          onChange={(e) => cambiarRol(u.id, e.target.value)}
-                          disabled={updatingId === u.id}
-                        >
-                          {ROLES_ASIGNABLES.map(r => (
-                            <option key={r} value={r}>{ROL_LABELS[r]}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs px-2.5 py-1 font-semibold rounded-md whitespace-nowrap" style={{ backgroundColor: rc.bg, color: rc.color }}>
-                          {ROL_LABELS[u.rol] ?? u.rol}
-                        </span>
-                      )}
+                      <span className="text-xs px-2.5 py-1 font-semibold rounded-md whitespace-nowrap" style={{ backgroundColor: rc.bg, color: rc.color }}>
+                        {ROL_LABELS[u.rol] ?? u.rol}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">{formatDate(u.created_at)}</td>
                     <td className="px-5 py-4 text-right">
                       {isEditing ? (
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={async () => {
-                              if (editEmail && editEmail !== u.email) {
-                                setSavingEmail(true)
-                                const result = await adminUpdateEmail(u.id, editEmail)
-                                if (result.error) {
-                                  alert('Error al cambiar email: ' + result.error)
-                                } else {
-                                  setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, email: editEmail } : x))
-                                }
-                                setSavingEmail(false)
-                              }
-                              setEditingUser(null)
-                            }}
-                            disabled={savingEmail}
-                            className="p-1.5 text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 rounded transition-colors inline-flex disabled:opacity-50"
-                            title="Guardar cambios"
-                          >
-                            <Save size={14} />
-                          </button>
-                          <button
-                            onClick={() => setEditingUser(null)}
-                            className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors inline-flex"
-                            title="Cancelar"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => { setEditingUser(null); setEditPassword(''); setShowEditPassword(false) }}
+                          className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors inline-flex"
+                          title="Cerrar"
+                        >
+                          <X size={14} />
+                        </button>
                       ) : (
                         <button
-                          onClick={() => { setEditingUser(u.id); setEditEmail(u.email) }}
+                          onClick={() => { setEditingUser(u.id); setEditEmail(u.email); setEditPassword(''); setShowEditPassword(false) }}
                           className="p-1.5 text-gray-400 hover:text-principal bg-transparent group-hover:bg-gray-100 rounded md:opacity-0 group-hover:opacity-100 transition-all inline-flex"
                           title="Editar usuario"
                         >
@@ -351,6 +308,105 @@ export default function AdminUsuariosPage() {
                       )}
                     </td>
                   </tr>
+                  {isEditing && (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-5 bg-gray-50/80 border-b border-borde">
+                        <div className="max-w-2xl space-y-4">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Editando: {u.nombre}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold mb-1 text-gray-600"><Mail size={12} className="inline mr-1" />Correo</label>
+                              <input
+                                type="email"
+                                value={editEmail}
+                                onChange={e => setEditEmail(e.target.value)}
+                                className="w-full border border-borde rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-acento/30 focus:border-acento outline-none transition-all"
+                                placeholder="nuevo@email.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold mb-1 text-gray-600"><Edit2 size={12} className="inline mr-1" />Rol</label>
+                              <select
+                                className="w-full border border-borde rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-acento/30 focus:border-acento outline-none font-medium transition-all"
+                                defaultValue={u.rol}
+                                onChange={(e) => cambiarRol(u.id, e.target.value)}
+                                disabled={updatingId === u.id}
+                              >
+                                {ROLES_ASIGNABLES.map(r => (
+                                  <option key={r} value={r}>{ROL_LABELS[r]}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold mb-1 text-gray-600"><KeyRound size={12} className="inline mr-1" />Nueva contraseña</label>
+                              <div className="relative">
+                                <input
+                                  type={showEditPassword ? 'text' : 'password'}
+                                  value={editPassword}
+                                  onChange={e => setEditPassword(e.target.value)}
+                                  className="w-full border border-borde rounded-lg px-3 py-2 pr-9 text-sm bg-white focus:ring-2 focus:ring-acento/30 focus:border-acento outline-none transition-all"
+                                  placeholder="Dejar vacío para no cambiar"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditPassword(!showEditPassword)}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                  {showEditPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 pt-2">
+                            <button
+                              onClick={async () => {
+                                setSavingUser(true)
+                                let hasError = false
+                                if (editEmail && editEmail !== u.email) {
+                                  const emailResult = await adminUpdateEmail(u.id, editEmail)
+                                  if (emailResult.error) {
+                                    alert('Error al cambiar email: ' + emailResult.error)
+                                    hasError = true
+                                  } else {
+                                    setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, email: editEmail } : x))
+                                  }
+                                }
+                                if (editPassword && editPassword.length >= 6 && !hasError) {
+                                  const pwResult = await adminResetPassword(u.id, editPassword)
+                                  if (pwResult.error) {
+                                    alert('Error al cambiar contraseña: ' + pwResult.error)
+                                    hasError = true
+                                  }
+                                } else if (editPassword && editPassword.length > 0 && editPassword.length < 6) {
+                                  alert('La contraseña debe tener al menos 6 caracteres.')
+                                  hasError = true
+                                }
+                                setSavingUser(false)
+                                if (!hasError) {
+                                  setEditingUser(null)
+                                  setEditPassword('')
+                                  setShowEditPassword(false)
+                                }
+                              }}
+                              disabled={savingUser}
+                              className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+                            >
+                              <Save size={14} /> {savingUser ? 'Guardando...' : 'Guardar cambios'}
+                            </button>
+                            <button
+                              onClick={() => { setEditingUser(null); setEditPassword(''); setShowEditPassword(false) }}
+                              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            {editPassword && <p className="text-xs text-amber-600">⚠️ La contraseña se cambiará de inmediato al guardar.</p>}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 )
               })}
             </tbody>
