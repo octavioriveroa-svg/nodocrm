@@ -5,11 +5,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function adminResetPassword(targetId: string, newPassword: string) {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return { error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor. Agrégala en Vercel → Settings → Environment Variables.' }
+    }
+
     const supabase = await createClient()
 
-    // Use getUser() instead of getSession() — more reliable in server actions
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) return { error: 'No autenticado' }
+    if (userError || !user) return { error: 'No autenticado: ' + (userError?.message || 'sesión expirada') }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -32,13 +35,13 @@ export async function adminResetPassword(targetId: string, newPassword: string) 
     })
 
     if (authError) {
-      console.error('Error resetting password:', authError)
       return { error: 'Error al cambiar contraseña: ' + authError.message }
     }
 
     return { success: true }
-  } catch (err) {
-    console.error('adminResetPassword unexpected error:', err)
-    return { error: 'Error inesperado al cambiar contraseña.' }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('adminResetPassword error:', message)
+    return { error: 'Error del servidor: ' + message }
   }
 }

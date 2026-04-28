@@ -5,11 +5,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function adminUpdateEmail(targetId: string, newEmail: string) {
   try {
+    // Check env vars first
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return { error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor. Agrégala en Vercel → Settings → Environment Variables.' }
+    }
+
     const supabase = await createClient()
 
-    // Use getUser() instead of getSession() — more reliable in server actions
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) return { error: 'No autenticado' }
+    if (userError || !user) return { error: 'No autenticado: ' + (userError?.message || 'sesión expirada') }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -21,7 +25,6 @@ export async function adminUpdateEmail(targetId: string, newEmail: string) {
       return { error: 'No autorizado. Solo administradores pueden cambiar emails.' }
     }
 
-    // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(newEmail)) {
       return { error: 'Formato de email inválido.' }
@@ -35,13 +38,13 @@ export async function adminUpdateEmail(targetId: string, newEmail: string) {
     })
 
     if (authError) {
-      console.error('Error updating email:', authError)
       return { error: 'Error al actualizar email: ' + authError.message }
     }
 
     return { success: true }
-  } catch (err) {
-    console.error('adminUpdateEmail unexpected error:', err)
-    return { error: 'Error inesperado al actualizar email.' }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('adminUpdateEmail error:', message)
+    return { error: 'Error del servidor: ' + message }
   }
 }
