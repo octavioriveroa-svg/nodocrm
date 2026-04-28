@@ -21,6 +21,93 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// ── Static sub-components (declared outside render) ──────────────────
+
+function ArchivoRow({ a, canDelete, onDelete }: { a: Archivo; canDelete: boolean; onDelete: (id: string) => void }) {
+  return (
+    <div className="flex items-start gap-4 p-4 border-b border-borde/50 hover:bg-gray-50/50 transition-colors group">
+      <div className="p-2 bg-gray-100 text-gray-500 rounded-lg mt-1">
+        <Paperclip size={18} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-bold text-principal hover:underline truncate">
+            {a.nombre}
+          </a>
+          {(a.tags || []).map(tag => (
+            <span key={tag} className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold uppercase rounded-md">
+              {tag}
+            </span>
+          ))}
+        </div>
+        {a.descripcion && (
+          <p className="text-sm text-gray-600 mb-2">{a.descripcion}</p>
+        )}
+        <div className="text-xs text-gray-400 font-medium">
+          Subido el {formatDate(a.created_at)} por {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
+        </div>
+      </div>
+      {canDelete && (
+        <button onClick={() => onDelete(a.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+          <Trash2 size={16} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function SpecialFileCard({ a, title, icon: Icon, onUploadNew, canUpload, canDelete, onDelete }: {
+  a: Archivo | null;
+  title: string;
+  icon: React.ElementType;
+  onUploadNew: () => void;
+  canUpload: boolean;
+  canDelete: boolean;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="border border-borde rounded-xl overflow-hidden bg-white shadow-sm flex flex-col h-full">
+      <div className="bg-gray-50 border-b border-borde px-4 py-3 flex items-center justify-between">
+        <h3 className="font-bold text-sm text-principal flex items-center gap-2">
+          <Icon size={16} className="text-acento" /> {title}
+        </h3>
+        {canUpload && (
+          <Button variant="outline" size="sm" onClick={onUploadNew} className="h-7 text-xs px-2">
+            <Upload size={12} className="mr-1" /> Nueva versión
+          </Button>
+        )}
+      </div>
+      <div className="p-5 flex-1 flex flex-col justify-center">
+        {a ? (
+          <div>
+            <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-bold text-lg text-principal hover:underline line-clamp-2 mb-2">
+              {a.nombre}
+            </a>
+            {a.descripcion && <p className="text-sm text-gray-600 mb-4 line-clamp-2">{a.descripcion}</p>}
+            
+            <div className="flex items-center justify-between mt-auto">
+              <div className="text-xs text-gray-500">
+                <span className="font-semibold text-gray-700">V. Actual</span> • {formatDate(a.created_at)}
+              </div>
+              {canDelete && (
+                <button onClick={() => onDelete(a.id)} className="text-red-500 hover:text-red-700 p-1">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center text-gray-400">
+            <p className="text-sm">Aún no hay {title.toLowerCase()}.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ───────────────────────────────────────────────────
+
 export default function DocumentCenter({ archivos, proyectoId, currentUser, onUploadSuccess, onDeleteSuccess }: DocumentCenterProps) {
   const supabase = createClient()
   
@@ -45,7 +132,6 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
 
   const isAdmin = currentUser.rol === 'nodo_admin'
   const isAnalista = currentUser.rol === 'nodo_analista'
-  const isEpcista = currentUser.rol === 'epc'
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este archivo? Esta acción no se puede deshacer.')) return
@@ -159,80 +245,9 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
   // Extract all unique tags used in general files for filtering
   const allUsedTags = Array.from(new Set(generalFiles.flatMap(a => a.tags || [])))
 
-  function ArchivoRow({ a }: { a: Archivo }) {
-    const canDelete = isAdmin || a.autor_id === currentUser.id
-    return (
-      <div className="flex items-start gap-4 p-4 border-b border-borde/50 hover:bg-gray-50/50 transition-colors group">
-        <div className="p-2 bg-gray-100 text-gray-500 rounded-lg mt-1">
-          <Paperclip size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-bold text-principal hover:underline truncate">
-              {a.nombre}
-            </a>
-            {(a.tags || []).map(tag => (
-              <span key={tag} className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold uppercase rounded-md">
-                {tag}
-              </span>
-            ))}
-          </div>
-          {a.descripcion && (
-            <p className="text-sm text-gray-600 mb-2">{a.descripcion}</p>
-          )}
-          <div className="text-xs text-gray-400 font-medium">
-            Subido el {formatDate(a.created_at)} por {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
-          </div>
-        </div>
-        {canDelete && (
-          <button onClick={() => handleDelete(a.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
-            <Trash2 size={16} />
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  function SpecialFileCard({ a, title, icon: Icon, onUploadNew, canUpload }: { a: Archivo | null, title: string, icon: any, onUploadNew: () => void, canUpload: boolean }) {
-    return (
-      <div className="border border-borde rounded-xl overflow-hidden bg-white shadow-sm flex flex-col h-full">
-        <div className="bg-gray-50 border-b border-borde px-4 py-3 flex items-center justify-between">
-          <h3 className="font-bold text-sm text-principal flex items-center gap-2">
-            <Icon size={16} className="text-acento" /> {title}
-          </h3>
-          {canUpload && (
-            <Button variant="outline" size="sm" onClick={onUploadNew} className="h-7 text-xs px-2">
-              <Upload size={12} className="mr-1" /> Nueva versión
-            </Button>
-          )}
-        </div>
-        <div className="p-5 flex-1 flex flex-col justify-center">
-          {a ? (
-            <div>
-              <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-bold text-lg text-principal hover:underline line-clamp-2 mb-2">
-                {a.nombre}
-              </a>
-              {a.descripcion && <p className="text-sm text-gray-600 mb-4 line-clamp-2">{a.descripcion}</p>}
-              
-              <div className="flex items-center justify-between mt-auto">
-                <div className="text-xs text-gray-500">
-                  <span className="font-semibold text-gray-700">V. Actual</span> • {formatDate(a.created_at)}
-                </div>
-                {(isAdmin || a.autor_id === currentUser.id) && (
-                  <button onClick={() => handleDelete(a.id)} className="text-red-500 hover:text-red-700 p-1">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-gray-400">
-              <p className="text-sm">Aún no hay {title.toLowerCase()}.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    )
+  // Helper to check if current user can delete a specific file
+  function canDeleteFile(a: Archivo) {
+    return isAdmin || a.autor_id === currentUser.id
   }
 
   return (
@@ -249,14 +264,18 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
             icon={FileText} 
             a={activeProposal} 
             canUpload={isAnalista || isAdmin}
+            canDelete={activeProposal ? canDeleteFile(activeProposal) : false}
             onUploadNew={() => triggerSpecialUpload('propuesta')}
+            onDelete={handleDelete}
           />
           <SpecialFileCard 
             title="Contrato (Machote)" 
             icon={FileSignature} 
             a={activeContract} 
             canUpload={isAnalista || isAdmin}
+            canDelete={activeContract ? canDeleteFile(activeContract) : false}
             onUploadNew={() => triggerSpecialUpload('machote_contrato')}
+            onDelete={handleDelete}
           />
         </div>
 
@@ -280,13 +299,13 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
         {showProposalHistory && proposalHistory.length > 0 && (
           <div className="mt-3 bg-gray-50 border border-borde rounded-lg overflow-hidden">
             <div className="px-4 py-2 bg-gray-100 border-b border-borde text-xs font-bold text-gray-600">Versiones Anteriores - Propuesta</div>
-            {proposalHistory.map(a => <ArchivoRow key={a.id} a={a} />)}
+            {proposalHistory.map(a => <ArchivoRow key={a.id} a={a} canDelete={canDeleteFile(a)} onDelete={handleDelete} />)}
           </div>
         )}
         {showContractHistory && contractHistory.length > 0 && (
           <div className="mt-3 bg-gray-50 border border-borde rounded-lg overflow-hidden">
             <div className="px-4 py-2 bg-gray-100 border-b border-borde text-xs font-bold text-gray-600">Versiones Anteriores - Contrato</div>
-            {contractHistory.map(a => <ArchivoRow key={a.id} a={a} />)}
+            {contractHistory.map(a => <ArchivoRow key={a.id} a={a} canDelete={canDeleteFile(a)} onDelete={handleDelete} />)}
           </div>
         )}
       </div>
@@ -343,7 +362,7 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
               <p>No se encontraron documentos.</p>
             </div>
           ) : (
-            filteredFiles.map(a => <ArchivoRow key={a.id} a={a} />)
+            filteredFiles.map(a => <ArchivoRow key={a.id} a={a} canDelete={canDeleteFile(a)} onDelete={handleDelete} />)
           )}
         </div>
       </div>
