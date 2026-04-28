@@ -10,16 +10,17 @@ export async function crearUsuarioAdmin(data: {
   rol: string
   password?: string
 }) {
+  try {
   const supabase = await createClient()
   
   // 1. Validate caller is nodo_admin
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return { error: 'No autenticado' }
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return { error: 'No autenticado' }
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('rol')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
   
   if (!profile || profile.rol !== 'nodo_admin') {
@@ -105,5 +106,9 @@ export async function crearUsuarioAdmin(data: {
     }
 
     return { success: true, userId, method: 'invited' }
+  }
+  } catch (err) {
+    console.error('crearUsuarioAdmin unexpected error:', err)
+    return { error: 'Error inesperado al crear usuario.' }
   }
 }
