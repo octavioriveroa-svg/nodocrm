@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Clock, CheckCircle, Edit2, X, UserPlus, Mail, Key, Eye, EyeOff } from 'lucide-react'
+import { Clock, CheckCircle, Edit2, X, UserPlus, Mail, Key, Eye, EyeOff, Save } from 'lucide-react'
 import { crearUsuarioAdmin } from '@/app/actions/crearUsuario'
+import { adminUpdateEmail } from '@/app/actions/adminUpdateEmail'
 
 interface Usuario {
   id: string
@@ -53,6 +54,8 @@ export default function AdminUsuariosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [editingUser, setEditingUser] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editEmail, setEditEmail] = useState('')
+  const [savingEmail, setSavingEmail] = useState(false)
 
   // Create/Invite form state
   const [newEmail, setNewEmail] = useState('')
@@ -274,12 +277,24 @@ export default function AdminUsuariosPage() {
                   <tr key={u.id} className="group border-t border-borde hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-4 font-medium">{u.nombre || '—'}</td>
                     <td className="px-5 py-4 text-gray-600">{u.empresa || '—'}</td>
-                    <td className="px-5 py-4 text-xs text-gray-500">{u.email}</td>
+                    <td className="px-5 py-4">
+                      {isEditing ? (
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          className="border border-borde rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-black outline-none w-full min-w-[180px]"
+                          placeholder="nuevo@email.com"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-500">{u.email}</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       {isEditing ? (
                         <select
                           className="border border-borde rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-black outline-none font-medium"
-                          value={u.rol}
+                          defaultValue={u.rol}
                           onChange={(e) => cambiarRol(u.id, e.target.value)}
                           disabled={updatingId === u.id}
                         >
@@ -296,18 +311,40 @@ export default function AdminUsuariosPage() {
                     <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">{formatDate(u.created_at)}</td>
                     <td className="px-5 py-4 text-right">
                       {isEditing ? (
-                        <button
-                          onClick={() => setEditingUser(null)}
-                          className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors inline-flex"
-                          title="Cancelar"
-                        >
-                          <X size={14} />
-                        </button>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            onClick={async () => {
+                              if (editEmail && editEmail !== u.email) {
+                                setSavingEmail(true)
+                                const result = await adminUpdateEmail(u.id, editEmail)
+                                if (result.error) {
+                                  alert('Error al cambiar email: ' + result.error)
+                                } else {
+                                  setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, email: editEmail } : x))
+                                }
+                                setSavingEmail(false)
+                              }
+                              setEditingUser(null)
+                            }}
+                            disabled={savingEmail}
+                            className="p-1.5 text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 rounded transition-colors inline-flex disabled:opacity-50"
+                            title="Guardar cambios"
+                          >
+                            <Save size={14} />
+                          </button>
+                          <button
+                            onClick={() => setEditingUser(null)}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors inline-flex"
+                            title="Cancelar"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => setEditingUser(u.id)}
+                          onClick={() => { setEditingUser(u.id); setEditEmail(u.email) }}
                           className="p-1.5 text-gray-400 hover:text-principal bg-transparent group-hover:bg-gray-100 rounded md:opacity-0 group-hover:opacity-100 transition-all inline-flex"
-                          title="Editar rol"
+                          title="Editar usuario"
                         >
                           <Edit2 size={14} />
                         </button>
