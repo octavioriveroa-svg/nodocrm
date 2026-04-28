@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Clock, CheckCircle, Edit2, X } from 'lucide-react'
+import { Clock, CheckCircle, Edit2, X, UserPlus, Mail, Key, Eye, EyeOff } from 'lucide-react'
+import { crearUsuarioAdmin } from '@/app/actions/crearUsuario'
 
 interface Usuario {
   id: string
@@ -21,7 +22,7 @@ const ROL_LABELS: Record<string, string> = {
   financiero: 'Financiero',
   suministrador: 'Suministrador',
   pendiente: 'Pendiente',
-  // Legacy backups
+  // Legacy
   epcista: 'EPC',
   analista: 'Analista Nodo',
   admin: 'Admin Nodo',
@@ -51,29 +52,44 @@ export default function AdminUsuariosPage() {
   const [filtroRol, setFiltroRol] = useState<string>('todos')
   const [busqueda, setBusqueda] = useState('')
   const [editingUser, setEditingUser] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Create/Invite form state
+  const [newEmail, setNewEmail] = useState('')
+  const [newNombre, setNewNombre] = useState('')
+  const [newEmpresa, setNewEmpresa] = useState('')
+  const [newRol, setNewRol] = useState('epc')
+  const [newPassword, setNewPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [createMode, setCreateMode] = useState<'invite' | 'create'>('invite')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [createSuccess, setCreateSuccess] = useState('')
 
   useEffect(() => {
-    async function load() {
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('get_all_users_admin')
-      if (!rpcErr && rpcData) {
-        setUsuarios(rpcData as Usuario[])
-      } else {
-        const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-        setUsuarios(
-          (profilesData ?? []).map((p: Record<string, unknown>) => ({
-            id: p.id as string,
-            nombre: (p.nombre as string) ?? '',
-            empresa: (p.empresa as string) ?? '',
-            rol: (p.rol as string) ?? '',
-            email: '—',
-            created_at: (p.created_at as string) ?? '',
-          }))
-        )
-      }
-      setLoading(false)
+    loadUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function loadUsers() {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_all_users_admin')
+    if (!rpcErr && rpcData) {
+      setUsuarios(rpcData as Usuario[])
+    } else {
+      const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      setUsuarios(
+        (profilesData ?? []).map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          nombre: (p.nombre as string) ?? '',
+          empresa: (p.empresa as string) ?? '',
+          rol: (p.rol as string) ?? '',
+          email: '—',
+          created_at: (p.created_at as string) ?? '',
+        }))
+      )
     }
-    load()
-  }, [supabase])
+    setLoading(false)
+  }
 
   async function cambiarRol(userId: string, nuevoRol: string) {
     setUpdatingId(userId)
@@ -87,6 +103,62 @@ export default function AdminUsuariosPage() {
     setUpdatingId(null)
   }
 
+  async function handleCreateUser() {
+    setCreateError('')
+    setCreateSuccess('')
+    setCreating(true)
+
+    if (!newEmail || !newNombre || !newEmpresa) {
+      setCreateError('Todos los campos son obligatorios.')
+      setCreating(false)
+      return
+    }
+
+    if (createMode === 'create' && (!newPassword || newPassword.length < 6)) {
+      setCreateError('La contraseña debe tener al menos 6 caracteres.')
+      setCreating(false)
+      return
+    }
+
+    const result = await crearUsuarioAdmin({
+      email: newEmail,
+      nombre: newNombre,
+      empresa: newEmpresa,
+      rol: newRol,
+      password: createMode === 'create' ? newPassword : undefined,
+    })
+
+    if (result.error) {
+      setCreateError(result.error)
+    } else {
+      setCreateSuccess(
+        result.method === 'invited'
+          ? `✅ Invitación enviada a ${newEmail}. El usuario recibirá un correo para configurar su contraseña.`
+          : `✅ Usuario ${newNombre} creado exitosamente con acceso inmediato.`
+      )
+      // Reset form
+      setNewEmail('')
+      setNewNombre('')
+      setNewEmpresa('')
+      setNewPassword('')
+      setNewRol('epc')
+      // Reload users
+      await loadUsers()
+    }
+    setCreating(false)
+  }
+
+  function closeCreateModal() {
+    setShowCreateModal(false)
+    setCreateError('')
+    setCreateSuccess('')
+    setNewEmail('')
+    setNewNombre('')
+    setNewEmpresa('')
+    setNewPassword('')
+    setNewRol('epc')
+  }
+
   const pendientes = usuarios.filter(u => u.rol === 'pendiente')
   const activos = usuarios.filter(u => u.rol !== 'pendiente' && (
     filtroRol === 'todos' || u.rol === filtroRol || (filtroRol === 'epc' && u.rol === 'epcista') || (filtroRol === 'nodo_analista' && u.rol === 'analista')
@@ -98,9 +170,18 @@ export default function AdminUsuariosPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black">Usuarios</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Gestiona accesos y roles de todos los usuarios</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-black">Usuarios</h1>
+          <p className="text-sm mt-1" style={{ color: '#666' }}>Gestiona accesos y roles de todos los usuarios</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md"
+          style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+        >
+          <UserPlus size={16} /> Nuevo Usuario
+        </button>
       </div>
 
       {/* Solicitudes pendientes */}
@@ -127,11 +208,11 @@ export default function AdminUsuariosPage() {
                       <button key={r}
                         onClick={() => cambiarRol(u.id, r)}
                         disabled={updatingId === u.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border rounded-md disabled:opacity-40 transition-colors ${updatingId === u.id ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-                        style={{ 
-                          borderColor: ROL_COLORS[r]?.color || '#000', 
-                          backgroundColor: ROL_COLORS[r]?.bg || '#fff', 
-                          color: ROL_COLORS[r]?.color || '#000' 
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border rounded-md disabled:opacity-40 transition-all hover:scale-105 active:scale-95"
+                        style={{
+                          borderColor: ROL_COLORS[r]?.color || '#000',
+                          backgroundColor: ROL_COLORS[r]?.bg || '#fff',
+                          color: ROL_COLORS[r]?.color || '#000'
                         }}>
                         {updatingId === u.id ? '…' : <><CheckCircle size={11} /> {ROL_LABELS[r]}</>}
                       </button>
@@ -152,7 +233,7 @@ export default function AdminUsuariosPage() {
           className="border px-3 py-2 text-sm flex-1 min-w-[200px] rounded-lg focus:ring-2 focus:ring-black/10 outline-none transition-all"
           style={{ borderColor: '#CFCFCF' }}
         />
-        <div className="flex gap-1 overflow-x-auto pb-1 max-w-full hide-scrollbar">
+        <div className="flex gap-1 overflow-x-auto pb-1 max-w-full">
           {['todos', ...ROLES_ASIGNABLES].map(r => (
             <button key={r} onClick={() => setFiltroRol(r)}
               className="px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap"
@@ -188,7 +269,7 @@ export default function AdminUsuariosPage() {
               {activos.map((u) => {
                 const rc = ROL_COLORS[u.rol] ?? ROL_COLORS.epc
                 const isEditing = editingUser === u.id
-                
+
                 return (
                   <tr key={u.id} className="group border-t border-borde hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-4 font-medium">{u.nombre || '—'}</td>
@@ -196,7 +277,7 @@ export default function AdminUsuariosPage() {
                     <td className="px-5 py-4 text-xs text-gray-500">{u.email}</td>
                     <td className="px-5 py-4">
                       {isEditing ? (
-                        <select 
+                        <select
                           className="border border-borde rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-black outline-none font-medium"
                           value={u.rol}
                           onChange={(e) => cambiarRol(u.id, e.target.value)}
@@ -215,7 +296,7 @@ export default function AdminUsuariosPage() {
                     <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">{formatDate(u.created_at)}</td>
                     <td className="px-5 py-4 text-right">
                       {isEditing ? (
-                        <button 
+                        <button
                           onClick={() => setEditingUser(null)}
                           className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors inline-flex"
                           title="Cancelar"
@@ -223,7 +304,7 @@ export default function AdminUsuariosPage() {
                           <X size={14} />
                         </button>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => setEditingUser(u.id)}
                           className="p-1.5 text-gray-400 hover:text-principal bg-transparent group-hover:bg-gray-100 rounded md:opacity-0 group-hover:opacity-100 transition-all inline-flex"
                           title="Editar rol"
@@ -240,6 +321,163 @@ export default function AdminUsuariosPage() {
         </div>
       </div>
       <p className="text-xs mt-3 text-gray-500">{activos.length} usuario{activos.length !== 1 ? 's' : ''} activos</p>
+
+      {/* Create / Invite Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-borde">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-lg text-principal">Nuevo Usuario</h3>
+                <button onClick={closeCreateModal} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">Invita por correo o crea una cuenta con acceso inmediato.</p>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Mode Toggle */}
+              <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => setCreateMode('invite')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all ${createMode === 'invite' ? 'bg-white shadow-sm text-principal' : 'text-gray-500'}`}
+                >
+                  <Mail size={15} /> Invitar por email
+                </button>
+                <button
+                  onClick={() => setCreateMode('create')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all ${createMode === 'create' ? 'bg-white shadow-sm text-principal' : 'text-gray-500'}`}
+                >
+                  <Key size={15} /> Crear con contraseña
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1.5 text-gray-700">Nombre completo</label>
+                <input
+                  type="text"
+                  value={newNombre}
+                  onChange={e => setNewNombre(e.target.value)}
+                  placeholder="Pablo Besoy"
+                  className="w-full border border-borde rounded-lg p-3 text-sm focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1.5 text-gray-700">Empresa</label>
+                <input
+                  type="text"
+                  value={newEmpresa}
+                  onChange={e => setNewEmpresa(e.target.value)}
+                  placeholder="Adgreen Power"
+                  className="w-full border border-borde rounded-lg p-3 text-sm focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1.5 text-gray-700">Correo electrónico</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  placeholder="usuario@empresa.com"
+                  className="w-full border border-borde rounded-lg p-3 text-sm focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1.5 text-gray-700">Rol</label>
+                <div className="flex flex-wrap gap-2">
+                  {ROLES_ASIGNABLES.map(r => {
+                    const rc = ROL_COLORS[r]
+                    const isSelected = newRol === r
+                    return (
+                      <button
+                        key={r}
+                        onClick={() => setNewRol(r)}
+                        className={`px-3 py-2 text-xs font-bold rounded-lg border-2 transition-all ${isSelected ? 'scale-105 shadow-md' : 'opacity-60 hover:opacity-100'}`}
+                        style={{
+                          borderColor: isSelected ? (rc?.color || '#000') : '#e0e0e0',
+                          backgroundColor: isSelected ? (rc?.bg || '#fff') : '#fff',
+                          color: isSelected ? (rc?.color || '#000') : '#666',
+                        }}
+                      >
+                        {ROL_LABELS[r]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {createMode === 'create' && (
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">Contraseña</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full border border-borde rounded-lg p-3 pr-10 text-sm focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">El usuario podrá cambiarla después desde su perfil.</p>
+                </div>
+              )}
+
+              {createMode === 'invite' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-700">
+                    📧 Se enviará un correo de invitación. El usuario deberá establecer su contraseña al aceptar la invitación.
+                  </p>
+                </div>
+              )}
+
+              {createError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-700">{createError}</p>
+                </div>
+              )}
+
+              {createSuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-700">{createSuccess}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-borde bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={closeCreateModal}
+                disabled={creating}
+                className="px-5 py-2.5 text-sm font-medium border border-borde rounded-xl bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateUser}
+                disabled={creating || !newEmail || !newNombre || !newEmpresa}
+                className="px-5 py-2.5 text-sm font-bold rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95 shadow-md"
+                style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+              >
+                {creating
+                  ? 'Procesando...'
+                  : createMode === 'invite'
+                    ? 'Enviar Invitación'
+                    : 'Crear Usuario'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

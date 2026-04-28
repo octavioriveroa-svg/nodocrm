@@ -1,8 +1,10 @@
 -- =============================================
 -- MIGRATION: V11 Admin Update Role Fix
 -- =============================================
--- Actualiza la función RPC admin_update_role para que verifique
--- correctamente el nuevo rol 'nodo_admin' en lugar del obsoleto 'admin'.
+-- Corrige la función admin_update_role:
+--   1. Ahora verifica 'nodo_admin' (no el viejo 'admin')
+--   2. No intenta escribir en 'updated_at' (esa columna no existe en profiles)
+--   3. Acepta todos los roles vigentes del sistema
 
 CREATE OR REPLACE FUNCTION public.admin_update_role(target_id UUID, new_rol TEXT)
 RETURNS void
@@ -15,23 +17,22 @@ BEGIN
   -- Obtener el rol del usuario que hace la llamada
   SELECT rol INTO caller_rol FROM public.profiles WHERE id = auth.uid();
   
-  -- Verificar si es administrador (ahora 'nodo_admin' en lugar de 'admin')
+  -- Solo nodo_admin puede cambiar roles
   IF caller_rol != 'nodo_admin' THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
-  -- Validar el nuevo rol contra los permitidos en el sistema
+  -- Validar el nuevo rol
   IF new_rol NOT IN ('epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'pendiente') THEN
-    RAISE EXCEPTION 'Invalid role';
+    RAISE EXCEPTION 'Invalid role: %', new_rol;
   END IF;
 
-  -- Actualizar el perfil
-  UPDATE public.profiles SET rol = new_rol, updated_at = NOW() WHERE id = target_id;
+  -- Actualizar solo la columna rol (profiles no tiene updated_at)
+  UPDATE public.profiles SET rol = new_rol WHERE id = target_id;
 END;
 $$;
 
--- Opcional: También agregamos una política UPDATE para los admins directamente
--- en caso de que quieran usar supabase.from('profiles').update()
+-- Política UPDATE para que el admin pueda modificar cualquier perfil
 DROP POLICY IF EXISTS "Admin actualiza perfiles" ON public.profiles;
 CREATE POLICY "Admin actualiza perfiles"
   ON public.profiles FOR UPDATE
