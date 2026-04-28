@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import type { Cliente } from '@/lib/types'
 
 function formatDate(d: string) {
@@ -94,8 +95,8 @@ export default function AdminClientesPage() {
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin clientes.</td></tr>
             )}
             {lista.map(c => (
-              <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-5 py-3 font-bold text-principal">{c.razon_social}</td>
+              <tr key={c.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/clientes/${c.id}`}>
+                <td className="px-5 py-3 font-bold text-principal hover:underline">{c.razon_social}</td>
                 <td className="px-5 py-3 text-xs font-mono text-gray-400">{c.rfc || '—'}</td>
                 <td className="px-5 py-3 text-xs font-medium text-gray-500">{c.industria || '—'}</td>
                 <td className="px-5 py-3 text-xs">

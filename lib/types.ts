@@ -5,7 +5,7 @@ export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'e
 export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
 export type ModalidadFinanciamiento = 'credito' | 'arrendamiento' | 'ensaas' | 'mem' | 'no_sabe'
-export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista' | 'evidencia_hito' | 'oferta_suministrador'
+export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista' | 'evidencia_hito' | 'oferta_suministrador' | 'documento_general'
 
 export interface Profile {
   id: string
@@ -111,6 +111,8 @@ export interface Archivo {
   nombre: string
   url: string
   tipo: TipoArchivo
+  descripcion: string | null
+  tags: string[]
   created_at: string
   profiles?: Profile
 }

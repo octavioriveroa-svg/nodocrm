@@ -4,18 +4,18 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Trash2, Building2, Mail, Phone, MapPin, FileText } from 'lucide-react'
-import type { Cliente, Sitio } from '@/lib/types'
+import { ChevronLeft, Pencil, Trash2, Building2, Mail, Phone, MapPin, FileText, Paperclip, Search, Filter } from 'lucide-react'
+import type { Cliente, Sitio, Archivo, Profile } from '@/lib/types'
 import SitiosCliente from '@/components/SitiosCliente'
 
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
   return (
-    <div>
+    <div className="min-w-0">
       <div className="text-xs font-medium mb-0.5" style={{ color: '#888' }}>{label}</div>
-      <div className="flex items-center gap-1.5 text-sm font-medium">
-        {Icon && <Icon size={13} style={{ color: '#888' }} />}
-        {value}
+      <div className="flex items-center gap-1.5 text-sm font-medium break-words">
+        {Icon && <Icon size={13} style={{ color: '#888' }} className="shrink-0" />}
+        <span className="break-words">{value}</span>
       </div>
     </div>
   )
@@ -32,6 +32,9 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   const [form, setForm] = useState<Partial<Cliente>>({})
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [archivosCliente, setArchivosCliente] = useState<(Archivo & { proyecto_nombre?: string })[]>([])
+  const [docSearch, setDocSearch] = useState('')
+  const [docTagFilter, setDocTagFilter] = useState<string | null>(null)
 
   const ESTADOS_MX = [
     'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -57,6 +60,31 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
       ])
       if (clienteData) { setCliente(clienteData as Cliente); setForm(clienteData as Cliente) }
       if (sitiosData) setSitios(sitiosData as Sitio[])
+
+      // Fetch all projects related to this client, then all archivos for those projects
+      const { data: proyectos } = await supabase
+        .from('proyectos')
+        .select('id, nombre_proyecto')
+        .or(`cliente_id.eq.${id},epcista_id.eq.${session?.user?.id}`)
+      
+      if (proyectos && proyectos.length > 0) {
+        const projectIds = proyectos.map((p: { id: string }) => p.id)
+        const projNameMap: Record<string, string> = {}
+        proyectos.forEach((p: { id: string; nombre_proyecto: string }) => { projNameMap[p.id] = p.nombre_proyecto })
+
+        const { data: archData } = await supabase
+          .from('archivos')
+          .select('*, profiles(*)')
+          .in('proyecto_id', projectIds)
+          .order('created_at', { ascending: false })
+
+        if (archData) {
+          setArchivosCliente(archData.map((a: Archivo) => ({
+            ...a,
+            proyecto_nombre: projNameMap[a.proyecto_id] || 'Proyecto',
+          })))
+        }
+      }
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,6 +277,96 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
             epcistaId={epcistaId}
             initialSitios={sitios}
           />
+
+          {/* Aggregated Document Center */}
+          {archivosCliente.length > 0 && (
+            <div className="border mt-4 bg-white shadow-sm overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
+              <div className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: '#CFCFCF' }}>
+                <div>
+                  <h3 className="font-bold text-lg">Documentos del Cliente</h3>
+                  <p className="text-sm" style={{ color: '#888' }}>Todos los archivos de todos los proyectos de {cliente.razon_social}.</p>
+                </div>
+                <span className="text-xs font-bold px-3 py-1.5 rounded-md bg-gray-100" style={{ color: '#666' }}>
+                  {archivosCliente.length} archivo{archivosCliente.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              
+              <div className="p-4 border-b bg-gray-50 flex flex-col sm:flex-row gap-3" style={{ borderColor: '#CFCFCF' }}>
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por nombre o descripción..." 
+                    value={docSearch}
+                    onChange={e => setDocSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
+                    style={{ borderColor: '#CFCFCF' }}
+                  />
+                </div>
+                {(() => {
+                  const allTags = Array.from(new Set(archivosCliente.flatMap(a => a.tags || [])))
+                  if (allTags.length === 0) return null
+                  return (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      <Filter size={14} className="text-gray-400 shrink-0" />
+                      <button 
+                        onClick={() => setDocTagFilter(null)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md shrink-0 transition-colors ${!docTagFilter ? 'bg-principal text-acento' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                      >
+                        Todos
+                      </button>
+                      {allTags.map(tag => (
+                        <button 
+                          key={tag}
+                          onClick={() => setDocTagFilter(tag)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-md shrink-0 transition-colors uppercase ${docTagFilter === tag ? 'bg-principal text-acento' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div>
+                {archivosCliente
+                  .filter(a => {
+                    if (docSearch && !a.nombre.toLowerCase().includes(docSearch.toLowerCase()) && !(a.descripcion || '').toLowerCase().includes(docSearch.toLowerCase())) return false
+                    if (docTagFilter && !(a.tags || []).includes(docTagFilter)) return false
+                    return true
+                  })
+                  .map(a => (
+                    <div key={a.id} className="flex items-start gap-4 p-4 border-b hover:bg-gray-50/50 transition-colors" style={{ borderColor: '#eee' }}>
+                      <div className="p-2 bg-gray-100 text-gray-500 rounded-lg mt-1">
+                        <Paperclip size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-bold hover:underline truncate">
+                            {a.nombre}
+                          </a>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-md">
+                            {a.proyecto_nombre}
+                          </span>
+                          {(a.tags || []).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold uppercase rounded-md">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        {a.descripcion && (
+                          <p className="text-sm mb-1" style={{ color: '#666' }}>{a.descripcion}</p>
+                        )}
+                        <div className="text-xs font-medium" style={{ color: '#999' }}>
+                          {new Date(a.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

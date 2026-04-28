@@ -13,7 +13,7 @@ export const CardHeader = ({ className = '', children, ...props }: React.HTMLAtt
 )
 
 export const CardTitle = ({ className = '', children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={`font-semibold text-xs uppercase tracking-widest text-gray-400 ${className}`} {...props}>
+  <h3 className={`font-semibold text-xs uppercase tracking-widest text-gray-400 px-6 pt-5 pb-0 ${className}`} {...props}>
     {children}
   </h3>
 )

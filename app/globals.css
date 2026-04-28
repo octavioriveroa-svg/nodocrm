@@ -72,6 +72,7 @@ input:focus, textarea:focus, select:focus {
   box-shadow: var(--shadow-glass);
   border-radius: 1.5rem; /* 24px */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .glass-card:hover {

@@ -1,19 +1,20 @@
 /* eslint-disable */
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, TipoArchivo } from '@/lib/types'
-import { Paperclip, Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Upload, Trash2, Pencil } from 'lucide-react'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto } from '@/lib/types'
+import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import GanttChart from './gantt/GanttChart'
 import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
+import DocumentCenter from './DocumentCenter'
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
   credito: 'Crédito',
@@ -24,12 +25,31 @@ const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
 }
 
 const ESTADO_LABELS: Record<string, string> = {
-  recibido: 'Recibido',
+  recibido: 'Lead',
   en_analisis: 'En análisis',
   propuesta_lista: 'Propuesta lista',
-  enviada: 'Enviada',
+  enviada: 'Propuesta enviada',
   cliente_interesado: 'Cliente interesado',
+  negociacion: 'Negociación',
+  aprobado: 'Cierre',
+  en_construccion: 'En construcción',
+  operativo: 'Operativo',
+  completado: 'Completado',
 }
+
+// Ordered sales cycle stages for the timeline
+const SALES_CYCLE: { key: string; label: string }[] = [
+  { key: 'recibido', label: 'Lead' },
+  { key: 'en_analisis', label: 'Análisis' },
+  { key: 'propuesta_lista', label: 'Propuesta' },
+  { key: 'enviada', label: 'Enviada' },
+  { key: 'cliente_interesado', label: 'Interesado' },
+  { key: 'negociacion', label: 'Negociación' },
+  { key: 'aprobado', label: 'Cierre' },
+  { key: 'en_construccion', label: 'Construcción' },
+  { key: 'operativo', label: 'Operativo' },
+  { key: 'completado', label: 'Completado' },
+]
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -42,7 +62,9 @@ function Seccion({ title, children }: { title: string; children: React.ReactNode
   return (
     <Card className="mb-4">
       <CardTitle>{title}</CardTitle>
-      {children}
+      <div className="px-6 pb-6 pt-2 overflow-hidden">
+        {children}
+      </div>
     </Card>
   )
 }
@@ -50,9 +72,9 @@ function Seccion({ title, children }: { title: string; children: React.ReactNode
 function Campo({ label, value }: { label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null
   return (
-    <div>
+    <div className="min-w-0">
       <div className="text-xs font-medium mb-0.5 text-gray-400">{label}</div>
-      <div className="text-sm font-medium">{value}</div>
+      <div className="text-sm font-medium break-words">{value}</div>
     </div>
   )
 }
@@ -82,16 +104,12 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const [generandoCronograma, setGenerandoCronograma] = useState(false)
   const [nuevoComentario, setNuevoComentario] = useState('')
   const [enviandoComentario, setEnviandoComentario] = useState(false)
-  const [subiendoArchivo, setSubiendoArchivo] = useState(false)
   
   const router = useRouter()
   const [editando, setEditando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState<Partial<Proyecto>>(initial)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const uploadTipoRef = useRef<TipoArchivo>('recibo_cfe')
 
   const isAnalista = currentUser.rol === 'nodo_analista'
   const isAdmin = currentUser.rol === 'nodo_admin'
@@ -143,49 +161,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     router.push(backHref)
   }
 
-  async function eliminarArchivo(id: string) {
-    if (!confirm('¿Eliminar este archivo?')) return
-    await supabase.from('archivos').delete().eq('id', id)
-    setArchivos(prev => prev.filter(a => a.id !== id))
-  }
-
-  function triggerUpload(tipo: TipoArchivo) {
-    uploadTipoRef.current = tipo
-    fileInputRef.current?.click()
-  }
-
-  async function subirArchivo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setSubiendoArchivo(true)
-
-    const ext = file.name.split('.').pop()
-    const path = `${proyecto.id}/${Date.now()}.${ext}`
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('archivos-proyectos')
-      .upload(path, file)
-
-    if (uploadError || !uploadData) {
-      alert('Error al subir archivo: ' + uploadError?.message)
-      setSubiendoArchivo(false)
-      return
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from('archivos-proyectos').getPublicUrl(path)
-
-    const { data: archivoData } = await supabase.from('archivos').insert({
-      proyecto_id: proyecto.id,
-      autor_id: currentUser.id,
-      nombre: file.name,
-      url: publicUrl,
-      tipo: uploadTipoRef.current,
-    }).select('*, profiles(*)').single()
-
-    if (archivoData) setArchivos(prev => [archivoData as Archivo, ...prev])
-    setSubiendoArchivo(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
   async function generarCronograma() {
     setGenerandoCronograma(true)
     const baseHitos = [
@@ -225,51 +200,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   const modalidades = proyecto.modalidad_financiamiento ?? []
   const noSabe = modalidades.includes('no_sabe')
-
-  // Archivos por categoría (incluyendo tipos legacy)
-  const recibos = archivos.filter(a => a.tipo === 'recibo_cfe' || a.tipo === 'adjunto_epcista')
-  const propuestas = archivos.filter(a => a.tipo === 'propuesta' || a.tipo === 'propuesta_analista')
-  const machotes = archivos.filter(a => a.tipo === 'machote_contrato')
-
-  function ArchivoItem({ a }: { a: Archivo }) {
-    const canDelete = isAdmin || a.autor_id === currentUser.id
-    return (
-      <div className="flex items-center gap-3 border border-white/40 rounded-lg px-4 py-3 bg-white/60 backdrop-blur-md hover:border-gray-300 hover:shadow-sm transition-all group">
-        <div className="p-2 bg-white/40 rounded-md group-hover:bg-gray-100 transition-colors">
-          <Paperclip size={16} className="text-gray-500 flex-shrink-0" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <a href={a.url} target="_blank" rel="noopener noreferrer"
-            className="text-sm font-semibold hover:underline truncate block text-principal transition-all">
-            {a.nombre}
-          </a>
-          <div className="text-xs mt-0.5 text-gray-500">
-            {formatDate(a.created_at)} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
-          </div>
-        </div>
-        {canDelete && (
-          <button onClick={() => eliminarArchivo(a.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  function UploadBtn({ tipo, label, allowed }: { tipo: TipoArchivo; label: string; allowed: boolean }) {
-    if (!allowed) return null
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => triggerUpload(tipo)}
-        disabled={subiendoArchivo}
-      >
-        <Upload size={11} />
-        {subiendoArchivo && uploadTipoRef.current === tipo ? 'Subiendo…' : label}
-      </Button>
-    )
-  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -339,6 +269,56 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           </div>
         )}
       </div>
+
+      {/* Sales Cycle Timeline */}
+      {!editando && (
+        <Card className="mb-4">
+          <div className="px-6 pt-5 pb-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Ciclo de Vida del Proyecto</p>
+          </div>
+          <div className="px-6 pb-6">
+            <div className="flex items-center">
+              {SALES_CYCLE.map((stage, i) => {
+                const currentIdx = SALES_CYCLE.findIndex(s => s.key === proyecto.estado)
+                const isActive = i === currentIdx
+                const isPast = i < currentIdx
+                const isLast = i === SALES_CYCLE.length - 1
+
+                return (
+                  <div key={stage.key} className="flex items-center flex-1 min-w-0">
+                    <div className="flex flex-col items-center relative group">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                        isActive 
+                          ? 'border-acento bg-acento scale-125 shadow-md shadow-acento/30' 
+                          : isPast 
+                            ? 'border-green-500 bg-green-500' 
+                            : 'border-gray-300 bg-white'
+                      }`}>
+                        {isPast && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-principal" />}
+                      </div>
+                      <span className={`text-[9px] mt-1.5 font-bold text-center leading-tight whitespace-nowrap ${
+                        isActive ? 'text-principal' : isPast ? 'text-green-600' : 'text-gray-400'
+                      }`}>
+                        {stage.label}
+                      </span>
+                    </div>
+                    {!isLast && (
+                      <div className={`flex-1 h-0.5 mx-1 transition-colors duration-300 ${
+                        isPast ? 'bg-green-400' : 'bg-gray-200'
+                      }`} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {editando && (
         <Seccion title="Modo edición">
@@ -665,49 +645,14 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Archivos — divididos en 3 categorías */}
-      <Seccion title="Archivos">
-        <input ref={fileInputRef} type="file" onChange={subirArchivo} className="hidden" />
-
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Evidencia de Instalación</h4>
-            <UploadBtn tipo="evidencia_hito" label="Subir evidencia" allowed={isEpcista || isAdmin} />
-          </div>
-          {archivos.filter(a => a.tipo === 'evidencia_hito').length === 0
-            ? <p className="text-xs text-gray-300">Sin archivos.</p>
-            : <div className="flex flex-col gap-1">{archivos.filter(a => a.tipo === 'evidencia_hito').map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
-        </div>
-
-        <div className="border-t border-white/20 pt-5 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Recibo CFE</h4>
-            <UploadBtn tipo="recibo_cfe" label="Subir recibo" allowed={isEpcista || isAdmin} />
-          </div>
-          {recibos.length === 0
-            ? <p className="text-xs text-gray-300">Sin archivos.</p>
-            : <div className="flex flex-col gap-1">{recibos.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
-        </div>
-
-        <div className="border-t border-white/20 mb-5 pt-5">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Propuesta</h4>
-            <UploadBtn tipo="propuesta" label="Subir propuesta" allowed={isAnalista} />
-          </div>
-          {propuestas.length === 0
-            ? <p className="text-xs text-gray-300">Sin archivos.</p>
-            : <div className="flex flex-col gap-1">{propuestas.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
-        </div>
-
-        <div className="border-t border-white/20 pt-5">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-[#444]">Machote de contrato</h4>
-            <UploadBtn tipo="machote_contrato" label="Subir machote" allowed={isAnalista || isAdmin} />
-          </div>
-          {machotes.length === 0
-            ? <p className="text-xs text-gray-300">Sin archivos.</p>
-            : <div className="flex flex-col gap-1">{machotes.map(a => <ArchivoItem key={a.id} a={a} />)}</div>}
-        </div>
+      <Seccion title="Documentos y Anexos">
+        <DocumentCenter 
+          archivos={archivos} 
+          proyectoId={proyecto.id} 
+          currentUser={currentUser} 
+          onUploadSuccess={(newA) => setArchivos(prev => [newA, ...prev])} 
+          onDeleteSuccess={(id) => setArchivos(prev => prev.filter(a => a.id !== id))} 
+        />
       </Seccion>
 
       {/* Comentarios */}
