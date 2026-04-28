@@ -1,9 +1,8 @@
-'use client'
-
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Folder, FolderPlus, Users, LogOut, Settings, LayoutDashboard, Building2, ShieldCheck } from 'lucide-react'
+import { Folder, FolderPlus, Users, LogOut, Settings, LayoutDashboard, Building2, ShieldCheck, Menu, X } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -16,6 +15,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [isOpen, setIsOpen] = useState(false)
 
   const navEpc = [
     { href: '/epc/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
@@ -72,56 +72,82 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     .slice(0, 2)
 
   return (
-    <aside className="sticky top-4 h-[calc(100vh-2rem)] flex flex-col w-[260px] m-4 mr-0 p-5 rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-10">
-      <div className="mb-8 px-1">
-        <Logo inverted size="sm" />
-      </div>
+    <>
+      {/* Mobile Toggle Button */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        className="md:hidden fixed top-6 left-6 z-50 p-2.5 bg-principal text-acento rounded-xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+        aria-label="Toggle Menu"
+      >
+        {isOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
 
-      <nav className="flex flex-col gap-1 flex-1">
-        {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
-          const isRoot = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem'].includes(href)
-          const active = pathname === href || (!isRoot && pathname.startsWith(href))
-          const yellow = alwaysYellow || active
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
-            >
-              <Icon size={16} />
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden" 
+          onClick={() => setIsOpen(false)} 
+        />
+      )}
 
-      <div className="mt-auto pt-6 border-t border-white/10">
-        <div className="mb-3 px-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-acento flex items-center justify-center text-xs font-bold text-principal flex-shrink-0">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] text-white/50 uppercase tracking-wider">
-              {rol.replace('nodo_', '').replace('_', ' ')}
-            </p>
-            <p className="text-sm font-medium text-white truncate">{nombre}</p>
-          </div>
+      {/* Sidebar Content */}
+      <aside className={`
+        fixed md:sticky top-4 h-[calc(100vh-2rem)] flex flex-col w-[260px] m-4 md:mr-0 p-5 
+        rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-40 transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-[150%] md:translate-x-0'}
+      `}>
+        <div className="mb-8 px-1">
+          <Logo inverted size="sm" />
         </div>
-        <Link
-          href={`/${rol.replace('nodo_analista', 'analista').replace('nodo_admin', 'admin')}/configuracion`}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
-        >
-          <Settings size={16} />
-          Configuración
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all text-white/70 hover:text-white hover:bg-white/5"
-        >
-          <LogOut size={16} />
-          Cerrar sesión
-        </button>
-      </div>
-    </aside>
+
+        <nav className="flex flex-col gap-1 flex-1">
+          {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
+            const isRoot = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem'].includes(href)
+            const active = pathname === href || (!isRoot && pathname.startsWith(href))
+            const yellow = alwaysYellow || active
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+              >
+                <Icon size={16} />
+                {label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="mt-auto pt-6 border-t border-white/10">
+          <div className="mb-3 px-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-acento flex items-center justify-center text-xs font-bold text-principal flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-white/50 uppercase tracking-wider">
+                {rol.replace('nodo_', '').replace('_', ' ')}
+              </p>
+              <p className="text-sm font-medium text-white truncate">{nombre}</p>
+            </div>
+          </div>
+          <Link
+            href={`/${rol.replace('nodo_analista', 'analista').replace('nodo_admin', 'admin')}/configuracion`}
+            onClick={() => setIsOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+          >
+            <Settings size={16} />
+            Configuración
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all text-white/70 hover:text-white hover:bg-white/5"
+          >
+            <LogOut size={16} />
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }

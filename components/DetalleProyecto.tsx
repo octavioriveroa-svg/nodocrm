@@ -626,24 +626,22 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       )}
 
       {/* Cronograma Gantt */}
-      {['aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
-        <Seccion title="Cronograma de Construcción">
-          {hitosLocales.length === 0 && (isEpcista || isAdmin) ? (
-            <div className="flex flex-col items-center justify-center py-10 bg-white/40 border border-dashed border-borde rounded-xl">
-              <p className="text-sm font-medium text-gray-500 mb-4">Aún no se ha definido el cronograma de obra.</p>
-              <Button onClick={generarCronograma} disabled={generandoCronograma}>
-                {generandoCronograma ? 'Generando...' : 'Generar Cronograma Base'}
-              </Button>
-            </div>
-          ) : (
-            <GanttChart 
-              hitos={hitosLocales} 
-              readOnly={!isEpcista && !isAdmin} 
-              onHitoClick={(hito) => setHitoSeleccionado(hito)}
-            />
-          )}
-        </Seccion>
-      )}
+      <Seccion title="Cronograma de Construcción">
+        {hitosLocales.length === 0 && (isEpcista || isAdmin) ? (
+          <div className="flex flex-col items-center justify-center py-10 bg-white/40 border border-dashed border-borde rounded-xl">
+            <p className="text-sm font-medium text-gray-500 mb-4">Aún no se ha definido el cronograma de obra.</p>
+            <Button onClick={generarCronograma} disabled={generandoCronograma}>
+              {generandoCronograma ? 'Generando...' : 'Generar Cronograma Base'}
+            </Button>
+          </div>
+        ) : (
+          <GanttChart 
+            hitos={hitosLocales} 
+            readOnly={!isEpcista && !isAdmin} 
+            onHitoClick={(hito) => setHitoSeleccionado(hito)}
+          />
+        )}
+      </Seccion>
 
       <Seccion title="Documentos y Anexos">
         <DocumentCenter 
