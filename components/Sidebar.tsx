@@ -18,8 +18,8 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const navEpc = [
-    { href: '/epc/nuevo', label: 'Nuevo proyecto', icon: FolderPlus },
-    { href: '/epc', label: 'Proyectos', icon: Folder },
+    { href: '/epc', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/epc/proyectos', label: 'Proyectos', icon: Folder },
     { href: '/epc/clientes', label: 'Clientes', icon: Users },
   ]
 
