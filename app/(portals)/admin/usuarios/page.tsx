@@ -179,12 +179,11 @@ export default function AdminUsuariosPage() {
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black">Usuarios</h1>
-          <p className="text-sm mt-1" style={{ color: '#666' }}>Gestiona accesos y roles de todos los usuarios</p>
+          <p className="text-sm mt-1 text-muted">Gestiona accesos y roles de todos los usuarios</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md"
-          style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md bg-acento text-principal rounded-xl"
         >
           <UserPlus size={16} /> Nuevo Usuario
         </button>
@@ -204,11 +203,11 @@ export default function AdminUsuariosPage() {
               <div key={u.id} className="px-5 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <p className="font-semibold text-sm">{u.nombre || '—'}</p>
-                  <p className="text-xs mt-1" style={{ color: '#666' }}>{u.empresa || '—'} {u.email !== '—' ? `· ${u.email}` : ''}</p>
+                  <p className="text-xs mt-1 text-muted">{u.empresa || '—'} {u.email !== '—' ? `· ${u.email}` : ''}</p>
                   <p className="text-xs mt-0.5" style={{ color: '#aaa' }}>{formatDate(u.created_at)}</p>
                 </div>
                 <div className="flex flex-col md:items-end gap-2 flex-shrink-0">
-                  <span className="text-xs font-bold" style={{ color: '#888' }}>Asignar rol:</span>
+                  <span className="text-xs font-bold text-muted">Asignar rol:</span>
                   <div className="flex flex-wrap gap-2">
                     {ROLES_ASIGNABLES.map(r => (
                       <button key={r}
@@ -236,8 +235,7 @@ export default function AdminUsuariosPage() {
         <input
           type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, empresa o correo…"
-          className="border px-3 py-2 text-sm flex-1 min-w-[200px] rounded-lg focus:ring-2 focus:ring-black/10 outline-none transition-all"
-          style={{ borderColor: '#CFCFCF' }}
+          className="border px-3 py-2 text-sm flex-1 min-w-[200px] rounded-lg focus:ring-2 focus:ring-black/10 outline-none transition-all border-borde rounded-xl"
         />
         <div className="flex gap-1 overflow-x-auto pb-1 max-w-full">
           {['todos', ...ROLES_ASIGNABLES].map(r => (
@@ -255,7 +253,7 @@ export default function AdminUsuariosPage() {
       </div>
 
       {/* Tabla usuarios activos */}
-      <div className="border overflow-hidden rounded-xl shadow-sm bg-white" style={{ borderColor: '#CFCFCF' }}>
+      <div className="border overflow-hidden rounded-xl shadow-sm bg-white border-borde rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -270,7 +268,7 @@ export default function AdminUsuariosPage() {
             </thead>
             <tbody>
               {activos.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: '#888' }}>Sin resultados.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">Sin resultados.</td></tr>
               )}
               {activos.map((u) => {
                 const rc = ROL_COLORS[u.rol] ?? ROL_COLORS.epc
@@ -389,8 +387,7 @@ export default function AdminUsuariosPage() {
                                 }
                               }}
                               disabled={savingUser}
-                              className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+                              className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 bg-acento text-principal rounded-xl"
                             >
                               <Save size={14} /> {savingUser ? 'Guardando...' : 'Guardar cambios'}
                             </button>
@@ -558,8 +555,7 @@ export default function AdminUsuariosPage() {
               <button
                 onClick={handleCreateUser}
                 disabled={creating || !newEmail || !newNombre || !newEmpresa}
-                className="px-5 py-2.5 text-sm font-bold rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95 shadow-md"
-                style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+                className="px-5 py-2.5 text-sm font-bold rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95 shadow-md bg-acento text-principal rounded-xl"
               >
                 {creating
                   ? 'Procesando...'

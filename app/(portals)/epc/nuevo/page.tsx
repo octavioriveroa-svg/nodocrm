@@ -121,24 +121,24 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
     return (
-      <div className="border p-3 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#fafff0' }}>
+      <div className="border p-3 text-xs border-borde rounded-xl bg-white/60">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 font-bold text-sm mb-2">
-            <Zap size={13} style={{ color: '#888' }} />
+            <Zap size={13} className="text-muted" />
             Fotovoltaico
           </div>
-          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0" style={{ color: '#888' }}>
+          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0 text-muted">
             <X size={13} />
           </button>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
-          <span><span style={{ color: '#888' }}>Módulos: </span>{p.fv.num_modulos} × {p.fv.potencia_modulos_w} W · {p.fv.marca_modulos}</span>
-          <span><span style={{ color: '#888' }}>kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
-          <span><span style={{ color: '#888' }}>Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
-          <span><span style={{ color: '#888' }}>kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
-          <span><span style={{ color: '#888' }}>Generación: </span>{Number(p.fv.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año</span>
-          <span><span style={{ color: '#888' }}>CAPEX: </span>${Number(p.fv.capex).toLocaleString('es-MX')}</span>
-          <span className="col-span-2"><span style={{ color: '#888' }}>Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
+          <span><span className="text-muted">Módulos: </span>{p.fv.num_modulos} × {p.fv.potencia_modulos_w} W · {p.fv.marca_modulos}</span>
+          <span><span className="text-muted">kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
+          <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
+          <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
+          <span><span className="text-muted">Generación: </span>{Number(p.fv.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año</span>
+          <span><span className="text-muted">CAPEX: </span>${Number(p.fv.capex).toLocaleString('es-MX')}</span>
+          <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
         </div>
       </div>
     )
@@ -151,23 +151,23 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
       load_shifting_ups: 'Load Shifting + UPS',
     }
     return (
-      <div className="border p-3 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#f0f8ff' }}>
+      <div className="border p-3 text-xs border-borde rounded-xl bg-white/60">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 font-bold text-sm mb-2">
-            <Battery size={13} style={{ color: '#888' }} />
+            <Battery size={13} className="text-muted" />
             BESS
           </div>
-          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0" style={{ color: '#888' }}>
+          <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0 text-muted">
             <X size={13} />
           </button>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
-          <span><span style={{ color: '#888' }}>Potencia: </span>{p.bess.potencia_kw} kW</span>
-          <span><span style={{ color: '#888' }}>Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
-          <span><span style={{ color: '#888' }}>Marca: </span>{p.bess.marca}</span>
-          <span><span style={{ color: '#888' }}>Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
-          <span><span style={{ color: '#888' }}>CAPEX: </span>${Number(p.bess.capex).toLocaleString('es-MX')}</span>
-          <span><span style={{ color: '#888' }}>Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
+          <span><span className="text-muted">Potencia: </span>{p.bess.potencia_kw} kW</span>
+          <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
+          <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
+          <span><span className="text-muted">Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
+          <span><span className="text-muted">CAPEX: </span>${Number(p.bess.capex).toLocaleString('es-MX')}</span>
+          <span><span className="text-muted">Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
         </div>
       </div>
     )
@@ -178,8 +178,8 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
 // ── Campo calculado (display) ─────────────────────────────────
 function CalcField({ label, value, unit }: { label: string; value: number | null; unit: string }) {
   return (
-    <div className="border px-3 py-2 text-xs" style={{ borderColor: '#CFCFCF', backgroundColor: '#F9F6EF' }}>
-      <div style={{ color: '#888' }}>{label}</div>
+    <div className="border px-3 py-2 text-xs border-borde rounded-xl bg-fondo">
+      <div className="text-muted">{label}</div>
       <div className="font-bold text-sm mt-0.5">
         {value !== null ? `${n2(value, 4)} ${unit}` : '—'}
       </div>
@@ -536,7 +536,7 @@ export default function NuevoProyectoPage() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-black">Nuevo proyecto</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Completa los tres pasos para enviar tu solicitud</p>
+        <p className="text-sm mt-1 text-muted">Completa los tres pasos para enviar tu solicitud</p>
       </div>
 
       <StepIndicator current={step} />
@@ -566,7 +566,7 @@ export default function NuevoProyectoPage() {
               )}
             </div>
 
-            <hr style={{ borderColor: '#CFCFCF' }} />
+            <hr className="border-borde rounded-xl" />
 
             <div>
               <label className="block text-sm font-medium mb-3">Tipo de instalación *</label>
@@ -626,7 +626,7 @@ const Icon = opt.icon
               <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
 
               {sitiosCliente.length === 0 && !mostrarNuevoSitio && (
-                <p className="text-sm mb-3" style={{ color: '#888' }}>Este cliente no tiene sitios registrados.</p>
+                <p className="text-sm mb-3 text-muted">Este cliente no tiene sitios registrados.</p>
               )}
 
               {/* Lista de sitios */}
@@ -648,7 +648,7 @@ const Icon = opt.icon
                         <label htmlFor={`s-${s.id}`} className="flex-1 cursor-pointer min-w-0">
                           <div className="text-sm font-semibold">{s.nombre}</div>
                           {(s.ciudad || s.ubicacion_estado) && (
-                            <div className="text-xs truncate" style={{ color: '#666' }}>
+                            <div className="text-xs truncate text-muted">
                               {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
                             </div>
                           )}
@@ -690,7 +690,7 @@ const Icon = opt.icon
                           <p className="text-sm">¿Eliminar <strong>{s.nombre}</strong>?</p>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setDeletingSitioId(null)}
-                              className="px-3 py-1 text-xs border" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+                              className="px-3 py-1 text-xs border  border-borde rounded-xl">Cancelar</button>
                             <button type="button" onClick={() => eliminarSitio(s.id)}
                               className="px-3 py-1 text-xs font-bold text-white" style={{ backgroundColor: '#c00' }}>Eliminar</button>
                           </div>
@@ -701,10 +701,10 @@ const Icon = opt.icon
                       {viendoSitioId === s.id && (
                         <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                            {s.nombre_recibo && <div><span style={{ color: '#888' }}>Nombre en recibo: </span><span className="font-medium">{s.nombre_recibo}</span></div>}
-                            {(s.ciudad || s.ubicacion_estado) && <div><span style={{ color: '#888' }}>Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
-                            {s.rpu && <div><span style={{ color: '#888' }}>RPU: </span><span className="font-medium">{s.rpu}</span></div>}
-                            {s.demanda_contratada_kw != null && <div><span style={{ color: '#888' }}>Demanda: </span><span className="font-medium">{s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span></div>}
+                            {s.nombre_recibo && <div><span className="text-muted">Nombre en recibo: </span><span className="font-medium">{s.nombre_recibo}</span></div>}
+                            {(s.ciudad || s.ubicacion_estado) && <div><span className="text-muted">Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
+                            {s.rpu && <div><span className="text-muted">RPU: </span><span className="font-medium">{s.rpu}</span></div>}
+                            {s.demanda_contratada_kw != null && <div><span className="text-muted">Demanda: </span><span className="font-medium">{s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span></div>}
                             {s.recibo_url && (
                               <div className="col-span-2">
                                 <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
@@ -750,8 +750,7 @@ const Icon = opt.icon
                             <div className="flex items-center gap-3">
                               <input ref={fileRefEdit} type="file" accept=".pdf" onChange={subirPdfEdit} className="hidden" id="edit-recibo-pdf" />
                               <label htmlFor="edit-recibo-pdf"
-                                className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
-                                style={{ borderColor: '#CFCFCF' }}>
+                                className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer  border-borde rounded-xl">
                                 <Upload size={11} />
                                 {subiendoPdfEdit ? 'Subiendo…' : 'Recibo CFE (PDF)'}
                               </label>
@@ -765,13 +764,12 @@ const Icon = opt.icon
                           </div>
                           <div className="flex justify-between mt-3">
                             <button type="button" onClick={() => setEditandoSitioId(null)}
-                              className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                              className="px-3 py-1.5 text-xs border  border-borde rounded-xl">
                               Cancelar
                             </button>
                             <button type="button" onClick={actualizarSitio}
                               disabled={guardandoEditSitio || !editSitioForm.nombre.trim()}
-                              className="px-4 py-1.5 text-xs font-bold disabled:opacity-50"
-                              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                              className="px-4 py-1.5 text-xs font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
                               {guardandoEditSitio ? 'Guardando…' : 'Guardar cambios'}
                             </button>
                           </div>
@@ -781,7 +779,7 @@ const Icon = opt.icon
                       {/* Productos — solo cuando el sitio está seleccionado */}
                       {selected && (
                         <div className="border border-t-0 px-3 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
-                          <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#666' }}>
+                          <p className="text-xs font-bold uppercase tracking-wide mb-2 text-muted">
                             Productos del sitio
                           </p>
 
@@ -804,23 +802,21 @@ const Icon = opt.icon
                                   <p className="text-xs font-bold mb-3">¿Qué tipo de producto?</p>
                                   <div className="grid grid-cols-2 gap-3">
                                     <button type="button" onClick={() => setProductTipo('fv')}
-                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black"
-                                      style={{ borderColor: '#CFCFCF' }}>
+                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black  border-borde rounded-xl">
                                       <Zap size={20} />
                                       <span className="text-sm font-bold">Fotovoltaico</span>
-                                      <span className="text-xs text-center" style={{ color: '#666' }}>Paneles solares e inversores</span>
+                                      <span className="text-xs text-center text-muted">Paneles solares e inversores</span>
                                     </button>
                                     <button type="button" onClick={() => setProductTipo('bess')}
-                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black"
-                                      style={{ borderColor: '#CFCFCF' }}>
+                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black  border-borde rounded-xl">
                                       <Battery size={20} />
                                       <span className="text-sm font-bold">BESS</span>
-                                      <span className="text-xs text-center" style={{ color: '#666' }}>Sistema de almacenamiento</span>
+                                      <span className="text-xs text-center text-muted">Sistema de almacenamiento</span>
                                     </button>
                                   </div>
                                   <div className="flex justify-end mt-3">
                                     <button type="button" onClick={() => setAddingToSitioId(null)}
-                                      className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                                      className="px-3 py-1.5 text-xs border  border-borde rounded-xl">
                                       Cancelar
                                     </button>
                                   </div>
@@ -831,11 +827,11 @@ const Icon = opt.icon
                                   <div className="flex items-center justify-between mb-4">
                                     <p className="text-sm font-bold flex items-center gap-2"><Zap size={14} /> Fotovoltaico</p>
                                     <button type="button" onClick={() => setProductTipo(null)}
-                                      className="text-xs underline" style={{ color: '#666' }}>← Cambiar tipo</button>
+                                      className="text-xs underline text-muted">← Cambiar tipo</button>
                                   </div>
                                   <div className="flex flex-col gap-3">
                                     {/* Módulos */}
-                                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#888' }}>Módulos</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Módulos</p>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">No. Módulos *</label>
@@ -862,7 +858,7 @@ const Icon = opt.icon
                                     </div>
 
                                     {/* Inversores */}
-                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1" style={{ color: '#888' }}>Inversores</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Inversores</p>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">No. Inversores *</label>
@@ -889,7 +885,7 @@ const Icon = opt.icon
                                     </div>
 
                                     {/* Energía y CAPEX */}
-                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1" style={{ color: '#888' }}>Energía y costos</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Energía y costos</p>
                                     <div className="grid grid-cols-2 gap-3">
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Generación anual (kWh) *</label>
@@ -914,7 +910,7 @@ const Icon = opt.icon
                                   <div className="flex items-center justify-between mb-4">
                                     <p className="text-sm font-bold flex items-center gap-2"><Battery size={14} /> BESS</p>
                                     <button type="button" onClick={() => setProductTipo(null)}
-                                      className="text-xs underline" style={{ color: '#666' }}>← Cambiar tipo</button>
+                                      className="text-xs underline text-muted">← Cambiar tipo</button>
                                   </div>
                                   <div className="flex flex-col gap-3">
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
@@ -967,12 +963,11 @@ const Icon = opt.icon
                               {productTipo && (
                                 <div className="flex justify-between mt-4">
                                   <button type="button" onClick={() => { setAddingToSitioId(null); setAddProductError('') }}
-                                    className="px-3 py-1.5 text-xs border" style={{ borderColor: '#CFCFCF' }}>
+                                    className="px-3 py-1.5 text-xs border  border-borde rounded-xl">
                                     Cancelar
                                   </button>
                                   <button type="button" onClick={addProduct}
-                                    className="px-4 py-1.5 text-xs font-bold"
-                                    style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                                    className="px-4 py-1.5 text-xs font-bold bg-acento text-principal rounded-xl">
                                     Agregar producto
                                   </button>
                                 </div>
@@ -980,8 +975,7 @@ const Icon = opt.icon
                             </div>
                           ) : (
                             <button type="button" onClick={() => startAddingProduct(s.id)}
-                              className="flex items-center gap-2 px-3 py-2 text-xs border font-medium w-full justify-center"
-                              style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
+                              className="flex items-center gap-2 px-3 py-2 text-xs border font-medium w-full justify-center border-borde border-dashed rounded-xl">
                               <Plus size={12} />
                               {productos.length === 0 ? 'Agregar producto' : 'Agregar otro producto'}
                             </button>
@@ -1031,8 +1025,7 @@ const Icon = opt.icon
                     <div className="flex items-center gap-3">
                       <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="nuevo-recibo-pdf" />
                       <label htmlFor="nuevo-recibo-pdf"
-                        className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer"
-                        style={{ borderColor: '#CFCFCF' }}>
+                        className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer  border-borde rounded-xl">
                         <Upload size={11} />
                         {subiendoPdfNuevo ? 'Subiendo…' : 'Recibo CFE (PDF)'}
                       </label>
@@ -1047,8 +1040,7 @@ const Icon = opt.icon
                   <div className="flex justify-end mt-3">
                     <button type="button" onClick={guardarNuevoSitio}
                       disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
-                      className="px-4 py-2 text-xs font-bold disabled:opacity-50"
-                      style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                      className="px-4 py-2 text-xs font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
                       {guardandoSitio ? 'Guardando…' : 'Agregar sitio'}
                     </button>
                   </div>
@@ -1056,8 +1048,7 @@ const Icon = opt.icon
               ) : (
                 <button type="button"
                   onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null) }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center"
-                  style={{ borderColor: '#CFCFCF', borderStyle: 'dashed' }}>
+                  className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center border-borde border-dashed rounded-xl">
                   <Plus size={14} />
                   {sitiosCliente.length === 0 ? 'Agregar sitio' : 'Agregar otro sitio'}
                 </button>
@@ -1079,7 +1070,7 @@ const Icon = opt.icon
                     className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold">Considerar alternativa de Mercado Eléctrico Mayorista</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#666' }}>
+                    <p className="text-xs mt-0.5 text-muted">
                       Uno o más sitios seleccionados tienen más de 1,000 kW de demanda contratada. El analista evaluará si conviene migrar al MEM.
                     </p>
                   </div>
@@ -1087,7 +1078,7 @@ const Icon = opt.icon
               </div>
             )}
 
-            <hr style={{ borderColor: '#CFCFCF' }} />
+            <hr className="border-borde rounded-xl" />
 
             {/* Modalidad */}
             <div>
@@ -1126,7 +1117,7 @@ const Icon = opt.icon
                     color: '#000',
                   }}>
                   <div className="font-semibold text-sm">Prefiero que Nodo me recomiende las mejores alternativas para este cliente</div>
-                  <div className="text-xs mt-0.5" style={{ color: '#666' }}>El analista definirá la modalidad más adecuada</div>
+                  <div className="text-xs mt-0.5 text-muted">El analista definirá la modalidad más adecuada</div>
                 </button>
               </div>
             </div>
@@ -1149,8 +1140,7 @@ const Icon = opt.icon
           </button>
           {step < 2 ? (
             <button type="button" onClick={handleNext}
-              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] bg-acento text-principal rounded-xl">
               Siguiente
             </button>
           ) : (
@@ -1165,3 +1155,4 @@ const Icon = opt.icon
     </div>
   )
 }
+

@@ -67,13 +67,13 @@ export default function AdminDetalleProyectoPage({ params }: { params: Promise<{
   }, [])
 
   if (loadError) return (
-    <div className="max-w-xl mx-auto mt-16 p-6 border" style={{ borderColor: '#CFCFCF' }}>
+    <div className="max-w-xl mx-auto mt-16 p-6 border border-borde rounded-xl">
       <p className="font-bold mb-1">Error al cargar</p>
-      <p className="text-sm" style={{ color: '#666' }}>{loadError}</p>
+      <p className="text-sm text-muted">{loadError}</p>
     </div>
   )
   if (notFound) return (
-    <div className="max-w-xl mx-auto mt-16 p-6 border" style={{ borderColor: '#CFCFCF' }}>
+    <div className="max-w-xl mx-auto mt-16 p-6 border border-borde rounded-xl">
       <p className="font-bold mb-1">Proyecto no encontrado</p>
     </div>
   )

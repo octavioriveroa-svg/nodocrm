@@ -88,7 +88,7 @@ export default function ClientesPage() {
           </div>
 
           {filtrados.length === 0 ? (
-            <p className="text-sm text-center py-12" style={{ color: '#888' }}>
+            <p className="text-sm text-center py-12 text-muted">
               Sin resultados para &quot;{busqueda}&quot;
             </p>
           ) : (

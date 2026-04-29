@@ -272,7 +272,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           <div className="border p-4 mt-4 flex items-center justify-between rounded-lg" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
             <p className="text-sm font-medium text-red-800">¿Eliminar este proyecto? Esta acción no se puede deshacer e involucrará borrar sus datos asociados.</p>
             <div className="flex gap-2 ml-4 shrink-0">
-              <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border rounded-md" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+              <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border rounded-md border-borde rounded-xl">Cancelar</button>
               <button onClick={handleEliminarProyecto} className="px-3 py-1.5 text-sm font-bold text-white rounded-md" style={{ backgroundColor: '#c00' }}>Eliminar proyecto</button>
             </div>
           </div>
@@ -388,8 +388,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                   href={responsableProfile.calendario_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md"
-                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-acento text-principal rounded-xl"
                 >
                   <CalendarDays size={16} /> Agendar Reunión <ExternalLink size={12} />
                 </a>

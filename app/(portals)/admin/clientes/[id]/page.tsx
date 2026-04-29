@@ -137,7 +137,7 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
   })
 
   const inputClass = "w-full border px-3 py-2 text-sm bg-white rounded-lg"
-  const inputStyle = { borderColor: '#CFCFCF' }
+  const inputStyle = {}
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -158,13 +158,11 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
           {!editando && (
             <>
               <button onClick={() => setEditando(true)}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm border font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-                style={{ borderColor: '#CFCFCF' }}>
+                className="flex items-center gap-1.5 px-4 py-2 text-sm border font-semibold rounded-lg hover:bg-gray-50 transition-colors border-borde rounded-xl">
                 <Pencil size={14} /> Editar
               </button>
               <button onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm border font-semibold rounded-lg hover:bg-red-50 transition-colors"
-                style={{ borderColor: '#CFCFCF', color: '#c00' }}>
+                className="flex items-center gap-1.5 px-4 py-2 text-sm border font-semibold rounded-lg hover:bg-red-50 transition-colors border-borde rounded-xl text-red-600">
                 <Trash2 size={14} /> Eliminar
               </button>
             </>
@@ -177,7 +175,7 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
         <div className="border p-4 mb-6 flex items-center justify-between rounded-xl" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
           <p className="text-sm font-medium text-red-800">¿Eliminar este cliente y todos sus datos? Esta acción no se puede deshacer.</p>
           <div className="flex gap-2 ml-4 shrink-0">
-            <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 text-sm border rounded-lg" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+            <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 text-sm border rounded-lg border-borde rounded-xl">Cancelar</button>
             <button onClick={handleEliminar} className="px-4 py-2 text-sm font-bold text-white rounded-lg" style={{ backgroundColor: '#c00' }}>Eliminar cliente</button>
           </div>
         </div>
@@ -248,12 +246,11 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
           </div>
           <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
             <button onClick={() => { setEditando(false); setForm(cliente) }}
-              className="px-5 py-2 text-sm border rounded-lg" style={{ borderColor: '#CFCFCF' }}>
+              className="px-5 py-2 text-sm border rounded-lg border-borde rounded-xl">
               Cancelar
             </button>
             <button onClick={handleGuardar} disabled={guardando}
-              className="px-5 py-2 text-sm font-bold rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+              className="px-5 py-2 text-sm font-bold rounded-lg disabled:opacity-50 bg-acento text-principal rounded-xl">
               {guardando ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>

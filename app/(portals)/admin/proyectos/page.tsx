@@ -161,7 +161,7 @@ export default function AdminProyectosPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin proyectos.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted">Sin proyectos.</td></tr>
             )}
             {lista.map(p => (
               <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
@@ -202,7 +202,7 @@ export default function AdminProyectosPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs mt-2" style={{ color: '#888' }}>{lista.length} proyecto{lista.length !== 1 ? 's' : ''}</p>
+      <p className="text-xs mt-2 text-muted">{lista.length} proyecto{lista.length !== 1 ? 's' : ''}</p>
     </div>
   )
 }

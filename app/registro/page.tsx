@@ -61,8 +61,7 @@ export default function RegistroPage() {
         </div>
 
         <div
-          className="border p-8"
-          style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}
+          className="border p-8 glass-card"
         >
           <h1 className="text-xl font-bold mb-6">Crear cuenta</h1>
 
@@ -74,8 +73,7 @@ export default function RegistroPage() {
                 value={nombre}
                 onChange={e => setNombre(e.target.value)}
                 required
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full border px-3 py-2 text-sm border-borde rounded-xl"
                 placeholder="Juan Pérez"
               />
             </div>
@@ -87,8 +85,7 @@ export default function RegistroPage() {
                 value={empresa}
                 onChange={e => setEmpresa(e.target.value)}
                 required
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full border px-3 py-2 text-sm border-borde rounded-xl"
                 placeholder="Mi empresa S.A."
               />
             </div>
@@ -100,8 +97,7 @@ export default function RegistroPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full border px-3 py-2 text-sm border-borde rounded-xl"
                 placeholder="tu@correo.com"
               />
             </div>
@@ -114,8 +110,7 @@ export default function RegistroPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full border px-3 py-2 text-sm"
-                style={{ borderColor: '#CFCFCF' }}
+                className="w-full border px-3 py-2 text-sm border-borde rounded-xl"
                 placeholder="Mínimo 6 caracteres"
               />
             </div>
@@ -127,15 +122,14 @@ export default function RegistroPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 font-bold text-sm transition-opacity disabled:opacity-50"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+              className="w-full py-2.5 font-bold text-sm transition-opacity disabled:opacity-50 bg-acento text-principal rounded-xl"
             >
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm mt-6" style={{ color: '#666' }}>
+        <p className="text-center text-sm mt-6 text-muted">
           ¿Ya tienes cuenta?{' '}
           <Link href="/login" className="font-semibold underline" style={{ color: '#000' }}>
             Inicia sesión

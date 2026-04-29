@@ -12,9 +12,9 @@ function Campo({ label, value, icon: Icon }: { label: string; value?: string | n
   if (!value) return null
   return (
     <div className="min-w-0">
-      <div className="text-xs font-medium mb-0.5" style={{ color: '#888' }}>{label}</div>
+      <div className="text-xs font-medium mb-0.5 text-muted">{label}</div>
       <div className="flex items-center gap-1.5 text-sm font-medium break-words">
-        {Icon && <Icon size={13} style={{ color: '#888' }} className="shrink-0" />}
+        {Icon && <Icon size={13} className="text-muted shrink-0" />}
         <span className="break-words">{value}</span>
       </div>
     </div>
@@ -123,11 +123,11 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   if (!cliente) return null
 
   const inputClass = "w-full border px-3 py-2 text-sm bg-white"
-  const inputStyle = { borderColor: '#CFCFCF' }
+  const inputStyle = {}
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Link href="/epc/clientes" className="inline-flex items-center gap-1 text-sm mb-6" style={{ color: '#666' }}>
+      <Link href="/epc/clientes" className="inline-flex items-center gap-1 text-sm mb-6 text-muted">
         <ChevronLeft size={14} />
         Volver a clientes
       </Link>
@@ -136,20 +136,18 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
         <div>
           <h1 className="text-2xl font-black">{cliente.razon_social}</h1>
           {cliente.industria && (
-            <span className="text-sm mt-1 inline-block" style={{ color: '#666' }}>{cliente.industria}</span>
+            <span className="text-sm mt-1 inline-block text-muted">{cliente.industria}</span>
           )}
         </div>
         <div className="flex gap-2">
           {!editando && (
             <>
               <button onClick={() => setEditando(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border font-medium"
-                style={{ borderColor: '#CFCFCF' }}>
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border font-medium border-borde rounded-xl">
                 <Pencil size={13} /> Editar
               </button>
               <button onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border font-medium"
-                style={{ borderColor: '#CFCFCF', color: '#c00' }}>
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border font-medium border-borde rounded-xl text-red-600">
                 <Trash2 size={13} /> Eliminar
               </button>
             </>
@@ -161,14 +159,14 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
         <div className="border p-4 mb-4 flex items-center justify-between" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
           <p className="text-sm font-medium">¿Eliminar este cliente? Esta acción no se puede deshacer.</p>
           <div className="flex gap-2 ml-4">
-            <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border" style={{ borderColor: '#CFCFCF' }}>Cancelar</button>
+            <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border border-borde rounded-xl">Cancelar</button>
             <button onClick={handleEliminar} className="px-3 py-1.5 text-sm font-bold text-white" style={{ backgroundColor: '#c00' }}>Eliminar</button>
           </div>
         </div>
       )}
 
       {editando ? (
-        <div className="border p-8" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+        <div className="border p-8 glass-card">
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Razón social *</label>
@@ -230,20 +228,19 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
           </div>
           <div className="flex justify-between mt-6">
             <button onClick={() => { setEditando(false); setForm(cliente) }}
-              className="px-5 py-2 text-sm border" style={{ borderColor: '#CFCFCF' }}>
+              className="px-5 py-2 text-sm border border-borde rounded-xl">
               Cancelar
             </button>
             <button onClick={handleGuardar} disabled={loading}
-              className="px-5 py-2 text-sm font-bold disabled:opacity-50"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+              className="px-5 py-2 text-sm font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
               {loading ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
         </div>
       ) : (
         <>
-          <div className="border p-6 mb-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-            <h3 className="font-bold text-xs uppercase tracking-wide mb-4" style={{ color: '#666' }}>Empresa</h3>
+          <div className="border p-6 mb-4 glass-card">
+            <h3 className="font-bold text-xs uppercase tracking-wide mb-4 text-muted">Empresa</h3>
             <div className="grid grid-cols-2 gap-4">
               <Campo label="Razón social" value={cliente.razon_social} icon={Building2} />
               <Campo label="RFC" value={cliente.rfc} />
@@ -252,8 +249,8 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          <div className="border p-6 mb-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-            <h3 className="font-bold text-xs uppercase tracking-wide mb-4" style={{ color: '#666' }}>Contacto principal</h3>
+          <div className="border p-6 mb-4 glass-card">
+            <h3 className="font-bold text-xs uppercase tracking-wide mb-4 text-muted">Contacto principal</h3>
             <div className="grid grid-cols-2 gap-4">
               <Campo label="Nombre" value={cliente.contacto_nombre} />
               <Campo label="Cargo" value={cliente.contacto_cargo} />
@@ -263,8 +260,8 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
           </div>
 
           {cliente.notas && (
-            <div className="border p-6" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-              <h3 className="font-bold text-xs uppercase tracking-wide mb-3" style={{ color: '#666' }}>Notas internas</h3>
+            <div className="border p-6 glass-card">
+              <h3 className="font-bold text-xs uppercase tracking-wide mb-3 text-muted">Notas internas</h3>
               <p className="text-sm whitespace-pre-wrap flex gap-2">
                 <FileText size={14} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
                 {cliente.notas}
@@ -280,18 +277,18 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
 
           {/* Aggregated Document Center */}
           {archivosCliente.length > 0 && (
-            <div className="border mt-4 bg-white shadow-sm overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
-              <div className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: '#CFCFCF' }}>
+            <div className="border mt-4 bg-white shadow-sm overflow-hidden border-borde rounded-xl">
+              <div className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-borde rounded-xl">
                 <div>
                   <h3 className="font-bold text-lg">Documentos del Cliente</h3>
-                  <p className="text-sm" style={{ color: '#888' }}>Todos los archivos de todos los proyectos de {cliente.razon_social}.</p>
+                  <p className="text-sm text-muted">Todos los archivos de todos los proyectos de {cliente.razon_social}.</p>
                 </div>
-                <span className="text-xs font-bold px-3 py-1.5 rounded-md bg-gray-100" style={{ color: '#666' }}>
+                <span className="text-xs font-bold px-3 py-1.5 rounded-md bg-gray-100 text-muted">
                   {archivosCliente.length} archivo{archivosCliente.length !== 1 ? 's' : ''}
                 </span>
               </div>
               
-              <div className="p-4 border-b bg-gray-50 flex flex-col sm:flex-row gap-3" style={{ borderColor: '#CFCFCF' }}>
+              <div className="p-4 border-b bg-gray-50 flex flex-col sm:flex-row gap-3 border-borde rounded-xl">
                 <div className="relative flex-1">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input 
@@ -299,8 +296,7 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
                     placeholder="Buscar por nombre o descripción..." 
                     value={docSearch}
                     onChange={e => setDocSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none"
-                    style={{ borderColor: '#CFCFCF' }}
+                    className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-acento/30 focus:border-acento transition-all outline-none border-borde rounded-xl"
                   />
                 </div>
                 {(() => {
@@ -356,7 +352,7 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
                           ))}
                         </div>
                         {a.descripcion && (
-                          <p className="text-sm mb-1" style={{ color: '#666' }}>{a.descripcion}</p>
+                          <p className="text-sm mb-1 text-muted">{a.descripcion}</p>
                         )}
                         <div className="text-xs font-medium" style={{ color: '#999' }}>
                           {new Date(a.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}

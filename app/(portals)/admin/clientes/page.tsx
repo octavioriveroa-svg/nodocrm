@@ -91,7 +91,7 @@ export default function AdminClientesPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin clientes.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted">Sin clientes.</td></tr>
             )}
             {lista.map(c => (
               <tr key={c.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/clientes/${c.id}`}>
@@ -110,7 +110,7 @@ export default function AdminClientesPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs mt-2" style={{ color: '#888' }}>{lista.length} cliente{lista.length !== 1 ? 's' : ''}</p>
+      <p className="text-xs mt-2 text-muted">{lista.length} cliente{lista.length !== 1 ? 's' : ''}</p>
     </div>
   )
 }

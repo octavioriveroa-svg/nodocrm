@@ -35,20 +35,20 @@ export default function PendientePage() {
         <div className="flex justify-center mb-10">
           <Logo size="lg" />
         </div>
-        <div className="border p-8 text-center" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+        <div className="border p-8 text-center glass-card">
           <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center"
             style={{ backgroundColor: '#D7FF2F' }}>
             <span className="text-2xl">⏳</span>
           </div>
           <h1 className="text-xl font-bold mb-2">Solicitud enviada</h1>
-          <p className="text-sm mb-6" style={{ color: '#666' }}>
+          <p className="text-sm mb-6 text-muted">
             Tu cuenta está pendiente de aprobación. Un administrador revisará tu solicitud y te asignará el acceso correspondiente. Te notificaremos cuando esté lista.
           </p>
           <p className="text-xs mb-6" style={{ color: '#aaa' }}>
             Esta página se actualizará automáticamente cuando tu acceso sea aprobado.
           </p>
           <button onClick={handleLogout}
-            className="text-sm underline" style={{ color: '#666' }}>
+            className="text-sm underline text-muted">
             Cerrar sesión
           </button>
         </div>

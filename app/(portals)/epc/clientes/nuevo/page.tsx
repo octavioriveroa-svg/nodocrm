@@ -76,23 +76,23 @@ export default function NuevoClientePage() {
   }
 
   const inputClass = "w-full border px-3 py-2 text-sm bg-white"
-  const inputStyle = { borderColor: '#CFCFCF' }
+  const inputStyle = {}
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Link href="/epc/clientes" className="inline-flex items-center gap-1 text-sm mb-6" style={{ color: '#666' }}>
+      <Link href="/epc/clientes" className="inline-flex items-center gap-1 text-sm mb-6 text-muted">
         <ChevronLeft size={14} />
         Volver a clientes
       </Link>
 
       <div className="mb-6">
         <h1 className="text-2xl font-black">Nuevo cliente</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Registra los datos de tu cliente</p>
+        <p className="text-sm mt-1 text-muted">Registra los datos de tu cliente</p>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="border p-8 mb-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-          <h2 className="font-bold text-sm uppercase tracking-wide mb-5" style={{ color: '#666' }}>Datos de la empresa</h2>
+        <div className="border p-8 mb-4 glass-card">
+          <h2 className="font-bold text-sm uppercase tracking-wide mb-5 text-muted">Datos de la empresa</h2>
 
           <div className="flex flex-col gap-4">
             <div>
@@ -128,8 +128,8 @@ export default function NuevoClientePage() {
           </div>
         </div>
 
-        <div className="border p-8 mb-4" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-          <h2 className="font-bold text-sm uppercase tracking-wide mb-5" style={{ color: '#666' }}>Contacto principal</h2>
+        <div className="border p-8 mb-4 glass-card">
+          <h2 className="font-bold text-sm uppercase tracking-wide mb-5 text-muted">Contacto principal</h2>
 
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
@@ -160,8 +160,8 @@ export default function NuevoClientePage() {
           </div>
         </div>
 
-        <div className="border p-8 mb-6" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
-          <h2 className="font-bold text-sm uppercase tracking-wide mb-5" style={{ color: '#666' }}>Notas internas</h2>
+        <div className="border p-8 mb-6 glass-card">
+          <h2 className="font-bold text-sm uppercase tracking-wide mb-5 text-muted">Notas internas</h2>
           <textarea value={form.notas} onChange={e => set('notas', e.target.value)}
             rows={3} className={inputClass} style={inputStyle}
             placeholder="Información adicional sobre este cliente…" />
@@ -171,13 +171,11 @@ export default function NuevoClientePage() {
 
         <div className="flex justify-between">
           <Link href="/epc/clientes"
-            className="px-5 py-2 text-sm font-medium border"
-            style={{ borderColor: '#CFCFCF' }}>
+            className="px-5 py-2 text-sm font-medium border border-borde rounded-xl">
             Cancelar
           </Link>
           <button type="submit" disabled={loading}
-            className="px-5 py-2 text-sm font-bold disabled:opacity-50"
-            style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+            className="px-5 py-2 text-sm font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
             {loading ? 'Guardando…' : 'Guardar cliente'}
           </button>
         </div>
