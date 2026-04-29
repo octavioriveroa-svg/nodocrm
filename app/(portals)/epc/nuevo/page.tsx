@@ -53,6 +53,9 @@ interface FormData {
 }
 
 // ── Valores vacíos ─────────────────────────────────────────────
+const inp = "w-full rounded-lg border border-borde px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all";
+const borde = {};
+
 const emptyFv: FVForm = {
   num_modulos: '', potencia_modulos_w: '', marca_modulos: '',
   num_inversores: '', potencia_inversores_kw: '', marca_inversores: '',
@@ -525,8 +528,6 @@ export default function NuevoProyectoPage() {
     router.push(`/epc/proyectos/${proyecto.id}`)
   }
 
-  const inp = "w-full rounded-lg border border-borde px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all"
-  const borde = {}
   const fvCalc = calcFV(fvForm)
   const bessCalc = calcBESS(bessForm)
   const anyHighDemanda = sitiosSeleccionados.some(id => (sitiosCliente.find(s => s.id === id)?.demanda_contratada_kw ?? 0) > 1000)
