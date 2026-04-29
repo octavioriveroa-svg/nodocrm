@@ -45,6 +45,7 @@ export interface Proyecto {
   demanda_kw: number | null
   created_at: string
   updated_at: string
+  historial_estados?: Record<string, string>
   profiles?: Profile
 }
 

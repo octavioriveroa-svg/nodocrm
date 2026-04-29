@@ -21,7 +21,7 @@ export default async function AdminDashboard() {
 
   const [{ data: perfiles }, { data: proyectos }, { data: clientes }, { data: productos }] = await Promise.all([
     supabase.from('profiles').select('rol'),
-    supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, created_at, epcista_id').order('created_at', { ascending: false }),
+    supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, historial_estados, created_at, epcista_id').order('created_at', { ascending: false }),
     supabase.from('clientes').select('id'),
     supabase.from('proyecto_sitio_productos').select('tipo, datos'),
   ])
@@ -61,9 +61,9 @@ export default async function AdminDashboard() {
     byEstado,
   }
 
-  type RecentProyecto = { id: string; nombre_proyecto: string; tipo: string; estado: string; created_at: string; epcista_id: string; epcista_nombre: string }
+  type RecentProyecto = { id: string; nombre_proyecto: string; tipo: string; estado: string; historial_estados?: Record<string, string>; created_at: string; epcista_id: string; epcista_nombre: string }
   let recientes: RecentProyecto[] = []
-  const recientesList = pr.slice(0, 8) as { id: string; nombre_proyecto: string; tipo: string; estado: string; created_at: string; epcista_id: string }[]
+  const recientesList = pr.slice(0, 8) as { id: string; nombre_proyecto: string; tipo: string; estado: string; historial_estados?: Record<string, string>; created_at: string; epcista_id: string }[]
   if (recientesList.length > 0) {
     const ids = [...new Set(recientesList.map(r => r.epcista_id))]
     const { data: profilesData } = await supabase.from('profiles').select('id, nombre').in('id', ids)
@@ -214,7 +214,7 @@ export default async function AdminDashboard() {
                   </td>
                   <td className="px-6 py-3.5 text-gray-500">{proj.epcista_nombre}</td>
                   <td className="px-6 py-3.5"><BadgeTipo tipo={proj.tipo as import('@/lib/types').TipoProyecto} /></td>
-                  <td className="px-6 py-3.5"><BadgeEstado estado={proj.estado} /></td>
+                  <td className="px-6 py-3.5"><BadgeEstado estado={proj.estado} historial={proj.historial_estados} /></td>
                   <td className="px-6 py-3.5 text-xs text-gray-400">{formatDate(proj.created_at)}</td>
                 </tr>
               ))}

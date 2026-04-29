@@ -170,7 +170,7 @@ export default function AdminProyectosPage() {
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.epcista_nombre}</td>
                 <td className="px-5 py-3 text-xs font-medium" style={{ color: p.responsable_nombre !== '—' ? '#15803D' : '#aaa' }}>{p.responsable_nombre}</td>
                 <td className="px-5 py-3"><BadgeTipo tipo={p.tipo} /></td>
-                <td className="px-5 py-3"><BadgeEstado estado={p.estado} /></td>
+                <td className="px-5 py-3"><BadgeEstado estado={p.estado} historial={p.historial_estados} /></td>
                 <td className="px-5 py-3 text-xs font-medium text-gray-400">{formatDate(p.created_at)}</td>
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2 justify-end">

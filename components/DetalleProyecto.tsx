@@ -232,7 +232,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             )}
             <div className="flex items-center gap-3 mt-2">
               <BadgeTipo tipo={proyecto.tipo} />
-              <BadgeEstado estado={proyecto.estado} />
+              <BadgeEstado estado={proyecto.estado} historial={proyecto.historial_estados} />
               <span className="text-sm text-gray-400">{formatDate(proyecto.created_at)}</span>
             </div>
           </div>

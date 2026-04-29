@@ -13,11 +13,33 @@ const config: Record<string, { label: string; classes: string }> = {
   completado: { label: 'Completado', classes: 'bg-principal text-white' },
 }
 
-export default function BadgeEstado({ estado }: { estado: EstadoProyecto | string }) {
+export default function BadgeEstado({ 
+  estado, 
+  historial 
+}: { 
+  estado: EstadoProyecto | string
+  historial?: Record<string, string>
+}) {
   const { label, classes } = config[estado] ?? { label: estado, classes: 'bg-gray-100 text-gray-600' }
+  
+  let fechaFormat = null
+  if (historial && historial[estado]) {
+    const d = new Date(historial[estado])
+    if (!isNaN(d.getTime())) {
+      fechaFormat = d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+  }
+
   return (
-    <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${classes}`}>
-      {label}
-    </span>
+    <div className="flex flex-col items-start gap-1">
+      <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${classes}`}>
+        {label}
+      </span>
+      {fechaFormat && (
+        <span className="text-[10px] text-muted font-medium ml-1">
+          {fechaFormat}
+        </span>
+      )}
+    </div>
   )
 }

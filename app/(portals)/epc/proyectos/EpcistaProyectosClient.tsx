@@ -248,7 +248,7 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
                       </p>
                     )}
                   </div>
-                  <BadgeEstado estado={p.estado} />
+                  <BadgeEstado estado={p.estado} historial={p.historial_estados} />
                 </div>
 
                 {/* Card Body — Metadata */}

@@ -38,6 +38,7 @@ interface ProyectoResumen {
   id: string
   nombre_proyecto: string
   estado: string
+  historial_estados?: Record<string, string>
   created_at: string
 }
 
@@ -68,7 +69,7 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
 
       const { data: projs } = await supabase
         .from('proyectos')
-        .select('id, nombre_proyecto, estado, created_at')
+        .select('id, nombre_proyecto, estado, historial_estados, created_at')
         .or(`cliente_final_empresa.eq.${(clienteData as Cliente)?.razon_social}`)
         .order('created_at', { ascending: false })
 

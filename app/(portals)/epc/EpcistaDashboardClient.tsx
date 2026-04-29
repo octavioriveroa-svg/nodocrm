@@ -156,7 +156,7 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
                       <span className="line-clamp-1">{proj.cliente_final_empresa || proj.cliente_final_nombre || '—'}</span>
                     </td>
                     <td className="px-6 py-3.5"><BadgeTipo tipo={proj.tipo} /></td>
-                    <td className="px-6 py-3.5"><BadgeEstado estado={proj.estado} /></td>
+                    <td className="px-6 py-3.5"><BadgeEstado estado={proj.estado} historial={proj.historial_estados} /></td>
                     <td className="px-6 py-3.5 text-xs text-gray-400 text-right">
                       <span className="flex items-center justify-end gap-1.5">
                         <Calendar size={11} /> {formatDate(proj.created_at)}
