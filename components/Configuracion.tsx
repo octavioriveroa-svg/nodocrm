@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays } from 'lucide-react'
+import Link from 'next/link'
+import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays, Users } from 'lucide-react'
 import type { Profile } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -203,13 +204,33 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 style={{
                   backgroundColor: seccion === id ? '#000' : 'transparent',
                   color: seccion === id ? '#D7FF2F' : '#444',
-                  borderBottom: idx < sections.length - 1 ? '1px solid #CFCFCF' : 'none',
+                  borderBottom: '1px solid #CFCFCF',
                 }}
               >
                 <Icon size={15} />
                 {label}
               </button>
             ))}
+            {initialProfile.rol === 'nodo_admin' && (
+              <>
+                <Link
+                  href="/admin/configuracion/usuarios"
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors hover:bg-gray-50"
+                  style={{ color: '#444', borderBottom: '1px solid #CFCFCF' }}
+                >
+                  <Users size={15} />
+                  Usuarios
+                </Link>
+                <Link
+                  href="/admin/configuracion/roles"
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors hover:bg-gray-50"
+                  style={{ color: '#444' }}
+                >
+                  <ShieldCheck size={15} />
+                  Roles
+                </Link>
+              </>
+            )}
           </nav>
         </div>
 

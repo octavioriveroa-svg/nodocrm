@@ -53,9 +53,9 @@ export default async function AdminDashboard() {
 
   const stats = {
     totalUsuarios: p.length,
-    epcistas: p.filter((u: { rol: string }) => u.rol === 'epcista').length,
-    analistas: p.filter((u: { rol: string }) => u.rol === 'analista').length,
-    admins: p.filter((u: { rol: string }) => u.rol === 'admin').length,
+    epcistas: p.filter((u: { rol: string }) => u.rol === 'epc').length,
+    analistas: p.filter((u: { rol: string }) => u.rol === 'nodo_analista').length,
+    admins: p.filter((u: { rol: string }) => u.rol === 'nodo_admin').length,
     totalProyectos: pr.length,
     totalClientes: (clientes ?? []).length,
     byEstado,
@@ -92,7 +92,7 @@ export default async function AdminDashboard() {
       {/* Stats grid */}
       <div className="grid grid-cols-4 gap-5 mb-6">
         {[
-          { label: 'Usuarios totales', value: stats.totalUsuarios, icon: Users, href: '/admin/usuarios', color: iconColors.Users },
+          { label: 'Usuarios totales', value: stats.totalUsuarios, icon: Users, href: '/admin/configuracion/usuarios', color: iconColors.Users },
           { label: 'Proyectos', value: stats.totalProyectos, icon: Folder, href: '/admin/proyectos', color: iconColors.Folder },
           { label: 'Clientes', value: stats.totalClientes, icon: Building2, href: '/admin/clientes', color: iconColors.Building2 },
           { label: 'Cliente interesado', value: stats.byEstado['cliente_interesado'] ?? 0, icon: TrendingUp, href: '/admin/proyectos', color: iconColors.TrendingUp },

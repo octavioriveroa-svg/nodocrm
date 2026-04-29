@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Folder, FolderPlus, Users, LogOut, Settings, LayoutDashboard, Building2, ShieldCheck, Menu, X } from 'lucide-react'
+import { Folder, Users, LogOut, Settings, LayoutDashboard, Building2, Menu, X } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -29,10 +29,8 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
   const navAdmin = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
     { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
     { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
-    { href: '/admin/configuracion/roles', label: 'Roles', icon: ShieldCheck },
   ]
 
   const navCliente = [
