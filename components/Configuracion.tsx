@@ -181,31 +181,27 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
     }
   }
 
-  const inp = "w-full border px-3 py-2 text-sm bg-white"
-  const borde = { borderColor: '#CFCFCF' }
-  const inpDisabled = { borderColor: '#CFCFCF', color: '#888', backgroundColor: '#f5f5f5' }
+  const inp = "w-full border border-borde px-3 py-2 text-sm bg-white/60 rounded-xl"
+  const inpDisabled = "w-full border border-borde px-3 py-2 text-sm rounded-xl text-muted bg-gray-50"
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-black">Configuración</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Administra tu perfil, empresa y preferencias</p>
+        <p className="text-sm mt-1 text-muted">Administra tu perfil, empresa y preferencias</p>
       </div>
 
       <div className="flex gap-6 items-start">
         {/* Navegación lateral */}
-        <div className="w-52 flex-shrink-0 border" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+        <div className="w-52 flex-shrink-0 glass-card overflow-hidden">
           <nav className="flex flex-col">
-            {sections.map(({ id, label, icon: Icon }, idx) => (
+            {sections.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => cambiarSeccion(id)}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors"
-                style={{
-                  backgroundColor: seccion === id ? '#000' : 'transparent',
-                  color: seccion === id ? '#D7FF2F' : '#444',
-                  borderBottom: '1px solid #CFCFCF',
-                }}
+                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors border-b border-borde ${
+                  seccion === id ? 'bg-principal text-acento' : 'text-gray-600 hover:bg-white/50'
+                }`}
               >
                 <Icon size={15} />
                 {label}
@@ -215,16 +211,14 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
               <>
                 <Link
                   href="/admin/configuracion/usuarios"
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors hover:bg-gray-50"
-                  style={{ color: '#444', borderBottom: '1px solid #CFCFCF' }}
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors border-b border-borde text-gray-600 hover:bg-white/50"
                 >
                   <Users size={15} />
                   Usuarios
                 </Link>
                 <Link
                   href="/admin/configuracion/roles"
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors hover:bg-gray-50"
-                  style={{ color: '#444' }}
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors text-gray-600 hover:bg-white/50"
                 >
                   <ShieldCheck size={15} />
                   Roles
@@ -235,17 +229,15 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
         </div>
 
         {/* Panel de contenido */}
-        <div className="flex-1 border p-8" style={{ borderColor: '#CFCFCF', backgroundColor: '#fff' }}>
+        <div className="flex-1 glass-card p-8">
 
           {savedMsg && (
-            <div className="flex items-center gap-2 mb-6 px-4 py-2.5 text-sm font-medium"
-              style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+            <div className="flex items-center gap-2 mb-6 px-4 py-2.5 text-sm font-medium rounded-xl bg-acento text-principal">
               <Check size={14} /> {savedMsg}
             </div>
           )}
           {errorMsg && (
-            <div className="mb-6 px-4 py-2.5 text-sm font-medium border"
-              style={{ backgroundColor: '#fff5f5', color: '#c00', borderColor: '#fcc' }}>
+            <div className="mb-6 px-4 py-2.5 text-sm font-medium rounded-xl bg-red-50 text-red-600 border border-red-200">
               {errorMsg}
             </div>
           )}
@@ -255,25 +247,25 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-bold text-lg mb-1">Mi Perfil</h2>
-                <p className="text-sm" style={{ color: '#666' }}>Tu información personal dentro de Nodo.</p>
+                <p className="text-sm text-muted">Tu información personal dentro de Nodo.</p>
               </div>
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
               <div className="flex flex-col gap-4 max-w-md">
                 <div>
                   <label className="block text-sm font-medium mb-1">Nombre</label>
                   <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-                    className={inp} style={borde} />
+                    className={inp} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Correo electrónico</label>
-                  <input type="email" value={email} disabled className={inp} style={inpDisabled} />
-                  <p className="text-xs mt-1" style={{ color: '#888' }}>El correo se gestiona desde Seguridad.</p>
+                  <input type="email" value={email} disabled className={inpDisabled} />
+                  <p className="text-xs mt-1 text-muted">El correo se gestiona desde Seguridad.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Rol en la plataforma</label>
                   <input type="text"
                     value={initialProfile.rol === 'nodo_analista' ? 'Analista' : initialProfile.rol === 'nodo_admin' ? 'Administrador' : 'EPCista'}
-                    disabled className={inp} style={inpDisabled} />
+                    disabled className={inpDisabled} />
                 </div>
                 {isNodoUser && (
                   <div>
@@ -281,9 +273,9 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                       <CalendarDays size={14} /> Link de calendario para reuniones
                     </label>
                     <input type="url" value={calendarioUrl} onChange={e => setCalendarioUrl(e.target.value)}
-                      className={inp} style={borde}
+                      className={inp}
                       placeholder="https://calendly.com/tu-nombre" />
-                    <p className="text-xs mt-1" style={{ color: '#888' }}>
+                    <p className="text-xs mt-1 text-muted">
                       Los EPCistas podrán ver este link en el detalle de cada proyecto asignado a ti para agendar reuniones.
                     </p>
                   </div>
@@ -291,8 +283,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
               </div>
               <div>
                 <button onClick={guardarPerfil} disabled={loading || !nombre.trim()}
-                  className="px-6 py-2.5 text-sm font-bold disabled:opacity-50"
-                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                  className="px-6 py-2.5 text-sm font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
                   {loading ? 'Guardando…' : 'Guardar cambios'}
                 </button>
               </div>
@@ -304,25 +295,25 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-bold text-lg mb-1">Mi Empresa</h2>
-                <p className="text-sm" style={{ color: '#666' }}>Información de tu organización o negocio.</p>
+                <p className="text-sm text-muted">Información de tu organización o negocio.</p>
               </div>
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
               <div className="flex flex-col gap-4 max-w-md">
                 <div>
                   <label className="block text-sm font-medium mb-1">Razón social</label>
                   <input type="text" value={empresa} onChange={e => setEmpresa(e.target.value)}
-                    className={inp} style={borde} placeholder="Nombre de tu empresa" />
+                    className={inp} placeholder="Nombre de tu empresa" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">RFC</label>
                     <input type="text" value={rfc} onChange={e => setRfc(e.target.value)}
-                      className={inp} style={borde} placeholder="XAXX010101000" />
+                      className={inp} placeholder="XAXX010101000" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Estado</label>
                     <select value={empresaEstado} onChange={e => setEmpresaEstado(e.target.value)}
-                      className={inp} style={borde}>
+                      className={inp}>
                       <option value="">Selecciona</option>
                       {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
                     </select>
@@ -331,7 +322,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Industria</label>
                   <select value={industria} onChange={e => setIndustria(e.target.value)}
-                    className={inp} style={borde}>
+                    className={inp}>
                     <option value="">Selecciona</option>
                     {INDUSTRIAS.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
@@ -339,13 +330,12 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Sitio web</label>
                   <input type="url" value={website} onChange={e => setWebsite(e.target.value)}
-                    className={inp} style={borde} placeholder="https://tuempresa.com" />
+                    className={inp} placeholder="https://tuempresa.com" />
                 </div>
               </div>
               <div>
                 <button onClick={guardarEmpresa} disabled={loading}
-                  className="px-6 py-2.5 text-sm font-bold disabled:opacity-50"
-                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                  className="px-6 py-2.5 text-sm font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
                   {loading ? 'Guardando…' : 'Guardar cambios'}
                 </button>
               </div>
@@ -357,23 +347,23 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-bold text-lg mb-1">General</h2>
-                <p className="text-sm" style={{ color: '#666' }}>Preferencias de visualización y formato.</p>
+                <p className="text-sm text-muted">Preferencias de visualización y formato.</p>
               </div>
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
               <div className="flex flex-col gap-5 max-w-md">
                 <div>
                   <label className="block text-sm font-medium mb-1">Moneda preferida</label>
                   <select value={moneda} onChange={e => setMoneda(e.target.value)}
-                    className={inp} style={borde}>
+                    className={inp}>
                     <option value="MXN">MXN — Peso mexicano</option>
                     <option value="USD">USD — Dólar estadounidense</option>
                   </select>
-                  <p className="text-xs mt-1" style={{ color: '#888' }}>Se usará como valor por defecto al crear proyectos.</p>
+                  <p className="text-xs mt-1 text-muted">Se usará como valor por defecto al crear proyectos.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Zona horaria</label>
                   <select value={timezone} onChange={e => setTimezone(e.target.value)}
-                    className={inp} style={borde}>
+                    className={inp}>
                     <option value="America/Mexico_City">Ciudad de México (UTC−6)</option>
                     <option value="America/Tijuana">Tijuana / Ensenada (UTC−8)</option>
                     <option value="America/Monterrey">Monterrey (UTC−6)</option>
@@ -385,8 +375,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
               </div>
               <div>
                 <button onClick={guardarGeneral}
-                  className="px-6 py-2.5 text-sm font-bold"
-                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                  className="px-6 py-2.5 text-sm font-bold bg-acento text-principal rounded-xl">
                   Guardar cambios
                 </button>
               </div>
@@ -398,9 +387,9 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-bold text-lg mb-1">Notificaciones</h2>
-                <p className="text-sm" style={{ color: '#666' }}>Controla qué eventos generan alertas para ti.</p>
+                <p className="text-sm text-muted">Controla qué eventos generan alertas para ti.</p>
               </div>
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
               <div className="flex flex-col gap-3">
                 {[
                   {
@@ -422,11 +411,10 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                     set: setNotifComentario,
                   },
                 ].map(({ label, desc, value, set }) => (
-                  <div key={label} className="flex items-center justify-between border p-4"
-                    style={{ borderColor: '#CFCFCF' }}>
+                  <div key={label} className="flex items-center justify-between border border-borde rounded-xl p-4">
                     <div className="pr-4">
                       <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs mt-0.5" style={{ color: '#888' }}>{desc}</p>
+                      <p className="text-xs mt-0.5 text-muted">{desc}</p>
                     </div>
                     <Toggle value={value} onChange={set} />
                   </div>
@@ -434,8 +422,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
               </div>
               <div>
                 <button onClick={guardarNotificaciones}
-                  className="px-6 py-2.5 text-sm font-bold"
-                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}>
+                  className="px-6 py-2.5 text-sm font-bold bg-acento text-principal rounded-xl">
                   Guardar preferencias
                 </button>
               </div>
@@ -447,22 +434,22 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-bold text-lg mb-1">Seguridad</h2>
-                <p className="text-sm" style={{ color: '#666' }}>Administra tu contraseña y acceso a la cuenta.</p>
+                <p className="text-sm text-muted">Administra tu contraseña y acceso a la cuenta.</p>
               </div>
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
 
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#666' }}>Cuenta</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wide mb-3 text-muted">Cuenta</h3>
                 <div className="max-w-md">
                   <label className="block text-sm font-medium mb-1">Correo electrónico</label>
-                  <input type="email" value={email} disabled className={inp} style={inpDisabled} />
+                  <input type="email" value={email} disabled className={inpDisabled} />
                 </div>
               </div>
 
-              <hr style={{ borderColor: '#CFCFCF' }} />
+              <hr className="border-borde" />
 
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wide mb-4" style={{ color: '#666' }}>Cambiar contraseña</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wide mb-4 text-muted">Cambiar contraseña</h3>
                 <div className="flex flex-col gap-3 max-w-md">
                   <div>
                     <label className="block text-sm font-medium mb-1">Nueva contraseña</label>
@@ -470,7 +457,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                       type="password"
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      className={inp} style={borde}
+                      className={inp}
                       placeholder="Mínimo 8 caracteres"
                       autoComplete="new-password"
                     />
@@ -481,20 +468,19 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                       type="password"
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      className={inp} style={borde}
+                      className={inp}
                       placeholder="Repite la nueva contraseña"
                       autoComplete="new-password"
                     />
                   </div>
                   {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs" style={{ color: '#c00' }}>Las contraseñas no coinciden.</p>
+                    <p className="text-xs text-red-600">Las contraseñas no coinciden.</p>
                   )}
                 </div>
                 <button
                   onClick={cambiarPassword}
                   disabled={loading || !newPassword || !confirmPassword}
-                  className="mt-4 px-6 py-2.5 text-sm font-bold disabled:opacity-50"
-                  style={{ backgroundColor: '#000', color: '#D7FF2F' }}
+                  className="mt-4 px-6 py-2.5 text-sm font-bold disabled:opacity-50 bg-principal text-acento rounded-xl"
                 >
                   {loading ? 'Actualizando…' : 'Actualizar contraseña'}
                 </button>

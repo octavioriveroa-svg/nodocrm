@@ -13,16 +13,22 @@ interface Usuario {
 }
 
 const ROL_LABELS: Record<string, string> = {
-  epcista: 'EPCista',
-  analista: 'Analista',
-  admin: 'Admin',
+  epc: 'EPC',
+  nodo_analista: 'Analista Nodo',
+  nodo_admin: 'Admin Nodo',
+  cliente_final: 'Cliente Final',
+  financiero: 'Financiero',
+  suministrador: 'Suministrador',
   pendiente: 'Pendiente',
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  epcista: { bg: '#E8E8E8', color: '#444' },
-  analista: { bg: '#D7FF2F', color: '#000' },
-  admin: { bg: '#000', color: '#fff' },
+  epc: { bg: '#E8E8E8', color: '#444' },
+  nodo_analista: { bg: '#D7FF2F', color: '#000' },
+  nodo_admin: { bg: '#000', color: '#fff' },
+  cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
+  financiero: { bg: '#DCFCE7', color: '#15803D' },
+  suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
   pendiente: { bg: '#FFF3CD', color: '#856404' },
 }
 
@@ -83,22 +89,21 @@ export default function RolesPage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-black">Gestión de roles</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Asigna y modifica el nivel de acceso de cada cuenta</p>
+        <p className="text-sm mt-1 text-muted">Asigna y modifica el nivel de acceso de cada cuenta</p>
       </div>
 
       <div className="mb-4">
         <input
           type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, empresa o correo…"
-          className="border px-3 py-1.5 text-sm w-full max-w-sm"
-          style={{ borderColor: '#CFCFCF' }}
+          className="border border-borde px-3 py-1.5 text-sm w-full max-w-sm rounded-xl bg-white/60"
         />
       </div>
 
-      <div className="border overflow-hidden" style={{ borderColor: '#CFCFCF' }}>
+      <div className="glass-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ backgroundColor: '#000', color: '#fff' }}>
+            <tr className="bg-principal text-white">
               <th className="text-left px-4 py-3 font-semibold">Nombre</th>
               <th className="text-left px-4 py-3 font-semibold">Empresa</th>
               <th className="text-left px-4 py-3 font-semibold">Correo</th>
@@ -109,36 +114,35 @@ export default function RolesPage() {
           </thead>
           <tbody>
             {filtrados.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin resultados.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">Sin resultados.</td></tr>
             )}
             {filtrados.map((u, i) => {
-              const rc = ROL_COLORS[u.rol] ?? ROL_COLORS.epcista
+              const rc = ROL_COLORS[u.rol] ?? ROL_COLORS.epc
               return (
-                <tr key={u.id} style={{ borderTop: '1px solid #CFCFCF', backgroundColor: i % 2 === 0 ? '#fff' : '#fafaf8' }}>
+                <tr key={u.id} className={`border-t border-borde ${i % 2 === 0 ? 'bg-white/40' : 'bg-fondo/50'}`}>
                   <td className="px-4 py-3 font-medium">{u.nombre || '—'}</td>
-                  <td className="px-4 py-3" style={{ color: '#666' }}>{u.empresa || '—'}</td>
-                  <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{u.email}</td>
+                  <td className="px-4 py-3 text-muted">{u.empresa || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-muted">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-0.5 font-semibold" style={{ backgroundColor: rc.bg, color: rc.color }}>
+                    <span className="text-xs px-2 py-0.5 font-semibold rounded-full" style={{ backgroundColor: rc.bg, color: rc.color }}>
                       {ROL_LABELS[u.rol] ?? u.rol}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: '#666' }}>{formatDate(u.created_at)}</td>
+                  <td className="px-4 py-3 text-xs text-muted">{formatDate(u.created_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <select
                         value={u.rol}
                         disabled={updatingId === u.id}
                         onChange={e => cambiarRol(u.id, e.target.value)}
-                        className="border text-xs px-2 py-1.5 disabled:opacity-40"
-                        style={{ borderColor: '#CFCFCF' }}
+                        className="border border-borde text-xs px-2 py-1.5 rounded-lg bg-white/60 disabled:opacity-40"
                       >
                         {Object.entries(ROL_LABELS).map(([r, lbl]) => (
                           <option key={r} value={r}>{lbl}</option>
                         ))}
                       </select>
-                      {updatingId === u.id && <span className="text-xs" style={{ color: '#888' }}>Guardando…</span>}
-                      {saved === u.id && <span className="text-xs font-medium" style={{ color: '#065f46' }}>✓ Guardado</span>}
+                      {updatingId === u.id && <span className="text-xs text-muted">Guardando…</span>}
+                      {saved === u.id && <span className="text-xs font-medium text-emerald-700">✓ Guardado</span>}
                     </div>
                   </td>
                 </tr>
@@ -147,7 +151,7 @@ export default function RolesPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs mt-2" style={{ color: '#888' }}>{filtrados.length} cuenta{filtrados.length !== 1 ? 's' : ''}</p>
+      <p className="text-xs mt-2 text-muted">{filtrados.length} cuenta{filtrados.length !== 1 ? 's' : ''}</p>
     </div>
   )
 }
