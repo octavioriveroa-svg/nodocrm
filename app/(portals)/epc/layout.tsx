@@ -35,6 +35,7 @@ export default function EpcistaLayout({ children }: { children: React.ReactNode 
         nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
         rol,
+        calendario_url: profileRow?.calendario_url ?? null,
         created_at: profileRow?.created_at ?? session.user.created_at,
       })
       setLoading(false)
