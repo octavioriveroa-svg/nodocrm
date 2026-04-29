@@ -20,7 +20,7 @@ export default function ConfiguracionAdminPage() {
         id: session.user.id,
         nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
-        rol: profileRow?.rol ?? 'admin',
+        rol: profileRow?.rol ?? 'nodo_admin',
         created_at: profileRow?.created_at ?? session.user.created_at,
       }
 
