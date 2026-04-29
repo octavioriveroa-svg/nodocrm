@@ -12,12 +12,14 @@ export interface Profile {
   nombre: string
   empresa: string
   rol: Rol
+  calendario_url: string | null
   created_at: string
 }
 
 export interface Proyecto {
   id: string
   epcista_id: string
+  responsable_nodo_id: string | null
   cliente_id: string | null
   financiero_id: string | null
   tipo: TipoProyecto

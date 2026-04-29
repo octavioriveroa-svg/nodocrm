@@ -1,14 +1,14 @@
 /* eslint-disable */
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
 import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto } from '@/lib/types'
-import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil } from 'lucide-react'
+import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import GanttChart from './gantt/GanttChart'
@@ -116,6 +116,15 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const isEpcista = currentUser.rol === 'epc'
   const canChangeEstado = isAnalista || isAdmin
   const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epc'
+
+  // Fetch responsable nodo profile
+  const [responsableProfile, setResponsableProfile] = useState<{nombre: string; empresa: string; calendario_url: string | null} | null>(null)
+  useEffect(() => {
+    if (initial.responsable_nodo_id) {
+      supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).single()
+        .then(({ data }) => { if (data) setResponsableProfile(data as {nombre: string; empresa: string; calendario_url: string | null}) })
+    }
+  }, [])
 
   async function cambiarEstado(estado: EstadoProyecto) {
     const { data } = await supabase.from('proyectos').update({ estado }).eq('id', proyecto.id).select().single()
@@ -362,6 +371,43 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             <Campo label="Empresa" value={proyecto.cliente_final_empresa} />
             <Campo label="Contacto" value={proyecto.cliente_final_contacto} />
           </div>
+        </Seccion>
+      )}
+
+      {/* Accesos al Portal */}
+      {!editando && (
+        <Seccion title="Responsable Nodo">
+          {responsableProfile ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">{responsableProfile.nombre}</p>
+                <p className="text-xs text-gray-500">{responsableProfile.empresa}</p>
+              </div>
+              {responsableProfile.calendario_url && isEpcista && (
+                <a
+                  href={responsableProfile.calendario_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md"
+                  style={{ backgroundColor: '#D7FF2F', color: '#000' }}
+                >
+                  <CalendarDays size={16} /> Agendar Reunión <ExternalLink size={12} />
+                </a>
+              )}
+              {responsableProfile.calendario_url && !isEpcista && (
+                <a
+                  href={responsableProfile.calendario_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-principal transition-colors"
+                >
+                  <CalendarDays size={13} /> Ver calendario <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">Sin responsable asignado.</p>
+          )}
         </Seccion>
       )}
 

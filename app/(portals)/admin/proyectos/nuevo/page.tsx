@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, X, Eye, Pencil, Trash2, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
-import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
+import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio, Profile } from '@/lib/types'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -197,6 +197,16 @@ export default function NuevoProyectoPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Admin: EPC + Responsable selectors
+  const [epcList, setEpcList] = useState<Profile[]>([])
+  const [nodoUsers, setNodoUsers] = useState<Profile[]>([])
+  const [selectedEpcId, setSelectedEpcId] = useState('')
+  const [selectedResponsableId, setSelectedResponsableId] = useState('')
+
+  // Manual client toggle
+  const [clienteManual, setClienteManual] = useState(false)
+  const [manualCliente, setManualCliente] = useState({ nombre: '', empresa: '', contacto: '' })
+
   // Clientes y sitios
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [clientesCargados, setClientesCargados] = useState(false)
@@ -229,17 +239,31 @@ export default function NuevoProyectoPage() {
   const [guardandoEditSitio, setGuardandoEditSitio] = useState(false)
   const fileRefEdit = useRef<HTMLInputElement>(null)
 
+  // Load EPC users and Nodo users for admin assignment
   useEffect(() => {
-    async function loadClientes() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) { setClientesCargados(true); return }
-      const { data } = await supabase.from('clientes').select('*').eq('epcista_id', session.user.id).order('razon_social')
-      setClientes((data ?? []) as Cliente[])
-      setClientesCargados(true)
+    async function loadAdminData() {
+      const { data: epcs } = await supabase.from('profiles').select('*').eq('rol', 'epc').order('nombre')
+      setEpcList((epcs ?? []) as Profile[])
+      const { data: nodos } = await supabase.from('profiles').select('*').in('rol', ['nodo_admin', 'nodo_analista']).order('nombre')
+      setNodoUsers((nodos ?? []) as Profile[])
     }
-    loadClientes()
+    loadAdminData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // When admin selects an EPC, load that EPC's clients
+  async function handleSelectEpc(epcId: string) {
+    setSelectedEpcId(epcId)
+    setClienteManual(false)
+    setForm(prev => ({ ...prev, cliente_id: '' }))
+    setSitiosCliente([])
+    setSitiosSeleccionados([])
+    setProductosMap({})
+    if (!epcId) { setClientes([]); setClientesCargados(true); return }
+    const { data } = await supabase.from('clientes').select('*').eq('epcista_id', epcId).order('razon_social')
+    setClientes((data ?? []) as Cliente[])
+    setClientesCargados(true)
+  }
 
   async function cargarSitios(clienteId: string) {
     if (!clienteId) { setSitiosCliente([]); setSitiosSeleccionados([]); return }
@@ -431,7 +455,10 @@ export default function NuevoProyectoPage() {
   // ── Validaciones ─────────────────────────────────────────────
   function validarPaso0() {
     if (!form.nombre_proyecto.trim()) return 'Ingresa el nombre del proyecto.'
-    if (!form.cliente_id) return 'Selecciona un cliente.'
+    if (!selectedEpcId) return 'Selecciona un EPCista.'
+    if (!clienteManual && !form.cliente_id) return 'Selecciona un cliente o ingresa datos manualmente.'
+    if (clienteManual && !manualCliente.nombre.trim()) return 'Ingresa el nombre del contacto del cliente.'
+    if (clienteManual && !manualCliente.empresa.trim()) return 'Ingresa la empresa del cliente.'
     if (!form.tipo_instalacion) return 'Selecciona el tipo de instalación.'
     return ''
   }
@@ -465,8 +492,8 @@ export default function NuevoProyectoPage() {
     if (err) { setError(err); return }
     setLoading(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setError('Sesión expirada.'); setLoading(false); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Sesión expirada.'); setLoading(false); return }
 
     const cliente = clientes.find(c => c.id === form.cliente_id)
     const allProds = sitiosSeleccionados.flatMap(sid => productosMap[sid] ?? [])
@@ -476,24 +503,24 @@ export default function NuevoProyectoPage() {
 
     const ubicacion_estado = sitiosCliente.find(s => s.id === sitiosSeleccionados[0])?.ubicacion_estado ?? ''
 
-    const payload = {
-      epcista_id: session.user.id,
-      cliente_id: form.cliente_id,
+    const payload: Record<string, unknown> = {
+      epcista_id: selectedEpcId,
+      responsable_nodo_id: selectedResponsableId || null,
+      cliente_id: clienteManual ? null : (form.cliente_id || null),
       tipo,
       nombre_proyecto: form.nombre_proyecto,
       estado: 'recibido',
       tipo_instalacion: form.tipo_instalacion,
       incluye_mem: form.incluye_mem,
       demanda_kw: null,
-      cliente_final_nombre: cliente?.contacto_nombre ?? '',
-      cliente_final_empresa: cliente?.razon_social ?? '',
-      cliente_final_contacto: cliente?.contacto_email ?? cliente?.contacto_telefono ?? '',
+      cliente_final_nombre: clienteManual ? manualCliente.nombre : (cliente?.contacto_nombre ?? ''),
+      cliente_final_empresa: clienteManual ? manualCliente.empresa : (cliente?.razon_social ?? ''),
+      cliente_final_contacto: clienteManual ? manualCliente.contacto : (cliente?.contacto_email ?? cliente?.contacto_telefono ?? ''),
       capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
       moneda: form.moneda,
       ubicacion_estado,
       modalidad_financiamiento: form.modalidad_financiamiento,
       notas_adicionales: form.notas_adicionales || null,
-      // Campos legacy — null en proyectos nuevos
       capacidad_mwh: null, capacidad_mw: null, tecnologia_bateria: null,
       duracion_descarga_hrs: null, punto_interconexion: null,
       tipo_participacion_mem: null, volumen_energia_mwh_anual: null,
@@ -536,7 +563,7 @@ export default function NuevoProyectoPage() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-black">Nuevo proyecto</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>Completa los tres pasos para enviar tu solicitud</p>
+        <p className="text-sm mt-1" style={{ color: '#666' }}>Completa los tres pasos para crear el proyecto</p>
       </div>
 
       <StepIndicator current={step} />
@@ -555,14 +582,80 @@ export default function NuevoProyectoPage() {
                 className={inp} style={borde} placeholder="Ej: Proyecto Energía Norte" />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Cliente *</label>
-              {clientesCargados && (
-                <select value={form.cliente_id} onChange={e => seleccionarCliente(e.target.value)}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">EPCista *</label>
+                <select value={selectedEpcId} onChange={e => handleSelectEpc(e.target.value)}
                   className={inp} style={borde}>
-                  <option value="">Selecciona un cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
+                  <option value="">Selecciona un EPCista</option>
+                  {epcList.map(u => <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Responsable Nodo</label>
+                <select value={selectedResponsableId} onChange={e => setSelectedResponsableId(e.target.value)}
+                  className={inp} style={borde}>
+                  <option value="">Sin asignar</option>
+                  {nodoUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} ({u.rol === 'nodo_admin' ? 'Admin' : 'Analista'})</option>)}
+                </select>
+              </div>
+            </div>
+
+            <hr style={{ borderColor: '#CFCFCF' }} />
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium">Cliente *</label>
+                {selectedEpcId && (
+                  <button type="button"
+                    onClick={() => { setClienteManual(!clienteManual); setForm(prev => ({ ...prev, cliente_id: '' })) }}
+                    className="text-xs font-medium underline transition-colors"
+                    style={{ color: clienteManual ? '#15803D' : '#666' }}>
+                    {clienteManual ? '← Elegir cliente existente' : 'Ingresar datos manualmente'}
+                  </button>
+                )}
+              </div>
+
+              {!clienteManual ? (
+                <>
+                  {!selectedEpcId && (
+                    <p className="text-xs text-gray-400">Selecciona un EPCista primero para ver sus clientes.</p>
+                  )}
+                  {selectedEpcId && clientesCargados && (
+                    <select value={form.cliente_id} onChange={e => seleccionarCliente(e.target.value)}
+                      className={inp} style={borde}>
+                      <option value="">Selecciona un cliente</option>
+                      {clientes.map(c => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
+                    </select>
+                  )}
+                  {selectedEpcId && clientesCargados && clientes.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1">Este EPCista no tiene clientes. Puedes ingresar datos manualmente.</p>
+                  )}
+                </>
+              ) : (
+                <div className="border border-borde rounded-lg p-4 flex flex-col gap-3 bg-gray-50/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Datos del cliente (manual)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Nombre contacto *</label>
+                      <input type="text" value={manualCliente.nombre}
+                        onChange={e => setManualCliente(prev => ({ ...prev, nombre: e.target.value }))}
+                        className={inp} style={borde} placeholder="Juan Pérez" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Empresa *</label>
+                      <input type="text" value={manualCliente.empresa}
+                        onChange={e => setManualCliente(prev => ({ ...prev, empresa: e.target.value }))}
+                        className={inp} style={borde} placeholder="Empresa del cliente" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Email o teléfono de contacto</label>
+                    <input type="text" value={manualCliente.contacto}
+                      onChange={e => setManualCliente(prev => ({ ...prev, contacto: e.target.value }))}
+                      className={inp} style={borde} placeholder="cliente@empresa.com" />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -587,7 +680,7 @@ export default function NuevoProyectoPage() {
                 ] as { value: 'nodo_busca' | 'epcista_instala'; icon: React.ElementType; title: string; desc: string }[]).map(opt => {
                   const selected = form.tipo_instalacion === opt.value
                   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const Icon = opt.icon
+                  const Icon = opt.icon
                   return (
                     <button key={opt.value} type="button"
                       onClick={() => setF('tipo_instalacion', opt.value)}

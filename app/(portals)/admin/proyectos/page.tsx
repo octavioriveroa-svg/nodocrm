@@ -15,6 +15,7 @@ function formatDate(d: string) {
 interface ProyectoConEpcista extends Proyecto {
   epcista_nombre: string
   epcista_empresa: string
+  responsable_nombre: string
 }
 
 export default function AdminProyectosPage() {
@@ -51,8 +52,12 @@ export default function AdminProyectosPage() {
 
       if (!prs || prs.length === 0) { setLoading(false); return }
 
-      const ids = [...new Set(prs.map((p: { epcista_id: string }) => p.epcista_id))]
-      const { data: perfiles } = await supabase.from('profiles').select('id, nombre, empresa').in('id', ids)
+      // Collect all profile IDs we need to resolve (epcista + responsable)
+      const allIds = [...new Set([
+        ...prs.map((p: { epcista_id: string }) => p.epcista_id),
+        ...prs.map((p: { responsable_nodo_id?: string | null }) => p.responsable_nodo_id).filter(Boolean) as string[],
+      ])]
+      const { data: perfiles } = await supabase.from('profiles').select('id, nombre, empresa').in('id', allIds)
       const nameMap: Record<string, { nombre: string; empresa: string }> = {}
       for (const pf of perfiles ?? []) {
         const p = pf as { id: string; nombre: string; empresa: string }
@@ -63,6 +68,7 @@ export default function AdminProyectosPage() {
         ...p,
         epcista_nombre: nameMap[p.epcista_id]?.nombre ?? '—',
         epcista_empresa: nameMap[p.epcista_id]?.empresa ?? '—',
+        responsable_nombre: p.responsable_nodo_id ? nameMap[p.responsable_nodo_id]?.nombre ?? '—' : '—',
       })))
       setLoading(false)
     }
@@ -84,7 +90,7 @@ export default function AdminProyectosPage() {
 
   async function eliminarProyecto(id: string) {
     setDeleting(true)
-    const { error } = await supabase.rpc('admin_delete_proyecto', { proyecto_id: id })
+    const { error } = await supabase.from('proyectos').delete().eq('id', id)
     if (error) {
       alert('Error al borrar: ' + error.message)
     } else {
@@ -146,6 +152,7 @@ export default function AdminProyectosPage() {
               <th className="px-5 py-4 font-semibold">Proyecto</th>
               <th className="px-5 py-4 font-semibold">Cliente</th>
               <th className="px-5 py-4 font-semibold">EPCista</th>
+              <th className="px-5 py-4 font-semibold">Responsable</th>
               <th className="px-5 py-4 font-semibold">Tipo</th>
               <th className="px-5 py-4 font-semibold">Estado</th>
               <th className="px-5 py-4 font-semibold">Fecha</th>
@@ -154,13 +161,14 @@ export default function AdminProyectosPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin proyectos.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: '#888' }}>Sin proyectos.</td></tr>
             )}
             {lista.map(p => (
               <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-3 font-bold text-principal">{p.nombre_proyecto}</td>
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.cliente_final_empresa || '—'}</td>
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.epcista_nombre}</td>
+                <td className="px-5 py-3 text-xs font-medium" style={{ color: p.responsable_nombre !== '—' ? '#15803D' : '#aaa' }}>{p.responsable_nombre}</td>
                 <td className="px-5 py-3"><BadgeTipo tipo={p.tipo} /></td>
                 <td className="px-5 py-3"><BadgeEstado estado={p.estado} /></td>
                 <td className="px-5 py-3 text-xs font-medium text-gray-400">{formatDate(p.created_at)}</td>

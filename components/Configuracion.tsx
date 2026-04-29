@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check } from 'lucide-react'
+import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays } from 'lucide-react'
 import type { Profile } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -57,6 +57,8 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
 
   // Mi Perfil
   const [nombre, setNombre] = useState(initialProfile.nombre)
+  const [calendarioUrl, setCalendarioUrl] = useState(initialProfile.calendario_url ?? '')
+  const isNodoUser = ['nodo_admin', 'nodo_analista'].includes(initialProfile.rol)
 
   // Mi Empresa
   const [empresa, setEmpresa] = useState(initialProfile.empresa)
@@ -125,7 +127,9 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
 
   async function guardarPerfil() {
     setLoading(true)
-    const { error } = await supabase.from('profiles').update({ nombre }).eq('id', initialProfile.id)
+    const updateData: Record<string, unknown> = { nombre }
+    if (isNodoUser) updateData.calendario_url = calendarioUrl || null
+    const { error } = await supabase.from('profiles').update(updateData).eq('id', initialProfile.id)
     setLoading(false)
     if (error) showError('Error al guardar: ' + error.message)
     else showSaved()
@@ -247,9 +251,22 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Rol en la plataforma</label>
                   <input type="text"
-                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : 'EPCista'}
+                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : initialProfile.rol === 'nodo_admin' ? 'Administrador' : 'EPCista'}
                     disabled className={inp} style={inpDisabled} />
                 </div>
+                {isNodoUser && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 flex items-center gap-1.5">
+                      <CalendarDays size={14} /> Link de calendario para reuniones
+                    </label>
+                    <input type="url" value={calendarioUrl} onChange={e => setCalendarioUrl(e.target.value)}
+                      className={inp} style={borde}
+                      placeholder="https://calendly.com/tu-nombre" />
+                    <p className="text-xs mt-1" style={{ color: '#888' }}>
+                      Los EPCistas podrán ver este link en el detalle de cada proyecto asignado a ti para agendar reuniones.
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <button onClick={guardarPerfil} disabled={loading || !nombre.trim()}
