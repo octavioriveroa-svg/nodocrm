@@ -58,7 +58,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
   // Mi Perfil
   const [nombre, setNombre] = useState(initialProfile.nombre)
   const [calendarioUrl, setCalendarioUrl] = useState(initialProfile.calendario_url ?? '')
-  const isNodoUser = ['nodo_admin', 'nodo_analista', 'admin'].includes(initialProfile.rol)
+  const isNodoUser = ['nodo_admin', 'nodo_analista'].includes(initialProfile.rol)
 
   // Mi Empresa
   const [empresa, setEmpresa] = useState(initialProfile.empresa)
@@ -251,7 +251,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Rol en la plataforma</label>
                   <input type="text"
-                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : ['nodo_admin', 'admin'].includes(initialProfile.rol) ? 'Administrador' : 'EPCista'}
+                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : initialProfile.rol === 'nodo_admin' ? 'Administrador' : 'EPCista'}
                     disabled className={inp} style={inpDisabled} />
                 </div>
                 {isNodoUser && (
