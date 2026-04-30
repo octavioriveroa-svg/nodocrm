@@ -119,10 +119,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   // Fetch responsable nodo profile
   const [responsableProfile, setResponsableProfile] = useState<{nombre: string; empresa: string; calendario_url: string | null} | null>(null)
+  const [nodoUsers, setNodoUsers] = useState<{id: string; nombre: string; empresa: string}[]>([])
   useEffect(() => {
     if (initial.responsable_nodo_id) {
       supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).single()
         .then(({ data }) => { if (data) setResponsableProfile(data as {nombre: string; empresa: string; calendario_url: string | null}) })
+    }
+    // Load nodo users for responsable selector (admin/analista only)
+    if (isAdmin || isAnalista) {
+      supabase.from('profiles').select('id, nombre, empresa').in('rol', ['nodo_admin', 'nodo_analista']).order('nombre')
+        .then(({ data }) => { if (data) setNodoUsers(data) })
     }
   }, [])
 
@@ -155,11 +161,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       cliente_final_contacto: form.cliente_final_contacto,
       capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
       ubicacion_estado: form.ubicacion_estado,
-      notas_adicionales: form.notas_adicionales
+      notas_adicionales: form.notas_adicionales,
+      responsable_nodo_id: form.responsable_nodo_id || null,
     }).eq('id', proyecto.id).select().single()
     if (data) {
       setProyecto(data as Proyecto)
       setForm(data as Proyecto)
+      // Refresh responsable profile display
+      if ((data as Proyecto).responsable_nodo_id) {
+        const { data: rp } = await supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', (data as Proyecto).responsable_nodo_id!).single()
+        if (rp) setResponsableProfile(rp as {nombre: string; empresa: string; calendario_url: string | null})
+      } else {
+        setResponsableProfile(null)
+      }
     }
     setEditando(false)
     setGuardando(false)
@@ -352,6 +366,21 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               <label className="block text-xs font-medium mb-1">Estado (Ubicación)</label>
               <input type="text" value={form.ubicacion_estado || ''} onChange={e => setForm(f => ({...f, ubicacion_estado: e.target.value}))} className="w-full border rounded p-2 text-sm" />
             </div>
+            {(isAdmin || isAnalista) && (
+              <div>
+                <label className="block text-xs font-medium mb-1">Responsable Nodo</label>
+                <select
+                  value={form.responsable_nodo_id || ''}
+                  onChange={e => setForm(f => ({...f, responsable_nodo_id: e.target.value || null}))}
+                  className="w-full border rounded p-2 text-sm border-borde rounded-xl"
+                >
+                  <option value="">Sin asignar</option>
+                  {nodoUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="col-span-2">
               <label className="block text-xs font-medium mb-1">Notas adicionales</label>
               <textarea rows={3} value={form.notas_adicionales || ''} onChange={e => setForm(f => ({...f, notas_adicionales: e.target.value}))} className="w-full border rounded p-2 text-sm" />
