@@ -59,8 +59,6 @@ export default function AnalistaUsuariosPage() {
   const [createError, setCreateError] = useState('')
   const [createSuccess, setCreateSuccess] = useState('')
 
-  useEffect(() => { loadUsers() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   async function loadUsers() {
     const { data: rpcData, error: rpcErr } = await supabase.rpc('get_all_users_admin')
     if (!rpcErr && rpcData) { setUsuarios(rpcData as Usuario[]) }
@@ -73,6 +71,8 @@ export default function AnalistaUsuariosPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => { loadUsers() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cambiarRol(userId: string, nuevoRol: string) {
     setUpdatingId(userId)

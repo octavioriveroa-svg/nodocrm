@@ -47,7 +47,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
   const [staleThreshold, setStaleThreshold] = useState(30)
   const [pipelinePeriod, setPipelinePeriod] = useState<TimePeriod>('all')
   const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('last_year')
-  const { kpis, pipeline, velocity, financial, technical, activity, epcLeaderboard, stalePipeline, financingMix, techMix, geoCAPEX } = data
+  const { kpis, technical, activity, epcLeaderboard, stalePipeline, financingMix, techMix, geoCAPEX } = data
   const filteredStale = stalePipeline.filter(s => s.daysInStage >= staleThreshold)
 
   const filteredPipeline = useMemo(() => {
