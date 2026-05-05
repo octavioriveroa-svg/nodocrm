@@ -9,11 +9,12 @@ export async function crearUsuarioAdmin(data: {
   empresa: string
   rol: string
   password?: string
+  cliente_crm_id?: string
 }) {
   try {
   const supabase = await createClient()
   
-  // 1. Validate caller is nodo_admin
+  // 1. Validate caller permissions
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) return { error: 'No autenticado' }
 
@@ -23,8 +24,17 @@ export async function crearUsuarioAdmin(data: {
     .eq('id', user.id)
     .single()
   
-  if (!profile || profile.rol !== 'nodo_admin') {
-    return { error: 'No autorizado. Solo administradores pueden crear usuarios.' }
+  if (!profile) return { error: 'No se encontró tu perfil.' }
+
+  // Permission matrix:
+  // - nodo_admin: can create any role
+  // - nodo_analista: can create any role
+  // - epc: can only create cliente_final or financiero (for their own clients)
+  const isNodo = ['nodo_admin', 'nodo_analista'].includes(profile.rol)
+  const isEpc = profile.rol === 'epc'
+
+  if (!isNodo && !isEpc) {
+    return { error: 'No autorizado para crear usuarios.' }
   }
 
   // 2. Validate role
@@ -33,8 +43,36 @@ export async function crearUsuarioAdmin(data: {
     return { error: 'Rol inválido: ' + data.rol }
   }
 
-  // 3. Use service-role admin client to create the user
+  // EPC can only create client-facing roles
+  if (isEpc && !['cliente_final', 'financiero'].includes(data.rol)) {
+    return { error: 'No autorizado para crear este tipo de usuario.' }
+  }
+
+  // 3. If EPC, verify the client belongs to them
+  if (isEpc && data.cliente_crm_id) {
+    const { data: clienteData } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('id', data.cliente_crm_id)
+      .eq('epcista_id', user.id)
+      .single()
+    
+    if (!clienteData) {
+      return { error: 'No autorizado: este cliente no te pertenece.' }
+    }
+  }
+
+  // 4. Use service-role admin client to create the user
   const adminClient = createAdminClient()
+
+  const profilePayload: Record<string, unknown> = {
+    nombre: data.nombre,
+    empresa: data.empresa,
+    rol: data.rol,
+  }
+  if (data.cliente_crm_id) {
+    profilePayload.cliente_crm_id = data.cliente_crm_id
+  }
 
   // If password provided → create user directly. Otherwise → send invite email.
   if (data.password && data.password.length >= 6) {
@@ -56,15 +94,10 @@ export async function crearUsuarioAdmin(data: {
 
     const userId = authData.user.id
 
-    // 4. Create profile
+    // Create profile with org link
     const { error: profileError } = await adminClient
       .from('profiles')
-      .upsert({
-        id: userId,
-        nombre: data.nombre,
-        empresa: data.empresa,
-        rol: data.rol,
-      })
+      .upsert({ id: userId, ...profilePayload })
 
     if (profileError) {
       console.error('Error creating profile:', profileError)
@@ -90,15 +123,10 @@ export async function crearUsuarioAdmin(data: {
 
     const userId = authData.user.id
 
-    // Create profile
+    // Create profile with org link
     const { error: profileError } = await adminClient
       .from('profiles')
-      .upsert({
-        id: userId,
-        nombre: data.nombre,
-        empresa: data.empresa,
-        rol: data.rol,
-      })
+      .upsert({ id: userId, ...profilePayload })
 
     if (profileError) {
       console.error('Error creating profile:', profileError)

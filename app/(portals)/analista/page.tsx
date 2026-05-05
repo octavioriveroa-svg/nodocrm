@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import AnalistaDashboardClient from './AnalistaDashboardClient'
+import DashboardAnalytics from '@/components/DashboardAnalytics'
+import { fetchDashboardData } from '@/lib/dashboard-data'
 import type { EstadoProyecto, TipoProyecto } from '@/lib/types'
 
 interface ProyectoRow {
@@ -27,6 +29,9 @@ interface OfertaRow {
 
 export default async function AnalistaDashboard() {
   const supabase = await createClient()
+
+  // Fetch dashboard analytics data
+  const dashboardData = await fetchDashboardData()
 
   const { data } = await supabase
     .from('proyectos')
@@ -69,5 +74,18 @@ export default async function AnalistaDashboard() {
     created_at: o.created_at
   }))
 
-  return <AnalistaDashboardClient initialProyectos={proyectos} initialOfertas={initialOfertas} />
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-8">
+        <p className="text-sm text-gray-400 mb-1">Panel de analista</p>
+        <h1 className="text-2xl font-black tracking-tight">Visión global de la plataforma</h1>
+      </div>
+
+      <DashboardAnalytics data={dashboardData} />
+
+      <div className="mt-8 pt-8 border-t border-borde">
+        <AnalistaDashboardClient initialProyectos={proyectos} initialOfertas={initialOfertas} />
+      </div>
+    </div>
+  )
 }

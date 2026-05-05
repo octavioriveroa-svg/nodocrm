@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Building2, Mail, Phone, MapPin, FileText, Paperclip, Search, Filter, Briefcase, Pencil, Trash2 } from 'lucide-react'
 import type { Cliente, Archivo, Profile } from '@/lib/types'
 import BadgeEstado from '@/components/BadgeEstado'
+import UsuariosCliente from '@/components/UsuariosCliente'
 
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
@@ -51,21 +52,38 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
   const [docSearch, setDocSearch] = useState('')
   const [docTagFilter, setDocTagFilter] = useState<string | null>(null)
 
+  // Linked users
+  const [linkedUsers, setLinkedUsers] = useState<{id: string; nombre: string; empresa: string; rol: string; created_at: string}[]>([])
+  const clienteIdRef = useRef<string>('')
+
   // Edit & Delete state
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState<Partial<Cliente>>({})
   const [guardando, setGuardando] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const loadLinkedUsers = useCallback(async (id: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, nombre, empresa, rol, created_at')
+      .eq('cliente_crm_id', id)
+      .order('created_at', { ascending: false })
+    if (data) setLinkedUsers(data)
+  }, [supabase])
+
   useEffect(() => {
     async function load() {
       const { id } = await params
+      clienteIdRef.current = id
 
       const { data: clienteData } = await supabase.from('clientes').select('*').eq('id', id).single()
       if (clienteData) { 
         setCliente(clienteData as Cliente)
         setForm(clienteData as Cliente)
       }
+
+      // Load linked users
+      await loadLinkedUsers(id)
 
       const { data: projs } = await supabase
         .from('proyectos')
@@ -291,6 +309,18 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
             </div>
           )}
         </>
+      )}
+
+      {/* Usuarios del Cliente */}
+      {cliente && (
+        <UsuariosCliente
+          clienteId={cliente.id}
+          clienteNombre={cliente.razon_social}
+          linkedUsers={linkedUsers}
+          onUsersChanged={() => loadLinkedUsers(clienteIdRef.current)}
+          canCreateWithPassword={true}
+          canManageAllRoles={true}
+        />
       )}
 
       {/* Projects linked to client */}

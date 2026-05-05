@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Trash2, Building2, Mail, Phone, MapPin, FileText, Paperclip, Search, Filter } from 'lucide-react'
 import type { Cliente, Sitio, Archivo, Profile } from '@/lib/types'
 import SitiosCliente from '@/components/SitiosCliente'
+import UsuariosCliente from '@/components/UsuariosCliente'
 
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
@@ -36,6 +37,19 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   const [docSearch, setDocSearch] = useState('')
   const [docTagFilter, setDocTagFilter] = useState<string | null>(null)
 
+  // Linked users
+  const [linkedUsers, setLinkedUsers] = useState<{id: string; nombre: string; empresa: string; rol: string; created_at: string}[]>([])
+  const clienteIdRef = useRef<string>('')
+
+  const loadLinkedUsers = useCallback(async (id: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, nombre, empresa, rol, created_at')
+      .eq('cliente_crm_id', id)
+      .order('created_at', { ascending: false })
+    if (data) setLinkedUsers(data)
+  }, [supabase])
+
   const ESTADOS_MX = [
     'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
     'Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero',
@@ -52,6 +66,7 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function load() {
       const { id } = await params
+      clienteIdRef.current = id
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) setEpcistaId(session.user.id)
       const [{ data: clienteData }, { data: sitiosData }] = await Promise.all([
@@ -60,6 +75,9 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
       ])
       if (clienteData) { setCliente(clienteData as Cliente); setForm(clienteData as Cliente) }
       if (sitiosData) setSitios(sitiosData as Sitio[])
+
+      // Load linked users
+      await loadLinkedUsers(id)
 
       // Fetch all projects related to this client, then all archivos for those projects
       const { data: proyectos } = await supabase
@@ -268,6 +286,16 @@ export default function DetalleClientePage({ params }: { params: Promise<{ id: s
               </p>
             </div>
           )}
+
+          {/* Usuarios del Cliente */}
+          <UsuariosCliente
+            clienteId={cliente.id}
+            clienteNombre={cliente.razon_social}
+            linkedUsers={linkedUsers}
+            onUsersChanged={() => loadLinkedUsers(clienteIdRef.current)}
+            canCreateWithPassword={true}
+            canManageAllRoles={false}
+          />
 
           <SitiosCliente
             clienteId={cliente.id}
