@@ -25,12 +25,14 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
   const navAnalista = [
     { href: '/analista', label: 'Proyectos', icon: Folder },
+    { href: '/analista/usuarios', label: 'Usuarios', icon: Users },
   ]
 
   const navAdmin = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
     { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
+    { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   ]
 
   const navCliente = [
