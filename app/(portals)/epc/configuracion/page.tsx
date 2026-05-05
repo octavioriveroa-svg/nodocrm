@@ -22,6 +22,7 @@ export default function ConfiguracionEpcistaPage() {
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
         rol: profileRow?.rol ?? session.user.user_metadata?.rol ?? 'epc',
         calendario_url: profileRow?.calendario_url ?? null,
+        cliente_crm_id: profileRow?.cliente_crm_id ?? null,
         created_at: profileRow?.created_at ?? session.user.created_at,
       }
 

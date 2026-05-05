@@ -13,6 +13,7 @@ export interface Profile {
   empresa: string
   rol: Rol
   calendario_url: string | null
+  cliente_crm_id: string | null
   created_at: string
 }
 

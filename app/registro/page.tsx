@@ -39,13 +39,20 @@ export default function RegistroPage() {
       return
     }
 
-    await supabase.rpc('upsert_profile', { p_nombre: nombre, p_empresa: empresa, p_rol: rol })
-    await supabase.rpc('notify_admin_new_user', {
-      p_user_id: data.user.id,
-      p_nombre: nombre,
-      p_empresa: empresa,
-      p_email: email,
-    })
+    // Create the profile row directly
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: data.user.id,
+        nombre,
+        empresa,
+        rol,
+      })
+
+    if (profileError) {
+      console.error('Error creating profile:', profileError)
+      // Non-fatal: the user was still created in auth
+    }
 
     window.location.href = '/pendiente'
   }
