@@ -207,24 +207,27 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 {label}
               </button>
             ))}
-            {initialProfile.rol === 'nodo_admin' && (
-              <>
-                <Link
-                  href="/admin/configuracion/usuarios"
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors border-b border-borde text-gray-600 hover:bg-white/50"
-                >
-                  <Users size={15} />
-                  Usuarios
-                </Link>
-                <Link
-                  href="/admin/configuracion/roles"
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors text-gray-600 hover:bg-white/50"
-                >
-                  <ShieldCheck size={15} />
-                  Roles
-                </Link>
-              </>
-            )}
+            {['nodo_admin', 'nodo_analista'].includes(initialProfile.rol) && (() => {
+              const base = initialProfile.rol === 'nodo_admin' ? '/admin' : '/analista'
+              return (
+                <>
+                  <Link
+                    href={`${base}/configuracion/usuarios`}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors border-b border-borde text-gray-600 hover:bg-white/50"
+                  >
+                    <Users size={15} />
+                    Usuarios
+                  </Link>
+                  <Link
+                    href={`${base}/configuracion/roles`}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors text-gray-600 hover:bg-white/50"
+                  >
+                    <ShieldCheck size={15} />
+                    Roles
+                  </Link>
+                </>
+              )
+            })()}
           </nav>
         </div>
 
