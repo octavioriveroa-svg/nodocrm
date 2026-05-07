@@ -11,52 +11,86 @@ interface SidebarProps {
   nombre: string
 }
 
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ElementType
+}
+
+interface NavSection {
+  label: string | null
+  items: NavItem[]
+}
+
 export default function Sidebar({ rol, nombre }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [isOpen, setIsOpen] = useState(false)
 
-  const navEpc = [
-    { href: '/epc', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/epc/proyectos', label: 'Proyectos', icon: Folder },
-    { href: '/epc/clientes', label: 'Clientes', icon: Users },
+  // ─── Grouped navigation per role ─────────────────────
+
+  const navEpc: NavSection[] = [
+    { label: null, items: [
+      { href: '/epc', label: 'Dashboard', icon: LayoutDashboard },
+    ]},
+    { label: null, items: [
+      { href: '/epc/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/epc/clientes', label: 'Clientes', icon: Users },
+    ]},
   ]
 
-  const navAnalista = [
-    { href: '/analista', label: 'Proyectos', icon: Folder },
-    { href: '/analista/usuarios', label: 'Usuarios', icon: Users },
+  const navAnalista: NavSection[] = [
+    { label: 'Visión general', items: [
+      { href: '/analista', label: 'Proyectos', icon: Folder },
+    ]},
+    { label: 'Operaciones', items: [
+      { href: '/analista/clientes', label: 'Clientes', icon: Building2 },
+    ]},
+    { label: 'Equipo', items: [
+      { href: '/analista/usuarios', label: 'Usuarios', icon: Users },
+    ]},
   ]
 
-  const navAdmin = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
-    { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
-    { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+  const navAdmin: NavSection[] = [
+    { label: 'Visión general', items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    ]},
+    { label: 'Operaciones', items: [
+      { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
+    ]},
+    { label: 'Equipo', items: [
+      { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+    ]},
   ]
 
-  const navCliente = [
-    { href: '/cliente', label: 'Mis Proyectos', icon: Folder },
+  const navCliente: NavSection[] = [
+    { label: null, items: [
+      { href: '/cliente', label: 'Mis Proyectos', icon: Folder },
+    ]},
   ]
 
-  const navFinanciero = [
-    { href: '/financiero', label: 'Portafolio', icon: LayoutDashboard },
-    { href: '/financiero/proyectos', label: 'Proyectos', icon: Folder },
+  const navFinanciero: NavSection[] = [
+    { label: null, items: [
+      { href: '/financiero', label: 'Portafolio', icon: LayoutDashboard },
+      { href: '/financiero/proyectos', label: 'Proyectos', icon: Folder },
+    ]},
   ]
 
-  const navMem = [
-    { href: '/mem', label: 'Marketplace', icon: LayoutDashboard },
+  const navMem: NavSection[] = [
+    { label: null, items: [
+      { href: '/mem', label: 'Marketplace', icon: LayoutDashboard },
+    ]},
   ]
 
-  let nav: typeof navEpc = []
-  if (rol === 'nodo_admin') nav = navAdmin
-  else if (rol === 'nodo_analista') nav = navAnalista
-  else if (rol === 'cliente_final') nav = navCliente
-  else if (rol === 'financiero') nav = navFinanciero
-  else if (rol === 'suministrador') nav = navMem
-  else nav = navEpc
-
-  type NavItem = { href: string; label: string; icon: React.ElementType; alwaysYellow?: boolean }
+  let sections: NavSection[] = []
+  if (rol === 'nodo_admin') sections = navAdmin
+  else if (rol === 'nodo_analista') sections = navAnalista
+  else if (rol === 'cliente_final') sections = navCliente
+  else if (rol === 'financiero') sections = navFinanciero
+  else if (rol === 'suministrador') sections = navMem
+  else sections = navEpc
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -101,22 +135,35 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
         </div>
 
         <nav className="flex flex-col gap-1 flex-1">
-          {(nav as NavItem[]).map(({ href, label, icon: Icon, alwaysYellow }) => {
-            const isRoot = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem'].includes(href)
-            const active = pathname === href || (!isRoot && pathname.startsWith(href))
-            const yellow = alwaysYellow || active
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${yellow ? 'bg-acento text-principal shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
-              >
-                <Icon size={16} />
-                {label}
-              </Link>
-            )
-          })}
+          {sections.map((section, sIdx) => (
+            <div key={sIdx} className={sIdx > 0 ? 'mt-3' : ''}>
+              {/* Section label */}
+              {section.label && (
+                <div className="px-3 mb-2 mt-1">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">
+                    {section.label}
+                  </span>
+                </div>
+              )}
+              {/* Section items */}
+              {section.items.map(({ href, label, icon: Icon }) => {
+                const portalRoots = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem']
+                const isRoot = portalRoots.includes(href)
+                const active = pathname === href || (!isRoot && pathname.startsWith(href))
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${active ? 'bg-acento text-principal shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+                  >
+                    <Icon size={16} />
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="mt-auto pt-6 border-t border-white/10">

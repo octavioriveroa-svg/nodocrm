@@ -4,10 +4,11 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Building2, Mail, Phone, MapPin, FileText, Paperclip, Search, Filter, Briefcase, Pencil, Trash2 } from 'lucide-react'
-import type { Cliente, Archivo, Profile } from '@/lib/types'
+import { ChevronLeft, Building2, Mail, Phone, MapPin, FileText, Paperclip, Search, Filter, Briefcase, Pencil, Trash2, UserCircle } from 'lucide-react'
+import type { Cliente, Sitio, Archivo, Profile } from '@/lib/types'
 import BadgeEstado from '@/components/BadgeEstado'
 import UsuariosCliente from '@/components/UsuariosCliente'
+import SitiosCliente from '@/components/SitiosCliente'
 
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
@@ -51,6 +52,10 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
   const [archivosCliente, setArchivosCliente] = useState<(Archivo & { proyecto_nombre?: string })[]>([])
   const [docSearch, setDocSearch] = useState('')
   const [docTagFilter, setDocTagFilter] = useState<string | null>(null)
+  const [sitios, setSitios] = useState<Sitio[]>([])
+
+  // EPCista owner info
+  const [epcistaInfo, setEpcistaInfo] = useState<{ nombre: string; empresa: string } | null>(null)
 
   // Linked users
   const [linkedUsers, setLinkedUsers] = useState<{id: string; nombre: string; empresa: string; rol: string; created_at: string}[]>([])
@@ -80,15 +85,32 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
       if (clienteData) { 
         setCliente(clienteData as Cliente)
         setForm(clienteData as Cliente)
+
+        // Load EPCista owner info
+        const { data: epcistaProfile } = await supabase
+          .from('profiles')
+          .select('nombre, empresa')
+          .eq('id', (clienteData as Cliente).epcista_id)
+          .single()
+        if (epcistaProfile) setEpcistaInfo(epcistaProfile as { nombre: string; empresa: string })
       }
 
       // Load linked users
       await loadLinkedUsers(id)
 
+      // Load sitios
+      const { data: sitiosData } = await supabase
+        .from('sitios')
+        .select('*')
+        .eq('cliente_id', id)
+        .order('created_at', { ascending: true })
+      if (sitiosData) setSitios(sitiosData as Sitio[])
+
+      // Load projects linked via FK cliente_id
       const { data: projs } = await supabase
         .from('proyectos')
         .select('id, nombre_proyecto, estado, historial_estados, created_at')
-        .or(`cliente_final_empresa.eq.${(clienteData as Cliente)?.razon_social}`)
+        .eq('cliente_id', id)
         .order('created_at', { ascending: false })
 
       if (projs) setProyectos(projs as ProyectoResumen[])
@@ -164,6 +186,18 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
         <ChevronLeft size={14} />
         Volver a clientes
       </Link>
+
+      {/* EPCista Owner Badge */}
+      {epcistaInfo && (
+        <div className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl border border-borde bg-gray-50">
+          <UserCircle size={18} className="text-gray-400 shrink-0" />
+          <div className="text-sm">
+            <span className="text-gray-500">EPCista propietario: </span>
+            <span className="font-bold text-principal">{epcistaInfo.nombre}</span>
+            <span className="text-gray-400 ml-1">({epcistaInfo.empresa})</span>
+          </div>
+        </div>
+      )}
 
       {/* Header with Edit/Delete buttons */}
       <div className="flex items-start justify-between mb-6">
@@ -320,6 +354,15 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
           onUsersChanged={() => loadLinkedUsers(clienteIdRef.current)}
           canCreateWithPassword={true}
           canManageAllRoles={true}
+        />
+      )}
+
+      {/* Sitios del Cliente */}
+      {cliente && (
+        <SitiosCliente
+          clienteId={cliente.id}
+          epcistaId={cliente.epcista_id}
+          initialSitios={sitios}
         />
       )}
 
