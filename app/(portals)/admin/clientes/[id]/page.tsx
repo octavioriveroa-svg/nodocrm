@@ -13,11 +13,11 @@ import SitiosCliente from '@/components/SitiosCliente'
 function Campo({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ElementType }) {
   if (!value) return null
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 overflow-hidden">
       <div className="text-xs font-medium mb-0.5 text-gray-400">{label}</div>
-      <div className="flex items-center gap-1.5 text-sm font-medium break-words">
-        {Icon && <Icon size={13} className="text-gray-400" />}
-        {value}
+      <div className="flex items-center gap-1.5 text-sm font-medium break-all">
+        {Icon && <Icon size={13} className="text-gray-400 shrink-0" />}
+        <span className="break-all">{value}</span>
       </div>
     </div>
   )
@@ -324,9 +324,11 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
 
             <div className="border border-borde rounded-xl p-5 bg-white shadow-sm">
               <h3 className="font-bold text-xs uppercase tracking-wide text-gray-400 mb-4">Contacto principal</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Campo label="Nombre" value={cliente.contacto_nombre} />
-                <Campo label="Cargo" value={cliente.contacto_cargo} />
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Campo label="Nombre" value={cliente.contacto_nombre} />
+                  <Campo label="Cargo" value={cliente.contacto_cargo} />
+                </div>
                 <Campo label="Email" value={cliente.contacto_email} icon={Mail} />
                 <Campo label="Teléfono" value={cliente.contacto_telefono} icon={Phone} />
               </div>
