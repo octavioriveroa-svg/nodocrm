@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -199,6 +199,7 @@ export default function NuevoProyectoPage() {
   const [form, setForm] = useState<FormData>(initialForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sitioError, setSitioError] = useState('')
 
   // Admin: EPC + Responsable selectors
   const [epcList, setEpcList] = useState<Profile[]>([])
@@ -381,22 +382,59 @@ export default function NuevoProyectoPage() {
   }
 
   async function guardarNuevoSitio() {
-    if (!nuevoSitio.nombre.trim() || !form.cliente_id) return
+    if (!nuevoSitio.nombre.trim()) return
+    setSitioError('')
     setGuardandoSitio(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setGuardandoSitio(false); return }
-    const { data } = await supabase.from('sitios').insert({
-      cliente_id: form.cliente_id, epcista_id: session.user.id,
+    if (!session?.user) { setSitioError('Sesión expirada. Recarga la página.'); setGuardandoSitio(false); return }
+
+    // If admin used manual client, auto-create the client record first
+    let clienteId = form.cliente_id
+    if (!clienteId && clienteManual) {
+      if (!manualCliente.empresa.trim()) {
+        setSitioError('Completa los datos del cliente en el paso anterior antes de agregar sitios.')
+        setGuardandoSitio(false)
+        return
+      }
+      const { data: newCliente, error: clienteErr } = await supabase.from('clientes').insert({
+        epcista_id: selectedEpcId,
+        razon_social: manualCliente.empresa,
+        contacto_nombre: manualCliente.nombre || manualCliente.empresa,
+        contacto_email: manualCliente.contacto.includes('@') ? manualCliente.contacto : null,
+        contacto_telefono: !manualCliente.contacto.includes('@') ? manualCliente.contacto : null,
+      }).select('id').single()
+      if (clienteErr) {
+        setSitioError('Error al crear el cliente: ' + clienteErr.message)
+        setGuardandoSitio(false)
+        return
+      }
+      clienteId = newCliente.id
+      setF('cliente_id', clienteId)
+      setClienteManual(false)
+    }
+
+    if (!clienteId) {
+      setSitioError('Selecciona un cliente antes de agregar sitios.')
+      setGuardandoSitio(false)
+      return
+    }
+    const { data, error: insertErr } = await supabase.from('sitios').insert({
+      cliente_id: clienteId, epcista_id: selectedEpcId || session.user.id,
       nombre: nuevoSitio.nombre, nombre_recibo: nuevoSitio.nombre_recibo || null,
       ciudad: nuevoSitio.ciudad || null, ubicacion_estado: nuevoSitio.ubicacion_estado || null,
       rpu: nuevoSitio.rpu || null,
       demanda_contratada_kw: nuevoSitio.demanda_contratada_kw ? Number(nuevoSitio.demanda_contratada_kw) : null,
       recibo_url: reciboUrlNuevo,
     }).select().single()
+    if (insertErr) {
+      setSitioError('Error al guardar el sitio: ' + insertErr.message)
+      setGuardandoSitio(false)
+      return
+    }
     if (data) {
       const sitio = data as Sitio
       setSitiosCliente(prev => [...prev, sitio])
-      setSitiosSeleccionados(prev => [...prev, sitio.id])
+      // Don't auto-select — let the user choose which sites to include
     }
     setNuevoSitio(emptyNuevoSitio)
     setReciboUrlNuevo(null)
@@ -467,11 +505,14 @@ export default function NuevoProyectoPage() {
   }
 
   function validarPaso1() {
-    if (sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio a cotizar.'
-    for (const sid of sitiosSeleccionados) {
-      const sitio = sitiosCliente.find(s => s.id === sid)
-      const prods = productosMap[sid] ?? []
-      if (prods.length === 0) return `El sitio "${sitio?.nombre ?? sid}" no tiene productos. Agrega al menos uno.`
+    if (sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio a cotizar (marca la casilla ☑ del sitio).'
+    const sinProductos = sitiosSeleccionados
+      .filter(sid => (productosMap[sid] ?? []).length === 0)
+      .map(sid => sitiosCliente.find(s => s.id === sid)?.nombre ?? sid)
+    if (sinProductos.length > 0) {
+      return sinProductos.length === 1
+        ? `El sitio "${sinProductos[0]}" no tiene productos. Agrega al menos un producto (FV o BESS) a cada sitio seleccionado.`
+        : `Los sitios ${sinProductos.map(n => `"${n}"`).join(', ')} no tienen productos. Agrega al menos un producto a cada sitio seleccionado, o desmarca los que no necesites.`
     }
     return ''
   }
@@ -1131,6 +1172,9 @@ export default function NuevoProyectoPage() {
                       )}
                     </div>
                   </div>
+                  {sitioError && (
+                    <p className="text-xs text-red-600 mt-2">{sitioError}</p>
+                  )}
                   <div className="flex justify-end mt-3">
                     <button type="button" onClick={guardarNuevoSitio}
                       disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
@@ -1141,7 +1185,7 @@ export default function NuevoProyectoPage() {
                 </div>
               ) : (
                 <button type="button"
-                  onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null) }}
+                  onClick={() => { setMostrarNuevoSitio(true); setSitioError(''); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null) }}
                   className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center border-borde border-dashed rounded-xl">
                   <Plus size={14} />
                   {sitiosCliente.length === 0 ? 'Agregar sitio' : 'Agregar otro sitio'}
