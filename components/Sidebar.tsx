@@ -74,7 +74,6 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const navFinanciero: NavSection[] = [
     { label: null, items: [
       { href: '/financiero', label: 'Portafolio', icon: LayoutDashboard },
-      { href: '/financiero/proyectos', label: 'Proyectos', icon: Folder },
     ]},
   ]
 
