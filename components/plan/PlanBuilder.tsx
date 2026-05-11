@@ -2,11 +2,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { PlanFase, PlanActividad, HitoFinanciero, Profile } from '@/lib/types'
+import type { PlanFase, PlanActividad, HitoFinanciero, Profile, PlanPlantillaEstructura } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { recalcPhaseDates, recalcPhaseProgress } from '@/lib/cascade-scheduler'
 import PhaseCard from './PhaseCard'
 import FinancialMilestones from './FinancialMilestones'
+import TemplateManager from './TemplateManager'
 import dynamic from 'next/dynamic'
 import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2 } from 'lucide-react'
 
@@ -162,6 +163,53 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
     }
   }, [actividades, supabase])
 
+  // ── Apply template handler ─────────────────────────────────
+  const handleApplyTemplate = useCallback(async (estructura: PlanPlantillaEstructura) => {
+    for (const faseT of estructura.fases) {
+      const { data: newFase } = await supabase.from('plan_fases').insert({
+        proyecto_id: proyectoId,
+        nombre: faseT.nombre,
+        orden: fases.length + faseT.orden,
+        color: faseT.color,
+      }).select().single()
+      if (!newFase) continue
+
+      setFases(prev => [...prev, newFase as PlanFase])
+
+      for (const actT of faseT.actividades) {
+        const { data: newAct } = await supabase.from('plan_actividades').insert({
+          fase_id: newFase.id,
+          proyecto_id: proyectoId,
+          nombre: actT.nombre,
+          orden: actT.orden,
+          duracion_dias: actT.duracion_dias,
+        }).select().single()
+        if (!newAct) continue
+
+        setActividades(prev => [...prev, newAct as PlanActividad])
+
+        for (const tareaT of actT.tareas) {
+          const { data: newTarea } = await supabase.from('plan_tareas').insert({
+            actividad_id: newAct.id,
+            proyecto_id: proyectoId,
+            nombre: tareaT.nombre,
+            orden: tareaT.orden,
+            prioridad: tareaT.prioridad,
+          }).select().single()
+          if (!newTarea) continue
+
+          for (const subT of tareaT.subtareas) {
+            await supabase.from('plan_subtareas').insert({
+              tarea_id: newTarea.id,
+              nombre: subT.nombre,
+              orden: subT.orden,
+            })
+          }
+        }
+      }
+    }
+  }, [proyectoId, fases.length, supabase])
+
   // ── Render ──────────────────────────────────────────────────
   const sortedFases = [...fases].sort((a, b) => a.orden - b.orden)
 
@@ -184,9 +232,20 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-black text-principal">Plan de Proyecto EPC</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {fases.length} fases · {totalActividades} actividades · {overallPct}% completado
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-gray-500">
+              {fases.length} fases · {totalActividades} actividades · {overallPct}% completado
+            </p>
+            {!readOnly && (
+              <TemplateManager
+                proyectoId={proyectoId}
+                currentUser={currentUser}
+                fases={fases}
+                actividades={actividades}
+                onApplyTemplate={handleApplyTemplate}
+              />
+            )}
+          </div>
         </div>
 
         {/* View mode toggle */}
