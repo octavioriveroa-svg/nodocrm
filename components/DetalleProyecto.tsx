@@ -699,8 +699,26 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Cronograma Gantt */}
-      <Seccion title="Cronograma de Construcción">
+      {/* Plan EPC — new project management tool */}
+      <Seccion title="Plan de Proyecto EPC">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600">
+              Plan detallado de ingeniería, procurement y construcción con fases, actividades, tareas y hitos financieros.
+            </p>
+          </div>
+          <Link
+            href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : '/analista'}/proyectos/${proyecto.id}/plan`}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-principal text-acento whitespace-nowrap"
+          >
+            <CalendarDays size={16} />
+            {isEpcista ? 'Gestionar Plan' : 'Ver Plan'}
+          </Link>
+        </div>
+      </Seccion>
+
+      {/* Cronograma Gantt (legacy) */}
+      <Seccion title="Cronograma de Construcción (Legacy)">
         {hitosLocales.length === 0 && (isEpcista || isAdmin) ? (
           <div className="flex flex-col items-center justify-center py-10 bg-white/40 border border-dashed border-borde rounded-xl">
             <p className="text-sm font-medium text-gray-500 mb-4">Aún no se ha definido el cronograma de obra.</p>
