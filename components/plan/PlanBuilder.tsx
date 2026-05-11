@@ -6,7 +6,15 @@ import type { PlanFase, PlanActividad, HitoFinanciero, Profile } from '@/lib/typ
 import { createClient } from '@/lib/supabase/client'
 import { recalcPhaseDates, recalcPhaseProgress } from '@/lib/cascade-scheduler'
 import PhaseCard from './PhaseCard'
+import dynamic from 'next/dynamic'
 import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2 } from 'lucide-react'
+
+// Dynamic import — SVAR Gantt uses browser APIs, not SSR-safe
+const GanttView = dynamic(() => import('./GanttView'), { ssr: false, loading: () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 size={24} className="animate-spin text-gray-400" />
+  </div>
+) })
 
 // ── Colors palette for new phases ─────────────────────────────
 const PHASE_COLORS = ['#2563EB', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#4F46E5', '#BE185D']
@@ -118,6 +126,40 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
   function deleteActividad(id: string) {
     setActividades(prev => prev.filter(a => a.id !== id))
   }
+
+  // ── Gantt drag handler ──────────────────────────────────────
+  const handleTaskDragged = useCallback(async (updates: { id: string; fecha_inicio_estimada: string; fecha_fin_estimada: string }[]) => {
+    // Batch update all affected activities in Supabase
+    for (const u of updates) {
+      await supabase.from('plan_actividades').update({
+        fecha_inicio_estimada: u.fecha_inicio_estimada,
+        fecha_fin_estimada: u.fecha_fin_estimada,
+      }).eq('id', u.id)
+    }
+
+    // Update local state
+    setActividades(prev => {
+      const updateMap = new Map(updates.map(u => [u.id, u]))
+      return prev.map(a => {
+        const upd = updateMap.get(a.id)
+        return upd ? { ...a, fecha_inicio_estimada: upd.fecha_inicio_estimada, fecha_fin_estimada: upd.fecha_fin_estimada } : a
+      })
+    })
+
+    // Recalculate affected phases
+    const affectedFaseIds = new Set(
+      updates.map(u => actividades.find(a => a.id === u.id)?.fase_id).filter(Boolean) as string[]
+    )
+    for (const faseId of affectedFaseIds) {
+      const faseActs = actividades.map(a => {
+        const upd = updates.find(u => u.id === a.id)
+        return upd ? { ...a, ...upd } : a
+      }).filter(a => a.fase_id === faseId)
+      const newDates = recalcPhaseDates(faseActs, faseId)
+      await supabase.from('plan_fases').update(newDates).eq('id', faseId)
+      setFases(prev => prev.map(f => f.id === faseId ? { ...f, ...newDates } : f))
+    }
+  }, [actividades, supabase])
 
   // ── Render ──────────────────────────────────────────────────
   const sortedFases = [...fases].sort((a, b) => a.orden - b.orden)
@@ -277,13 +319,15 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
         </div>
       )}
 
-      {/* Gantt View — placeholder for Phase 3 */}
+      {/* Gantt View */}
       {viewMode === 'gantt' && (
-        <div className="flex flex-col items-center justify-center py-16 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-          <BarChart3 size={32} className="text-gray-300 mb-4" />
-          <h3 className="text-sm font-bold text-gray-500 mb-1">Gantt en construcción</h3>
-          <p className="text-xs text-gray-400">El diagrama de Gantt interactivo estará disponible pronto.</p>
-        </div>
+        <GanttView
+          fases={fases}
+          actividades={actividades}
+          hitosFinancieros={hitosFinancieros}
+          readOnly={readOnly}
+          onTaskDragged={handleTaskDragged}
+        />
       )}
 
       {/* Financial View — placeholder for Phase 4 */}
