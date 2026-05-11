@@ -152,3 +152,136 @@ export interface OfertaMem {
   updated_at: string
   suministrador?: Profile
 }
+
+// ── Plan Management Types ─────────────────────────────────────
+
+export type EstadoPlan = 'pendiente' | 'en_progreso' | 'completado' | 'retrasado'
+export type EstadoTarea = 'pendiente' | 'en_progreso' | 'completado'
+export type PrioridadTarea = 'baja' | 'media' | 'alta' | 'critica'
+export type TipoDependencia = 'FS' | 'SS' | 'FF' | 'SF'
+export type EstadoHitoFinanciero = 'pendiente' | 'elegible' | 'aprobado' | 'pagado'
+
+export interface PlanFase {
+  id: string
+  proyecto_id: string
+  nombre: string
+  descripcion: string | null
+  orden: number
+  color: string
+  fecha_inicio_estimada: string | null
+  fecha_fin_estimada: string | null
+  fecha_inicio_real: string | null
+  fecha_fin_real: string | null
+  porcentaje_completado: number
+  estado: EstadoPlan
+  created_at: string
+  updated_at: string
+}
+
+export interface PlanActividad {
+  id: string
+  fase_id: string
+  proyecto_id: string
+  nombre: string
+  descripcion: string | null
+  orden: number
+  responsable_id: string | null
+  fecha_inicio_estimada: string | null
+  fecha_fin_estimada: string | null
+  duracion_dias: number | null
+  fecha_inicio_real: string | null
+  fecha_fin_real: string | null
+  dependencia_id: string | null
+  tipo_dependencia: TipoDependencia
+  porcentaje_completado: number
+  estado: EstadoPlan
+  created_at: string
+  updated_at: string
+  responsable?: Profile
+}
+
+export interface PlanTarea {
+  id: string
+  actividad_id: string
+  proyecto_id: string
+  nombre: string
+  descripcion: string | null
+  orden: number
+  responsable_id: string | null
+  prioridad: PrioridadTarea
+  fecha_vencimiento: string | null
+  estado: EstadoTarea
+  created_at: string
+  updated_at: string
+  responsable?: Profile
+  subtareas?: PlanSubtarea[]
+}
+
+export interface PlanSubtarea {
+  id: string
+  tarea_id: string
+  nombre: string
+  completado: boolean
+  orden: number
+  created_at: string
+}
+
+export interface HitoFinanciero {
+  id: string
+  proyecto_id: string
+  fase_id: string | null
+  nombre: string
+  descripcion: string | null
+  monto: number
+  moneda: string
+  porcentaje_del_total: number | null
+  condicion_desbloqueo: string | null
+  fase_gatillo_id: string | null
+  estado: EstadoHitoFinanciero
+  fecha_estimada: string | null
+  fecha_pago_real: string | null
+  comprobante_url: string | null
+  comprobante_tipo: string | null
+  notas: string | null
+  orden: number
+  created_at: string
+  updated_at: string
+  fase?: PlanFase
+}
+
+export interface PlanPlantilla {
+  id: string
+  epcista_id: string
+  nombre: string
+  descripcion: string | null
+  tipo_proyecto: string | null
+  estructura: PlanPlantillaEstructura
+  created_at: string
+  updated_at: string
+}
+
+export interface PlanPlantillaEstructura {
+  fases: {
+    nombre: string
+    orden: number
+    color: string
+    actividades: {
+      nombre: string
+      orden: number
+      duracion_dias: number | null
+      dependencia_orden?: number
+      tareas: {
+        nombre: string
+        orden: number
+        prioridad: PrioridadTarea
+        subtareas: { nombre: string; orden: number }[]
+      }[]
+    }[]
+  }[]
+  hitos_financieros?: {
+    nombre: string
+    porcentaje_del_total: number
+    fase_orden: number
+    condicion_desbloqueo: string
+  }[]
+}
