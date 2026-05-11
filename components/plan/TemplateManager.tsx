@@ -23,6 +23,7 @@ export default function TemplateManager({ proyectoId, currentUser, fases, activi
   const [showLoadModal, setShowLoadModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [applying, setApplying] = useState<string | null>(null)
+  const [confirmingApply, setConfirmingApply] = useState<string | null>(null)
 
   // Save modal form
   const [saveName, setSaveName] = useState('')
@@ -142,10 +143,10 @@ export default function TemplateManager({ proyectoId, currentUser, fases, activi
 
   // ── Apply template to current project ──────────────────────
   async function handleApply(template: PlanPlantilla) {
-    if (!confirm(`¿Aplicar la plantilla "${template.nombre}"?\n\nEsto agregará las fases y actividades de la plantilla al plan actual.`)) return
     setApplying(template.id)
     await onApplyTemplate(template.estructura)
     setApplying(null)
+    setConfirmingApply(null)
     setShowLoadModal(false)
   }
 
@@ -284,20 +285,41 @@ export default function TemplateManager({ proyectoId, currentUser, fases, activi
                           )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => handleApply(t)}
-                            disabled={isApplying}
-                            className="flex items-center gap-1 text-xs font-bold text-white bg-principal px-3 py-1.5 rounded-md hover:bg-gray-900 transition-colors disabled:opacity-50"
-                          >
-                            {isApplying ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                            Aplicar
-                          </button>
+                          {confirmingApply === t.id ? (
+                            <>
+                              <button
+                                onClick={() => handleApply(t)}
+                                disabled={isApplying}
+                                className="flex items-center gap-1 text-xs font-bold text-white bg-principal px-3 py-1.5 rounded-md hover:bg-gray-900 transition-colors disabled:opacity-50"
+                              >
+                                {isApplying ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                Confirmar
+                              </button>
+                              <button
+                                onClick={() => setConfirmingApply(null)}
+                                disabled={isApplying}
+                                className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5"
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmingApply(t.id)}
+                              className="flex items-center gap-1 text-xs font-bold text-white bg-principal px-3 py-1.5 rounded-md hover:bg-gray-900 transition-colors"
+                            >
+                              <Plus size={12} />
+                              Aplicar
+                            </button>
+                          )}
+                          {!confirmingApply && (
                           <button
                             onClick={() => handleDelete(t.id)}
                             className="text-gray-400 hover:text-red-500 p-1.5 opacity-0 group-hover:opacity-100 transition-all"
                           >
                             <Trash2 size={12} />
                           </button>
+                          )}
                         </div>
                       </div>
                     )
