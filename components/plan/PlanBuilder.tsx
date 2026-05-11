@@ -6,6 +6,7 @@ import type { PlanFase, PlanActividad, HitoFinanciero, Profile } from '@/lib/typ
 import { createClient } from '@/lib/supabase/client'
 import { recalcPhaseDates, recalcPhaseProgress } from '@/lib/cascade-scheduler'
 import PhaseCard from './PhaseCard'
+import FinancialMilestones from './FinancialMilestones'
 import dynamic from 'next/dynamic'
 import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2 } from 'lucide-react'
 
@@ -330,13 +331,17 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
         />
       )}
 
-      {/* Financial View — placeholder for Phase 4 */}
+      {/* Financial View */}
       {viewMode === 'financial' && (
-        <div className="flex flex-col items-center justify-center py-16 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-          <DollarSign size={32} className="text-gray-300 mb-4" />
-          <h3 className="text-sm font-bold text-gray-500 mb-1">Hitos financieros en construcción</h3>
-          <p className="text-xs text-gray-400">El tracker de desembolsos estará disponible pronto.</p>
-        </div>
+        <FinancialMilestones
+          hitos={hitosFinancieros}
+          fases={fases}
+          proyectoId={proyectoId}
+          capexEstimado={null}
+          readOnly={readOnly}
+          isFinanciero={currentUser.rol === 'financiero'}
+          onUpdate={setHitosFinancieros}
+        />
       )}
     </div>
   )
