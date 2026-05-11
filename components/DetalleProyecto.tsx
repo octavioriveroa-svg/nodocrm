@@ -708,7 +708,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             </p>
           </div>
           <Link
-            href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : '/analista'}/proyectos/${proyecto.id}/plan`}
+            href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : isAnalista ? '/analista' : '/financiero'}/proyectos/${proyecto.id}/plan`}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-principal text-acento whitespace-nowrap"
           >
             <CalendarDays size={16} />
