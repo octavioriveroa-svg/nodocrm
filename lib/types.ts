@@ -285,3 +285,41 @@ export interface PlanPlantillaEstructura {
     condicion_desbloqueo: string
   }[]
 }
+
+// ── Comment & Notification Types ──────────────────────────────
+
+export type CommentTargetType = 'fase' | 'actividad' | 'tarea' | 'subtarea' | 'hito'
+
+export interface PlanComentario {
+  id: string
+  proyecto_id: string
+  fase_id: string | null
+  actividad_id: string | null
+  tarea_id: string | null
+  subtarea_id: string | null
+  hito_id: string | null
+  parent_id: string | null
+  autor_id: string
+  contenido: string
+  resuelto: boolean
+  resuelto_por: string | null
+  created_at: string
+  updated_at: string
+  autor?: Profile
+  respuestas?: PlanComentario[]
+}
+
+export type TipoNotificacion = 'comentario' | 'respuesta' | 'resuelto' | 'sistema'
+
+export interface Notificacion {
+  id: string
+  usuario_id: string
+  tipo: TipoNotificacion
+  titulo: string
+  mensaje: string | null
+  enlace: string | null
+  proyecto_id: string | null
+  comentario_id: string | null
+  leido: boolean
+  created_at: string
+}

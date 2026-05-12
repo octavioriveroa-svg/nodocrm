@@ -2,10 +2,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { HitoFinanciero, PlanFase, EstadoHitoFinanciero } from '@/lib/types'
+import type { HitoFinanciero, PlanFase, EstadoHitoFinanciero, Profile } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { DollarSign, Plus, Pencil, Trash2, ExternalLink, CheckCircle2, Clock, CircleDot, CreditCard } from 'lucide-react'
 import FinancialMilestoneModal from './FinancialMilestoneModal'
+import CommentThread from './CommentThread'
 
 const ESTADO_CONFIG: Record<EstadoHitoFinanciero, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
   pendiente: { color: '#9CA3AF', bg: '#F3F4F6', icon: <Clock size={12} />, label: 'Pendiente' },
@@ -21,11 +22,13 @@ interface Props {
   capexEstimado: number | null
   readOnly?: boolean
   isFinanciero?: boolean
+  currentUser?: Profile
+  commentCounts?: Record<string, number>
   onUpdate: (hitos: HitoFinanciero[]) => void
 }
 
 export default function FinancialMilestones({
-  hitos, fases, proyectoId, capexEstimado, readOnly, isFinanciero, onUpdate,
+  hitos, fases, proyectoId, capexEstimado, readOnly, isFinanciero, currentUser, commentCounts, onUpdate,
 }: Props) {
   const supabase = createClient()
   const [editingHito, setEditingHito] = useState<HitoFinanciero | null>(null)
@@ -174,6 +177,17 @@ export default function FinancialMilestones({
                     className="text-green-600 hover:text-green-800 flex-shrink-0">
                     <ExternalLink size={12} />
                   </a>
+                )}
+
+                {/* Comment thread */}
+                {currentUser && (
+                  <CommentThread
+                    proyectoId={proyectoId}
+                    targetType="hito"
+                    targetId={h.id}
+                    currentUser={currentUser}
+                    commentCount={commentCounts?.[h.id] || 0}
+                  />
                 )}
 
                 {/* Actions */}

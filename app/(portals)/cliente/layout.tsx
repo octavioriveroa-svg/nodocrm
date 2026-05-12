@@ -60,7 +60,7 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
     <div className="flex min-h-screen">
       <Sidebar rol={profile!.rol} nombre={profile!.nombre} />
       <div className="flex-1 flex flex-col">
-        <TopBar nombre={profile!.nombre} />
+        <TopBar nombre={profile!.nombre} userId={profile!.id} />
         <main className="flex-1 p-8 bg-fondo">
           {children}
         </main>

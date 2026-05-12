@@ -2,10 +2,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { PlanTarea, PlanSubtarea, EstadoTarea, PrioridadTarea } from '@/lib/types'
+import type { PlanTarea, PlanSubtarea, EstadoTarea, PrioridadTarea, Profile } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronDown, ChevronRight, Circle, Clock, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react'
 import SubtaskChecklist from './SubtaskChecklist'
+import CommentThread from './CommentThread'
 
 const PRIORIDAD_COLORS: Record<PrioridadTarea, { bg: string; text: string; label: string }> = {
   baja: { bg: '#f0f9ff', text: '#3b82f6', label: 'Baja' },
@@ -29,11 +30,14 @@ const ESTADO_NEXT: Record<EstadoTarea, EstadoTarea> = {
 interface Props {
   tarea: PlanTarea
   readOnly?: boolean
+  currentUser: Profile
+  proyectoId: string
+  commentCounts: Record<string, number>
   onUpdate: (tarea: PlanTarea) => void
   onDelete: (id: string) => void
 }
 
-export default function TaskItem({ tarea, readOnly, onUpdate, onDelete }: Props) {
+export default function TaskItem({ tarea, readOnly, currentUser, proyectoId, commentCounts, onUpdate, onDelete }: Props) {
   const supabase = createClient()
   const [expanded, setExpanded] = useState(false)
   const [subtareas, setSubtareas] = useState<PlanSubtarea[]>(tarea.subtareas || [])
@@ -98,6 +102,15 @@ export default function TaskItem({ tarea, readOnly, onUpdate, onDelete }: Props)
             {new Date(tarea.fecha_vencimiento).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
           </span>
         )}
+
+        {/* Comment thread */}
+        <CommentThread
+          proyectoId={proyectoId}
+          targetType="tarea"
+          targetId={tarea.id}
+          currentUser={currentUser}
+          commentCount={commentCounts[tarea.id] || 0}
+        />
 
         {/* Delete */}
         {!readOnly && (
