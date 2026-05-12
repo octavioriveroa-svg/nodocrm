@@ -43,20 +43,6 @@ export interface CascadeUpdate {
 
 // ── Core Algorithm ────────────────────────────────────────────
 
-/**
- * Build an adjacency map: predecessor → [dependents]
- */
-function buildDependencyGraph(activities: PlanActividad[]): Map<string, PlanActividad[]> {
-  const graph = new Map<string, PlanActividad[]>()
-  for (const a of activities) {
-    if (a.dependencia_id) {
-      const deps = graph.get(a.dependencia_id) || []
-      deps.push(a)
-      graph.set(a.dependencia_id, deps)
-    }
-  }
-  return graph
-}
 
 /**
  * Topological sort using Kahn's algorithm.

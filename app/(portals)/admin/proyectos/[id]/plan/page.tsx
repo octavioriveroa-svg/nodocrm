@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PlanBuilder from '@/components/plan/PlanBuilder'

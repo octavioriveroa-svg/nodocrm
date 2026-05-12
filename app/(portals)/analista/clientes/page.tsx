@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
 import type { Cliente } from '@/lib/types'
 
 function formatDate(d: string) {
