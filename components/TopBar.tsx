@@ -59,9 +59,9 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
 
   useEffect(() => {
     if (!userId) return
-    loadNotifs()
+    const timeout = setTimeout(loadNotifs, 0)
     const interval = setInterval(loadNotifs, 30000)
-    return () => clearInterval(interval)
+    return () => { clearTimeout(timeout); clearInterval(interval) }
   }, [userId, loadNotifs])
 
   // Close on outside click
