@@ -9,7 +9,7 @@ import PhaseCard from './PhaseCard'
 import FinancialMilestones from './FinancialMilestones'
 import TemplateManager from './TemplateManager'
 import dynamic from 'next/dynamic'
-import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2 } from 'lucide-react'
+import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2, MessageCircle } from 'lucide-react'
 
 // Dynamic import — SVAR Gantt uses browser APIs, not SSR-safe
 const GanttView = dynamic(() => import('./GanttView'), { ssr: false, loading: () => (
@@ -41,6 +41,8 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
   const [addingActivity, setAddingActivity] = useState<string | null>(null)
   const [newActivityName, setNewActivityName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
+  const [totalComments, setTotalComments] = useState(0)
 
   // ── Load data ───────────────────────────────────────────────
   useEffect(() => {
@@ -57,6 +59,26 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
       if (fasesData) setFases(fasesData as PlanFase[])
       if (actData) setActividades(actData as PlanActividad[])
       if (hitosData) setHitosFinancieros(hitosData as HitoFinanciero[])
+
+      // Bulk fetch comment counts per entity
+      const { data: commentData } = await supabase
+        .from('plan_comentarios')
+        .select('id, fase_id, actividad_id, tarea_id, subtarea_id, hito_id, resuelto')
+        .eq('proyecto_id', proyectoId)
+        .is('parent_id', null)  // only top-level
+      if (commentData) {
+        const counts: Record<string, number> = {}
+        let total = 0
+        for (const c of commentData) {
+          if (c.resuelto) continue
+          total++
+          const entityId = c.fase_id || c.actividad_id || c.tarea_id || c.subtarea_id || c.hito_id
+          if (entityId) counts[entityId] = (counts[entityId] || 0) + 1
+        }
+        setCommentCounts(counts)
+        setTotalComments(total)
+      }
+
       setLoading(false)
     }
     load()
@@ -235,6 +257,11 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-gray-500">
               {fases.length} fases · {totalActividades} actividades · {overallPct}% completado
+              {totalComments > 0 && (
+                <span className="inline-flex items-center gap-1 ml-2 text-blue-500">
+                  <MessageCircle size={12} /> {totalComments}
+                </span>
+              )}
             </p>
             {!readOnly && (
               <TemplateManager
@@ -321,6 +348,9 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
               allActividades={actividades}
               hitosFinancieros={hitosFinancieros}
               readOnly={readOnly}
+              currentUser={currentUser}
+              proyectoId={proyectoId}
+              commentCounts={commentCounts}
               onUpdateFase={updateFase}
               onDeleteFase={deleteFase}
               onUpdateActividad={updateActividad}
@@ -399,6 +429,8 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
           capexEstimado={null}
           readOnly={readOnly}
           isFinanciero={currentUser.rol === 'financiero'}
+          currentUser={currentUser}
+          commentCounts={commentCounts}
           onUpdate={setHitosFinancieros}
         />
       )}

@@ -6,6 +6,7 @@ import type { PlanActividad, PlanTarea, PlanSubtarea, EstadoPlan, Profile } from
 import { createClient } from '@/lib/supabase/client'
 import { ChevronDown, ChevronRight, Plus, Trash2, Link2, User } from 'lucide-react'
 import TaskItem from './TaskItem'
+import CommentThread from './CommentThread'
 
 const ESTADO_COLORS: Record<EstadoPlan, string> = {
   pendiente: '#9CA3AF',
@@ -18,11 +19,14 @@ interface Props {
   actividad: PlanActividad
   allActividades: PlanActividad[]
   readOnly?: boolean
+  currentUser: Profile
+  proyectoId: string
+  commentCounts: Record<string, number>
   onUpdate: (actividad: PlanActividad) => void
   onDelete: (id: string) => void
 }
 
-export default function ActivityRow({ actividad, allActividades, readOnly, onUpdate, onDelete }: Props) {
+export default function ActivityRow({ actividad, allActividades, readOnly, currentUser, proyectoId, commentCounts, onUpdate, onDelete }: Props) {
   const supabase = createClient()
   const [expanded, setExpanded] = useState(false)
   const [tareas, setTareas] = useState<PlanTarea[]>([])
@@ -160,6 +164,15 @@ export default function ActivityRow({ actividad, allActividades, readOnly, onUpd
           </span>
         )}
 
+        {/* Comment thread */}
+        <CommentThread
+          proyectoId={proyectoId}
+          targetType="actividad"
+          targetId={actividad.id}
+          currentUser={currentUser}
+          commentCount={commentCounts[actividad.id] || 0}
+        />
+
         {/* Actions */}
         {!readOnly && (
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
@@ -220,6 +233,9 @@ export default function ActivityRow({ actividad, allActividades, readOnly, onUpd
                 key={t.id}
                 tarea={t}
                 readOnly={readOnly}
+                currentUser={currentUser}
+                proyectoId={proyectoId}
+                commentCounts={commentCounts}
                 onUpdate={updateTarea}
                 onDelete={deleteTarea}
               />

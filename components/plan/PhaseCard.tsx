@@ -2,10 +2,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { PlanFase, PlanActividad, EstadoPlan, HitoFinanciero } from '@/lib/types'
+import type { PlanFase, PlanActividad, EstadoPlan, HitoFinanciero, Profile } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, DollarSign, Calendar } from 'lucide-react'
 import ActivityRow from './ActivityRow'
+import CommentThread from './CommentThread'
 
 const ESTADO_LABELS: Record<EstadoPlan, string> = {
   pendiente: 'Pendiente',
@@ -20,6 +21,9 @@ interface Props {
   allActividades: PlanActividad[]
   hitosFinancieros: HitoFinanciero[]
   readOnly?: boolean
+  currentUser: Profile
+  proyectoId: string
+  commentCounts: Record<string, number>
   onUpdateFase: (fase: PlanFase) => void
   onDeleteFase: (id: string) => void
   onUpdateActividad: (actividad: PlanActividad) => void
@@ -29,7 +33,8 @@ interface Props {
 
 export default function PhaseCard({
   fase, actividades, allActividades, hitosFinancieros,
-  readOnly, onUpdateFase, onDeleteFase, onUpdateActividad, onDeleteActividad, onAddActividad,
+  readOnly, currentUser, proyectoId, commentCounts,
+  onUpdateFase, onDeleteFase, onUpdateActividad, onDeleteActividad, onAddActividad,
 }: Props) {
   const supabase = createClient()
   const [expanded, setExpanded] = useState(true)
@@ -120,6 +125,15 @@ export default function PhaseCard({
           <span className="text-xs font-bold text-gray-500 w-10 text-right">{Math.round(pct)}%</span>
         </div>
 
+        {/* Comment thread */}
+        <CommentThread
+          proyectoId={proyectoId}
+          targetType="fase"
+          targetId={fase.id}
+          currentUser={currentUser}
+          commentCount={commentCounts[fase.id] || 0}
+        />
+
         {/* Actions */}
         {!readOnly && (
           <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all ml-1">
@@ -188,6 +202,9 @@ export default function PhaseCard({
               actividad={act}
               allActividades={allActividades}
               readOnly={readOnly}
+              currentUser={currentUser}
+              proyectoId={proyectoId}
+              commentCounts={commentCounts}
               onUpdate={onUpdateActividad}
               onDelete={onDeleteActividad}
             />
