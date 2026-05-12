@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Bell, X, Check, MessageCircle, CheckCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Notificacion } from '@/lib/types'
@@ -25,10 +24,10 @@ function timeAgo(dateStr: string): string {
 
 export default function TopBar({ nombre, userId }: TopBarProps) {
   const supabase = createClient()
-  const router = useRouter()
   const [notifs, setNotifs] = useState<Notificacion[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const initials = nombre
@@ -39,30 +38,30 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
     .slice(0, 2)
 
   // Fetch notifications
-  const loadNotifs = useCallback(async () => {
-    if (!userId) return
-    const { data } = await supabase
-      .from('notificaciones')
-      .select('*')
-      .eq('usuario_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-    if (data) setNotifs(data as Notificacion[])
-    // Unread count
-    const { count: unread } = await supabase
-      .from('notificaciones')
-      .select('*', { count: 'exact', head: true })
-      .eq('usuario_id', userId)
-      .eq('leido', false)
-    setUnreadCount(unread || 0)
-  }, [userId, supabase])
-
   useEffect(() => {
     if (!userId) return
-    loadNotifs()
-    const interval = setInterval(loadNotifs, 30000)
+    async function load() {
+      const { data, count } = await supabase
+        .from('notificaciones')
+        .select('*', { count: 'exact' })
+        .eq('usuario_id', userId!)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (data) setNotifs(data as Notificacion[])
+      // Unread count
+      const { count: unread } = await supabase
+        .from('notificaciones')
+        .select('*', { count: 'exact', head: true })
+        .eq('usuario_id', userId!)
+        .eq('leido', false)
+      setUnreadCount(unread || 0)
+    }
+    load()
+
+    // Poll every 30 seconds
+    const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
-  }, [userId, loadNotifs])
+  }, [userId])
 
   // Close on outside click
   useEffect(() => {
@@ -92,7 +91,7 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
   function handleNotifClick(n: Notificacion) {
     if (!n.leido) markAsRead(n.id)
     if (n.enlace) {
-      router.push(n.enlace)
+      window.location.href = n.enlace
     }
     setOpen(false)
   }
