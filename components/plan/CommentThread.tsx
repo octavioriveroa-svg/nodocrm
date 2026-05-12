@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { PlanComentario, CommentTargetType, Profile } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -271,7 +272,7 @@ export default function CommentThread({ proyectoId, targetType, targetId, curren
   const resolved = comments.filter(c => c.resuelto)
 
   return (
-    <div className="relative" ref={panelRef}>
+    <>
       {/* Trigger button */}
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
@@ -288,115 +289,119 @@ export default function CommentThread({ proyectoId, targetType, targetId, curren
         )}
       </button>
 
-      {/* Comment panel */}
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1 z-[60] w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex items-center gap-2">
-              <MessageCircle size={14} className="text-blue-500" />
-              <span className="text-sm font-bold text-gray-800">Comentarios</span>
-              {unresolved.length > 0 && (
-                <span className="text-[10px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
-                  {unresolved.length}
-                </span>
-              )}
-            </div>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-0.5">
-              <X size={14} />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div ref={scrollRef} className="max-h-72 overflow-y-auto px-3 py-2 space-y-1">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 size={18} className="animate-spin text-gray-300" />
-              </div>
-            ) : unresolved.length === 0 && resolved.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-6">Sin comentarios aún. Sé el primero.</p>
-            ) : (
-              <>
-                {/* Unresolved comments */}
-                {unresolved.map(c => (
-                  <CommentBubble
-                    key={c.id}
-                    comment={c}
-                    currentUser={currentUser}
-                    canResolve={canResolve(c)}
-                    canDelete={canDelete(c)}
-                    replyingTo={replyingTo}
-                    replyText={replyText}
-                    sending={sending}
-                    onReplyClick={() => setReplyingTo(replyingTo === c.id ? null : c.id)}
-                    onReplyTextChange={setReplyText}
-                    onReplySubmit={() => handleReply(c.id)}
-                    onResolve={() => handleResolve(c.id)}
-                    onDelete={(id, pid) => handleDelete(id, pid)}
-                  />
-                ))}
-
-                {/* Resolved toggle */}
-                {resolved.length > 0 && (
-                  <button
-                    onClick={() => setShowResolved(!showResolved)}
-                    className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-600 w-full py-2 transition-colors"
-                  >
-                    <ChevronDown size={12} className={`transition-transform ${showResolved ? '' : '-rotate-90'}`} />
-                    Ver resueltos ({resolved.length})
-                  </button>
+      {/* Comment modal — rendered via portal at body level */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div
+            ref={panelRef}
+            className="w-full max-w-md mx-4 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={14} className="text-blue-500" />
+                <span className="text-sm font-bold text-gray-800">Comentarios</span>
+                {unresolved.length > 0 && (
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                    {unresolved.length}
+                  </span>
                 )}
-
-                {showResolved && resolved.map(c => (
-                  <CommentBubble
-                    key={c.id}
-                    comment={c}
-                    currentUser={currentUser}
-                    canResolve={canResolve(c)}
-                    canDelete={canDelete(c)}
-                    replyingTo={replyingTo}
-                    replyText={replyText}
-                    sending={sending}
-                    onReplyClick={() => setReplyingTo(replyingTo === c.id ? null : c.id)}
-                    onReplyTextChange={setReplyText}
-                    onReplySubmit={() => handleReply(c.id)}
-                    onResolve={() => handleResolve(c.id)}
-                    onDelete={(id, pid) => handleDelete(id, pid)}
-                    isResolved
-                  />
-                ))}
-              </>
-            )}
-          </div>
-
-          {/* New comment input */}
-          <div className="px-3 py-2.5 border-t border-gray-100 bg-gray-50/30">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={newText}
-                onChange={e => setNewText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() }
-                }}
-                placeholder="Escribe un comentario..."
-                rows={1}
-                className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 max-h-20 overflow-y-auto"
-              />
-              <button
-                onClick={handlePost}
-                disabled={sending || !newText.trim()}
-                className="flex items-center justify-center w-8 h-8 bg-principal text-acento rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
-              >
-                {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              </div>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-0.5">
+                <X size={14} />
               </button>
             </div>
+
+            {/* Body */}
+            <div ref={scrollRef} className="max-h-[60vh] overflow-y-auto px-4 py-3 space-y-1.5">
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 size={18} className="animate-spin text-gray-300" />
+                </div>
+              ) : unresolved.length === 0 && resolved.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">Sin comentarios aún. Sé el primero.</p>
+              ) : (
+                <>
+                  {/* Unresolved comments */}
+                  {unresolved.map(c => (
+                    <CommentBubble
+                      key={c.id}
+                      comment={c}
+                      currentUser={currentUser}
+                      canResolve={canResolve(c)}
+                      canDelete={canDelete(c)}
+                      replyingTo={replyingTo}
+                      replyText={replyText}
+                      sending={sending}
+                      onReplyClick={() => setReplyingTo(replyingTo === c.id ? null : c.id)}
+                      onReplyTextChange={setReplyText}
+                      onReplySubmit={() => handleReply(c.id)}
+                      onResolve={() => handleResolve(c.id)}
+                      onDelete={(id, pid) => handleDelete(id, pid)}
+                    />
+                  ))}
+
+                  {/* Resolved toggle */}
+                  {resolved.length > 0 && (
+                    <button
+                      onClick={() => setShowResolved(!showResolved)}
+                      className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-600 w-full py-2 transition-colors"
+                    >
+                      <ChevronDown size={12} className={`transition-transform ${showResolved ? '' : '-rotate-90'}`} />
+                      Ver resueltos ({resolved.length})
+                    </button>
+                  )}
+
+                  {showResolved && resolved.map(c => (
+                    <CommentBubble
+                      key={c.id}
+                      comment={c}
+                      currentUser={currentUser}
+                      canResolve={canResolve(c)}
+                      canDelete={canDelete(c)}
+                      replyingTo={replyingTo}
+                      replyText={replyText}
+                      sending={sending}
+                      onReplyClick={() => setReplyingTo(replyingTo === c.id ? null : c.id)}
+                      onReplyTextChange={setReplyText}
+                      onReplySubmit={() => handleReply(c.id)}
+                      onResolve={() => handleResolve(c.id)}
+                      onDelete={(id, pid) => handleDelete(id, pid)}
+                      isResolved
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* New comment input */}
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/30">
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={newText}
+                  onChange={e => setNewText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() }
+                  }}
+                  placeholder="Escribe un comentario..."
+                  rows={1}
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 max-h-20 overflow-y-auto"
+                />
+                <button
+                  onClick={handlePost}
+                  disabled={sending || !newText.trim()}
+                  className="flex items-center justify-center w-8 h-8 bg-principal text-acento rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
 
