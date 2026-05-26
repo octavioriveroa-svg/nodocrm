@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Edit2, X, Trash2, Save, Mail, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { Edit2, X, Trash2, Save, Mail, KeyRound, Eye, EyeOff, UserPlus } from 'lucide-react'
 import { adminUpdateEmail } from '@/app/actions/adminUpdateEmail'
 import { adminResetPassword } from '@/app/actions/adminResetPassword'
 import { adminDeleteUser } from '@/app/actions/adminDeleteUser'
+import NuevoUsuarioModal from '@/components/NuevoUsuarioModal'
 
 interface Usuario {
   id: string
@@ -42,6 +43,7 @@ export default function RolesPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Edit state
   const [editingUser, setEditingUser] = useState<string | null>(null)
@@ -209,9 +211,15 @@ export default function RolesPage() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre, empresa o correo…"
           className="border border-borde px-3 py-1.5 text-sm w-full max-w-sm rounded-xl bg-white/60" />
+        
+        <button onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-principal text-acento text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-sm shrink-0">
+          <UserPlus size={16} />
+          Nuevo Usuario
+        </button>
       </div>
 
       <div className="glass-card overflow-hidden">
@@ -353,6 +361,17 @@ export default function RolesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <NuevoUsuarioModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false)
+            loadUsers() // refresh list
+          }}
+        />
       )}
     </div>
   )
