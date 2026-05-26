@@ -77,6 +77,7 @@ export async function middleware(request: NextRequest) {
       case 'cliente_final': targetPath = 'cliente'; break;
       case 'financiero': targetPath = 'financiero'; break;
       case 'suministrador': targetPath = 'mem'; break;
+      case 'pendiente': targetPath = 'pendiente'; break;
     }
 
     if (targetPath && !path.startsWith(`/${targetPath}`)) {

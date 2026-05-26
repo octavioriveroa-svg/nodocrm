@@ -133,7 +133,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   }, [])
 
   async function cambiarEstado(estado: EstadoProyecto) {
-    const { data } = await supabase.from('proyectos').update({ estado }).eq('id', proyecto.id).select().single()
+    // Record state transition timestamp in historial_estados
+    const prevHistorial = (proyecto.historial_estados ?? {}) as Record<string, string>
+    const historial_estados = {
+      ...prevHistorial,
+      [estado]: new Date().toISOString(),
+    }
+    const { data } = await supabase.from('proyectos').update({ estado, historial_estados }).eq('id', proyecto.id).select().single()
     if (data) setProyecto(data as Proyecto)
   }
 
@@ -434,7 +440,25 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">Sin responsable asignado.</p>
+            <div>
+              {(isAdmin || isAnalista) ? (
+                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-amber-600 text-sm">⚠️</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800">Sin analista asignado</p>
+                    <p className="text-xs text-amber-600">Edita el proyecto para asignar un responsable de Nodo.</p>
+                  </div>
+                  <button onClick={() => { setEditando(true); setForm(proyecto) }}
+                    className="px-3 py-1.5 text-xs font-bold bg-principal text-acento rounded-lg hover:opacity-90 transition-all whitespace-nowrap">
+                    Asignar
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Sin responsable asignado.</p>
+              )}
+            </div>
           )}
         </Seccion>
       )}
@@ -559,7 +583,18 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       )}
 
       {/* Solución técnica */}
-      {productos.length > 0 && (() => {
+      {(() => {
+        if (productos.length === 0) {
+          // Show fallback only if the project has a tipo set (meaning products should exist)
+          if (proyecto.tipo && ['FV', 'BESS', 'FV+BESS'].includes(proyecto.tipo)) {
+            return (
+              <Seccion title="Solución técnica">
+                <p className="text-sm text-gray-400">Sin productos configurados para este proyecto.</p>
+              </Seccion>
+            )
+          }
+          return null
+        }
         const bySitio: Record<string, { nombre: string; items: ProyectoSitioProducto[] }> = {}
         for (const p of productos) {
           if (!bySitio[p.sitio_id]) bySitio[p.sitio_id] = { nombre: p.sitios?.nombre ?? 'Sitio', items: [] }
@@ -568,8 +603,52 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         const usoLabel: Record<string, string> = {
           load_shifting: 'Load Shifting', ups: 'UPS', load_shifting_ups: 'Load Shifting + UPS',
         }
+
+        // Calculate totals for summary
+        let totalKwp = 0, totalKwh = 0, totalFvCapex = 0, totalBessCapex = 0
+        for (const p of productos) {
+          const d = p.datos as Record<string, unknown>
+          if (p.tipo === 'fv') {
+            const nm = Number(d.num_modulos) || 0
+            const pw = Number(d.potencia_modulos_w) || 0
+            totalKwp += nm > 0 && pw > 0 ? (nm * pw) / 1000 : 0
+            totalFvCapex += Number(d.capex) || 0
+          } else if (p.tipo === 'bess') {
+            totalKwh += Number(d.capacidad_kwh) || 0
+            totalBessCapex += Number(d.capex) || 0
+          }
+        }
+
         return (
           <Seccion title="Solución técnica">
+            {/* Summary row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              {totalKwp > 0 && (
+                <div className="bg-[#fafff0] border border-[#e0f0c0] rounded-xl p-3 text-center">
+                  <div className="text-lg font-black text-[#4a5e1e]">{n2(totalKwp, 1)}</div>
+                  <div className="text-[10px] font-bold uppercase text-[#6a8e2e] tracking-wider">kWp total FV</div>
+                </div>
+              )}
+              {totalKwh > 0 && (
+                <div className="bg-[#f0f8ff] border border-[#c0e0f0] rounded-xl p-3 text-center">
+                  <div className="text-lg font-black text-[#1a5a8f]">{n2(totalKwh, 1)}</div>
+                  <div className="text-[10px] font-bold uppercase text-[#3a7abf] tracking-wider">kWh total BESS</div>
+                </div>
+              )}
+              {totalFvCapex > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+                  <div className="text-lg font-black">${totalFvCapex.toLocaleString('es-MX')}</div>
+                  <div className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">CAPEX FV</div>
+                </div>
+              )}
+              {totalBessCapex > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+                  <div className="text-lg font-black">${totalBessCapex.toLocaleString('es-MX')}</div>
+                  <div className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">CAPEX BESS</div>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col gap-6">
               {Object.entries(bySitio).map(([sitioId, { nombre, items }]) => (
                 <div key={sitioId}>
