@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -27,6 +27,21 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const router = useRouter()
   const supabase = createClient()
   const [isOpen, setIsOpen] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  // Fetch pending users count for admin/analyst
+  useEffect(() => {
+    if (rol !== 'nodo_admin' && rol !== 'nodo_analista') return
+    async function fetchPending() {
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('rol', 'pendiente')
+      setPendingCount(count ?? 0)
+    }
+    fetchPending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rol])
 
   // ─── Grouped navigation per role ─────────────────────
 
@@ -149,6 +164,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
                 const portalRoots = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem']
                 const isRoot = portalRoots.includes(href)
                 const active = pathname === href || (!isRoot && pathname.startsWith(href))
+                const showBadge = label === 'Usuarios' && pendingCount > 0
                 return (
                   <Link
                     key={href}
@@ -158,6 +174,11 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
                   >
                     <Icon size={16} />
                     {label}
+                    {showBadge && (
+                      <span className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-amber-500 text-white">
+                        {pendingCount}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

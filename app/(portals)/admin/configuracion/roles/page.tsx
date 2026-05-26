@@ -119,6 +119,13 @@ export default function RolesPage() {
     setConfirmDeleteId(null)
   }
 
+  // Pending approval state
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [approveRol, setApproveRol] = useState<string>('epc')
+  const [confirmRejectId, setConfirmRejectId] = useState<string | null>(null)
+
+  const pendientes = usuarios.filter(u => u.rol === 'pendiente')
+
   const filtrados = usuarios.filter(u =>
     !busqueda || [u.nombre, u.empresa, u.email].some(v => v?.toLowerCase().includes(busqueda.toLowerCase()))
   )
@@ -131,6 +138,78 @@ export default function RolesPage() {
         <h1 className="text-2xl font-black">Gestión de roles</h1>
         <p className="text-sm mt-1 text-muted">Asigna y modifica el nivel de acceso de cada cuenta</p>
       </div>
+
+      {/* ── Solicitudes pendientes ── */}
+      {pendientes.length > 0 && (
+        <div className="mb-8">
+          <div className="rounded-2xl border-2 border-amber-300 overflow-hidden">
+            <div className="px-5 py-3 flex items-center gap-2" style={{ backgroundColor: '#FFF3CD' }}>
+              <span className="text-lg">⏳</span>
+              <h2 className="font-bold text-sm" style={{ color: '#856404' }}>
+                Solicitudes pendientes ({pendientes.length})
+              </h2>
+            </div>
+            <div className="divide-y divide-amber-200 bg-amber-50/50">
+              {pendientes.map(u => {
+                const isApproving = approvingId === u.id
+                const isConfirmingReject = confirmRejectId === u.id
+                return (
+                  <div key={u.id} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{u.nombre || '—'}</p>
+                      <p className="text-xs text-muted truncate">{u.empresa || '—'} · {u.email}</p>
+                      <p className="text-[11px] text-muted mt-0.5">Registrado: {formatDate(u.created_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isApproving ? (
+                        <>
+                          <select value={approveRol} onChange={e => setApproveRol(e.target.value)}
+                            className="border border-borde text-xs px-2 py-1.5 rounded-lg bg-white">
+                            {ROLES_ASIGNABLES.map(r => <option key={r} value={r}>{ROL_LABELS[r]}</option>)}
+                          </select>
+                          <button onClick={() => { cambiarRol(u.id, approveRol); setApprovingId(null) }}
+                            disabled={updatingId === u.id}
+                            className="px-3 py-1.5 text-xs font-bold bg-acento text-principal rounded-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                            Confirmar
+                          </button>
+                          <button onClick={() => setApprovingId(null)}
+                            className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700">
+                            Cancelar
+                          </button>
+                        </>
+                      ) : isConfirmingReject ? (
+                        <>
+                          <span className="text-xs text-red-600 font-medium">¿Eliminar?</span>
+                          <button onClick={() => { handleDelete(u.id); setConfirmRejectId(null) }}
+                            disabled={deletingId === u.id}
+                            className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                            {deletingId === u.id ? '…' : 'Sí, eliminar'}
+                          </button>
+                          <button onClick={() => setConfirmRejectId(null)}
+                            className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700">
+                            Cancelar
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setApprovingId(u.id); setApproveRol('epc') }}
+                            className="px-3 py-1.5 text-xs font-bold bg-acento text-principal rounded-lg hover:scale-105 active:scale-95 transition-all">
+                            Aprobar
+                          </button>
+                          <button onClick={() => setConfirmRejectId(u.id)}
+                            className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                            Rechazar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre, empresa o correo…"
