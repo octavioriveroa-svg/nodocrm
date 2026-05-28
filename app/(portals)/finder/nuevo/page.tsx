@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, X, Eye, Pencil, Trash2, Upload, FileText, Zap, Battery, Wrench, HelpCircle, UserPlus } from 'lucide-react'
 import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio, Profile } from '@/lib/types'
 import NuevoUsuarioModal from '@/components/NuevoUsuarioModal'
+import { parseNum, formatNumberInput, fmtNum, fmtCurrency } from '@/lib/format'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -83,11 +84,11 @@ const initialForm: FormData = {
 
 // ── Helpers de cálculo ────────────────────────────────────────
 function calcFV(fv: FVForm) {
-  const n = Number(fv.num_modulos) || 0
-  const pw = Number(fv.potencia_modulos_w) || 0
-  const ni = Number(fv.num_inversores) || 0
-  const pi = Number(fv.potencia_inversores_kw) || 0
-  const capex = Number(fv.capex) || 0
+  const n = parseNum(fv.num_modulos)
+  const pw = parseNum(fv.potencia_modulos_w)
+  const ni = parseNum(fv.num_inversores)
+  const pi = parseNum(fv.potencia_inversores_kw)
+  const capex = parseNum(fv.capex)
   return {
     kwpSistema: n > 0 && pw > 0 ? n * pw / 1000 : null,
     kwpInversores: ni > 0 && pi > 0 ? ni * pi : null,
@@ -96,14 +97,14 @@ function calcFV(fv: FVForm) {
 }
 
 function calcBESS(bess: BESSForm) {
-  const cap = Number(bess.capacidad_kwh) || 0
-  const capex = Number(bess.capex) || 0
+  const cap = parseNum(bess.capacidad_kwh)
+  const capex = parseNum(bess.capex)
   return { precioKwh: capex > 0 && cap > 0 ? capex / cap : null }
 }
 
 function n2(v: number | null, dec = 2) {
   if (v === null) return '—'
-  return v.toLocaleString('es-MX', { maximumFractionDigits: dec })
+  return fmtNum(v, dec)
 }
 
 // ── StepIndicator ─────────────────────────────────────────────
@@ -132,7 +133,7 @@ function StepIndicator({ current }: { current: number }) {
 }
 
 // ── Tarjeta de producto (display) ────────────────────────────
-function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
+function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: string }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
     return (
@@ -151,8 +152,8 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
           <span><span className="text-muted">kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
           <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
           <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
-          <span><span className="text-muted">Generación: </span>{Number(p.fv.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año</span>
-          <span><span className="text-muted">CAPEX: </span>${Number(p.fv.capex).toLocaleString('es-MX')}</span>
+          <span><span className="text-muted">Generación: </span>{fmtNum(parseNum(p.fv.generacion_anual_kwh))} kWh/año</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda as any)}</span>
           <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
         </div>
       </div>
@@ -181,7 +182,7 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
           <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
           <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
           <span><span className="text-muted">Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
-          <span><span className="text-muted">CAPEX: </span>${Number(p.bess.capex).toLocaleString('es-MX')}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda as any)}</span>
           <span><span className="text-muted">Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
         </div>
       </div>
@@ -584,7 +585,7 @@ export default function FinderNuevoProyectoPage() {
 
     const firstConfigProducts = Object.values(configs[0].productosMap).flat()
     const firstConfigCapex = firstConfigProducts.reduce((sum, p) => {
-      const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
+      const pCapex = p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)
       return sum + pCapex
     }, 0)
 
@@ -594,6 +595,7 @@ export default function FinderNuevoProyectoPage() {
       cliente_id: form.cliente_id,
       tipo,
       nombre_proyecto: form.nombre_proyecto,
+      make_stage_history: true,
       estado: 'recibido',
       tipo_instalacion: form.tipo_instalacion,
       incluye_mem: form.incluye_mem,
@@ -622,7 +624,7 @@ export default function FinderNuevoProyectoPage() {
     const configsToInsert = configs.map((c, idx) => {
       const activeConfigProducts = Object.values(c.productosMap).flat()
       const inversion_total = activeConfigProducts.reduce((sum, p) => {
-        const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
+        const pCapex = p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)
         return sum + pCapex
       }, 0)
 
@@ -1086,7 +1088,7 @@ export default function FinderNuevoProyectoPage() {
                           {productos.length > 0 && (
                             <div className="flex flex-col gap-2 mb-3">
                               {productos.map(p => (
-                                <ProductoCard key={p.tempId} p={p}
+                                <ProductoCard key={p.tempId} p={p} moneda={form.moneda}
                                   onRemove={() => removeProduct(s.id, p.tempId)} />
                               ))}
                             </div>
@@ -1130,14 +1132,14 @@ export default function FinderNuevoProyectoPage() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">No. Módulos *</label>
-                                        <input type="number" min="0" value={fvForm.num_modulos}
-                                          onChange={e => setFvForm(f => ({ ...f, num_modulos: e.target.value }))}
+                                        <input type="text" value={fvForm.num_modulos}
+                                          onChange={e => setFvForm(f => ({ ...f, num_modulos: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Potencia (W) *</label>
-                                        <input type="number" min="0" value={fvForm.potencia_modulos_w}
-                                          onChange={e => setFvForm(f => ({ ...f, potencia_modulos_w: e.target.value }))}
+                                        <input type="text" value={fvForm.potencia_modulos_w}
+                                          onChange={e => setFvForm(f => ({ ...f, potencia_modulos_w: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
@@ -1155,14 +1157,14 @@ export default function FinderNuevoProyectoPage() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">No. Inversores *</label>
-                                        <input type="number" min="0" value={fvForm.num_inversores}
-                                          onChange={e => setFvForm(f => ({ ...f, num_inversores: e.target.value }))}
+                                        <input type="text" value={fvForm.num_inversores}
+                                          onChange={e => setFvForm(f => ({ ...f, num_inversores: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
-                                        <input type="number" min="0" value={fvForm.potencia_inversores_kw}
-                                          onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: e.target.value }))}
+                                        <input type="text" value={fvForm.potencia_inversores_kw}
+                                          onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
@@ -1180,14 +1182,14 @@ export default function FinderNuevoProyectoPage() {
                                     <div className="grid grid-cols-2 gap-3">
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Generación anual (kWh) *</label>
-                                        <input type="number" min="0" value={fvForm.generacion_anual_kwh}
-                                          onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: e.target.value }))}
+                                        <input type="text" value={fvForm.generacion_anual_kwh}
+                                          onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
-                                        <input type="number" min="0" value={fvForm.capex}
-                                          onChange={e => setFvForm(f => ({ ...f, capex: e.target.value }))}
+                                        <input type="text" value={fvForm.capex}
+                                          onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                     </div>
@@ -1205,14 +1207,14 @@ export default function FinderNuevoProyectoPage() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
-                                        <input type="number" min="0" value={bessForm.potencia_kw}
-                                          onChange={e => setBessForm(f => ({ ...f, potencia_kw: e.target.value }))}
+                                        <input type="text" value={bessForm.potencia_kw}
+                                          onChange={e => setBessForm(f => ({ ...f, potencia_kw: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
                                         <label className="block text-xs font-medium mb-1">Capacidad (kWh) *</label>
-                                        <input type="number" min="0" value={bessForm.capacidad_kwh}
-                                          onChange={e => setBessForm(f => ({ ...f, capacidad_kwh: e.target.value }))}
+                                        <input type="text" value={bessForm.capacidad_kwh}
+                                          onChange={e => setBessForm(f => ({ ...f, capacidad_kwh: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
@@ -1234,8 +1236,8 @@ export default function FinderNuevoProyectoPage() {
                                     </div>
                                     <div>
                                       <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
-                                      <input type="number" min="0" value={bessForm.capex}
-                                        onChange={e => setBessForm(f => ({ ...f, capex: e.target.value }))}
+                                      <input type="text" value={bessForm.capex}
+                                        onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
                                         className={inp} style={borde} placeholder="0" />
                                     </div>
                                     <CalcField label="Precio por kWh" value={bessCalc.precioKwh} unit="$/kWh" />
