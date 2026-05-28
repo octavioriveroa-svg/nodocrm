@@ -7,7 +7,7 @@ import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda } from '@/lib/types'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda, TipoProyecto, TecnologiaBateria } from '@/lib/types'
 import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -16,6 +16,7 @@ import GanttChart from './gantt/GanttChart'
 import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
 import DocumentCenter from './DocumentCenter'
+import EditarSolucionTecnicaModal from './EditarSolucionTecnicaModal'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -120,6 +121,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [configsList, setConfigsList] = useState<ConfiguracionTecnica[]>([])
+  const [showEditTecnica, setShowEditTecnica] = useState(false)
   const [seleccionandoConfig, setSeleccionandoConfig] = useState(false)
   const [errorEstado, setErrorEstado] = useState<string | null>(null)
 
@@ -255,8 +257,10 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     setEnviandoComentario(false)
   }
 
-  async function handleGuardar() {
+  async function handleGuardar(exitsEditMode: boolean | any = true) {
     setGuardando(true)
+
+    const shouldExit = exitsEditMode === true || (exitsEditMode && typeof exitsEditMode === 'object')
 
     const updatePayload: Record<string, any> = {
       nombre_proyecto: form.nombre_proyecto,
@@ -278,13 +282,29 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     }
 
     if (isAdmin || isAnalista || isEpcista) {
+      updatePayload.tipo = form.tipo
+      updatePayload.demanda_kw = form.demanda_kw ?? null
+      updatePayload.capacidad_mwh = form.capacidad_mwh ?? null
+      updatePayload.capacidad_mw = form.capacidad_mw ?? null
+      updatePayload.tecnologia_bateria = form.tecnologia_bateria || null
+      updatePayload.duracion_descarga_hrs = form.duracion_descarga_hrs ?? null
+      updatePayload.punto_interconexion = form.punto_interconexion || null
+      updatePayload.tipo_participacion_mem = form.tipo_participacion_mem || null
+      updatePayload.volumen_energia_mwh_anual = form.volumen_energia_mwh_anual ?? null
+
       updatePayload.tipo_instalacion = form.tipo_instalacion || null
       updatePayload.incluye_mem = !!form.incluye_mem
       updatePayload.modalidad_financiamiento = form.modalidad_financiamiento || []
       updatePayload.moneda = form.moneda || 'MXN'
     }
 
-    const { data } = await supabase.from('proyectos').update(updatePayload).eq('id', proyecto.id).select().single()
+    const { data, error } = await supabase.from('proyectos').update(updatePayload).eq('id', proyecto.id).select().single()
+    if (error) {
+      alert('Error al guardar cambios: ' + error.message)
+      setGuardando(false)
+      return false
+    }
+
     if (data) {
       setProyecto(data as Proyecto)
       setForm(data as Proyecto)
@@ -296,8 +316,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         setResponsableProfile(null)
       }
     }
-    setEditando(false)
+    if (shouldExit) {
+      setEditando(false)
+    }
     setGuardando(false)
+    return true
   }
 
   async function handleEliminarProyecto() {
@@ -375,7 +398,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             <div className="flex gap-2">
               {!editando && (
                 <>
-                  <button onClick={() => setEditando(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
+                  <button onClick={() => { setEditando(true); setForm(proyecto) }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
                     <Pencil size={13} /> Editar
                   </button>
                   {(isAdmin || isEpcista) && (
@@ -639,6 +662,158 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                 </div>
               </div>
             )}
+
+            {/* Group 4 — Solución técnica */}
+            {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
+              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 4: Solución técnica</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Tipo de proyecto *</label>
+                    <select
+                      value={form.tipo || ''}
+                      onChange={e => setForm(f => ({...f, tipo: e.target.value as TipoProyecto}))}
+                      className="w-full border rounded p-2 text-sm bg-white font-semibold"
+                    >
+                      <option value="FV">Fotovoltaico (FV)</option>
+                      <option value="BESS">Baterías (BESS)</option>
+                      <option value="FV+BESS">FV + BESS</option>
+                      <option value="MEM">MEM</option>
+                      <option value="BESS+MEM">BESS + MEM</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
+                    <input
+                      type="number"
+                      value={form.demanda_kw ?? ''}
+                      onChange={e => setForm(f => ({...f, demanda_kw: e.target.value ? Number(e.target.value) : null}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                      placeholder="Ej: 500"
+                    />
+                  </div>
+
+                  {/* BESS fields */}
+                  {(form.tipo === 'BESS' || form.tipo === 'FV+BESS' || form.tipo === 'BESS+MEM') && (
+                    <div className="col-span-2 border-t border-gray-200/60 pt-4 mt-2 grid grid-cols-2 gap-4">
+                      <p className="col-span-2 text-xs font-bold uppercase tracking-wide text-gray-400">Datos BESS</p>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Capacidad (MWh)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={form.capacidad_mwh ?? ''}
+                          onChange={e => setForm(f => ({...f, capacidad_mwh: e.target.value ? Number(e.target.value) : null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: 1.2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Potencia (MW)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={form.capacidad_mw ?? ''}
+                          onChange={e => setForm(f => ({...f, capacidad_mw: e.target.value ? Number(e.target.value) : null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: 0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Tecnología de batería</label>
+                        <select
+                          value={form.tecnologia_bateria || ''}
+                          onChange={e => setForm(f => ({...f, tecnologia_bateria: e.target.value as TecnologiaBateria || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                        >
+                          <option value="">Selecciona</option>
+                          <option value="Li-ion">Li-ion</option>
+                          <option value="LFP">LFP</option>
+                          <option value="NMC">NMC</option>
+                          <option value="Otra">Otra</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Duración descarga (hrs)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={form.duracion_descarga_hrs ?? ''}
+                          onChange={e => setForm(f => ({...f, duracion_descarga_hrs: e.target.value ? Number(e.target.value) : null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: 4"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium mb-1">Punto de interconexión</label>
+                        <input
+                          type="text"
+                          value={form.punto_interconexion || ''}
+                          onChange={e => setForm(f => ({...f, punto_interconexion: e.target.value || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: Subestación A, 13.8 kV"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MEM fields */}
+                  {(form.tipo === 'MEM' || form.tipo === 'BESS+MEM') && (
+                    <div className="col-span-2 border-t border-gray-200/60 pt-4 mt-2 grid grid-cols-2 gap-4">
+                      <p className="col-span-2 text-xs font-bold uppercase tracking-wide text-gray-400">Datos MEM</p>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Tipo de participación MEM</label>
+                        <input
+                          type="text"
+                          value={form.tipo_participacion_mem || ''}
+                          onChange={e => setForm(f => ({...f, tipo_participacion_mem: e.target.value || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: Usuario Calificado Co-representado"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Volumen de energía anual (MWh)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={form.volumen_energia_mwh_anual ?? ''}
+                          onChange={e => setForm(f => ({...f, volumen_energia_mwh_anual: e.target.value ? Number(e.target.value) : null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          placeholder="Ej: 1500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alternative configurations link */}
+                  {['FV', 'BESS', 'FV+BESS'].includes(form.tipo || '') && (
+                    <div className="col-span-2 border-t border-gray-200/60 pt-4 mt-2">
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Configuraciones y productos</p>
+                      <div className="bg-white border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-principal">Alternativas técnicas de la solución</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">Puedes configurar múltiples alternativas técnicas, sitios y productos (FV/BESS) asociados al proyecto.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            // First, save the current form edits to avoid losing them
+                            const saved = await handleGuardar(false)
+                            if (saved) {
+                              setShowEditTecnica(true)
+                            }
+                          }}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold bg-principal text-acento rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
+                        >
+                          <Pencil size={12} /> Configurar Alternativas y Productos
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
             <Button variant="outline" size="sm" onClick={() => { setEditando(false); setForm(proyecto) }}>Cancelar</Button>
@@ -832,10 +1007,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
       {/* Solución técnica */}
       {(() => {
+        const canEditTecnica = (isAdmin || isAnalista) || (isEpcista && proyecto.epcista_id === currentUser.id)
+
         if (productos.length === 0) {
-          if (proyecto.tipo && ['FV', 'BESS', 'FV+BESS'].includes(proyecto.tipo)) {
+          if (proyecto.tipo && ['FV', 'BESS', 'FV+BESS'].includes(proyecto.tipo) || canEditTecnica) {
             return (
               <Seccion title="Solución técnica">
+                {canEditTecnica && (
+                  <div className="flex justify-end mb-4">
+                    <Button size="sm" variant="outline" onClick={() => setShowEditTecnica(true)} className="flex items-center gap-1">
+                      <Pencil size={11} /> Editar Solución Técnica
+                    </Button>
+                  </div>
+                )}
                 <p className="text-sm text-gray-400">Sin productos configurados para este proyecto.</p>
               </Seccion>
             )
@@ -890,6 +1074,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
         return (
           <Seccion title="Solución técnica">
+            {canEditTecnica && (
+              <div className="flex justify-end mb-4">
+                <Button size="sm" variant="outline" onClick={() => setShowEditTecnica(true)} className="flex items-center gap-1">
+                  <Pencil size={11} /> Editar Solución Técnica
+                </Button>
+              </div>
+            )}
             {/* Warning if no config selected and state is negociacion or beyond */}
             {!configsList.some(c => c.seleccionada) && ['negociacion', 'aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
               <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5 text-amber-800 text-xs font-semibold">
@@ -1223,6 +1414,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           }}
         />
       )}
+
+      <EditarSolucionTecnicaModal
+        isOpen={showEditTecnica}
+        onClose={() => setShowEditTecnica(false)}
+        proyecto={proyecto}
+        configuraciones={configsList}
+        productos={productos}
+        sitios={sitios}
+        onSave={() => {
+          setShowEditTecnica(false)
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
