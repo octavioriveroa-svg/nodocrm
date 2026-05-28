@@ -56,7 +56,8 @@ export async function middleware(request: NextRequest) {
   // Protected portals list
   const isProtectedPath = path.startsWith('/admin') || path.startsWith('/epc') || 
                           path.startsWith('/analista') || path.startsWith('/cliente') || 
-                          path.startsWith('/financiero') || path.startsWith('/mem')
+                          path.startsWith('/financiero') || path.startsWith('/mem') ||
+                          path.startsWith('/finder')
 
   // Si no hay sesión y tratan de entrar a un portal privado, redirigir a login
   if (isProtectedPath && !session) {
@@ -77,6 +78,7 @@ export async function middleware(request: NextRequest) {
       case 'cliente_final': targetPath = 'cliente'; break;
       case 'financiero': targetPath = 'financiero'; break;
       case 'suministrador': targetPath = 'mem'; break;
+      case 'finder': targetPath = 'finder'; break;
       case 'pendiente': targetPath = 'pendiente'; break;
     }
 

@@ -98,12 +98,23 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     ]},
   ]
 
+  const navFinder: NavSection[] = [
+    { label: 'Visión general', items: [
+      { href: '/finder', label: 'Dashboard', icon: LayoutDashboard },
+    ]},
+    { label: 'Operaciones', items: [
+      { href: '/finder/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/finder/clientes', label: 'Clientes', icon: Building2 },
+    ]},
+  ]
+
   let sections: NavSection[] = []
   if (rol === 'nodo_admin') sections = navAdmin
   else if (rol === 'nodo_analista') sections = navAnalista
   else if (rol === 'cliente_final') sections = navCliente
   else if (rol === 'financiero') sections = navFinanciero
   else if (rol === 'suministrador') sections = navMem
+  else if (rol === 'finder') sections = navFinder
   else sections = navEpc
 
   async function handleLogout() {
@@ -161,7 +172,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
               )}
               {/* Section items */}
               {section.items.map(({ href, label, icon: Icon }) => {
-                const portalRoots = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem']
+                const portalRoots = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem', '/finder']
                 const isRoot = portalRoots.includes(href)
                 const active = pathname === href || (!isRoot && pathname.startsWith(href))
                 const showBadge = label === 'Usuarios' && pendingCount > 0

@@ -23,6 +23,7 @@ export default function PendientePage() {
         const rolPaths: Record<string, string> = {
           nodo_admin: '/admin', nodo_analista: '/analista', epc: '/epc',
           cliente_final: '/cliente', financiero: '/financiero', suministrador: '/mem',
+          finder: '/finder',
         }
         const dest = rolPaths[p.rol] || '/epc'
         window.location.href = dest

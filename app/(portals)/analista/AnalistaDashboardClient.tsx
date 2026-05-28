@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import BadgeTipo from '@/components/BadgeTipo'
 import type { EstadoProyecto, TipoProyecto } from '@/lib/types'
+import { fmtCurrency } from '@/lib/format'
 
 const ESTADO_LABELS: Record<string, string> = {
   recibido: 'Recibido',
@@ -268,7 +269,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-500">Precio ofertado:</span>
-                        <span className="font-bold text-green-600">${oferta.precio_kwh.toFixed(2)} MXN/kWh</span>
+                        <span className="font-bold text-green-600">{fmtCurrency(oferta.precio_kwh, 'MXN')}/kWh</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Vigencia:</span>

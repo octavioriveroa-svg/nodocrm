@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import BatteryStatus from '@/components/telemetry/BatteryStatus'
+import { fmtNum, fmtCurrency } from '@/lib/format'
 import GanttChart from '@/components/gantt/GanttChart'
 import type { HitoConstruccion } from '@/lib/types'
 import { MapPin, Zap, CalendarDays } from 'lucide-react'
@@ -183,7 +184,7 @@ export default function ClienteDashboard() {
                 <div className="glass-card p-6 shadow-sm flex flex-col justify-between">
                   <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Generación (24h)</h2>
                   <p className="text-4xl font-black text-principal">
-                    {metrics.totalGenerated.toLocaleString('es-MX', { maximumFractionDigits: 1 })} <span className="text-lg font-medium text-gray-400">kWh</span>
+                    {fmtNum(metrics.totalGenerated, 1)} <span className="text-lg font-medium text-gray-400">kWh</span>
                   </p>
                 </div>
                 <div className="glass-card p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
@@ -192,7 +193,7 @@ export default function ClienteDashboard() {
                   </div>
                   <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Ahorro Estimado (24h)</h2>
                   <p className="text-4xl font-black text-green-500">
-                    ${metrics.savingsMxn.toLocaleString('es-MX', { minimumFractionDigits: 2 })} <span className="text-lg font-medium text-gray-400">MXN</span>
+                    {fmtCurrency(metrics.savingsMxn, 'MXN')} <span className="text-lg font-medium text-gray-400">MXN</span>
                   </p>
                 </div>
               </div>

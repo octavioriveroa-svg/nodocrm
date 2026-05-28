@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import DetalleProyecto from '@/components/DetalleProyecto'
-import type { Proyecto, Comentario, Archivo, Profile, Sitio, ProyectoSitioProducto } from '@/lib/types'
+import type { Proyecto, Comentario, Archivo, Profile, Sitio, ProyectoSitioProducto, ConfiguracionTecnica } from '@/lib/types'
 
 export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = createClient()
@@ -14,6 +14,7 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
     currentUser: Profile
     sitios: Sitio[]
     productos: ProyectoSitioProducto[]
+    configuraciones: ConfiguracionTecnica[]
     hitos: import('@/lib/types').HitoConstruccion[]
   } | null>(null)
   const [notFound, setNotFound] = useState(false)
@@ -33,6 +34,7 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
           { data: profile },
           { data: ps },
           { data: prods },
+          { data: configs },
           { data: hitos },
         ] = await Promise.all([
           supabase.from('proyectos').select('*').eq('id', id).single(),
@@ -41,6 +43,7 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
           supabase.from('profiles').select('*').eq('id', session.user.id).single(),
           supabase.from('proyecto_sitios').select('*, sitios(*)').eq('proyecto_id', id),
           supabase.from('proyecto_sitio_productos').select('*, sitios(nombre)').eq('proyecto_id', id),
+          supabase.from('configuraciones_tecnicas').select('*').eq('proyecto_id', id).order('created_at', { ascending: true }),
           supabase.from('hitos_construccion').select('*').eq('proyecto_id', id).order('orden', { ascending: true }),
         ])
 
@@ -56,6 +59,7 @@ export default function DetalleAnalistaPage({ params }: { params: Promise<{ id: 
           currentUser: profile as Profile,
           sitios,
           productos: (prods ?? []) as ProyectoSitioProducto[],
+          configuraciones: (configs ?? []) as ConfiguracionTecnica[],
           hitos: (hitos ?? []) as import('@/lib/types').HitoConstruccion[],
         })
       } catch (err) {

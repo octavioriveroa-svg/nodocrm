@@ -15,11 +15,7 @@ interface PortafolioStats {
   fv_capex: number
 }
 
-function fmt(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} M`
-  if (n >= 1_000) return `${(n / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} k`
-  return n.toLocaleString('es-MX', { maximumFractionDigits: 1 })
-}
+import { fmtCompact } from '@/lib/format'
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('es-MX', {
@@ -88,15 +84,15 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <div className="text-2xl font-black">{fmt(portafolio.bess_kw)}</div>
+                    <div className="text-2xl font-black">{fmtCompact(portafolio.bess_kw)}</div>
                     <div className="text-xs mt-0.5 text-gray-400">kW Potencia</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-black">{fmt(portafolio.bess_kwh)}</div>
+                    <div className="text-2xl font-black">{fmtCompact(portafolio.bess_kwh)}</div>
                     <div className="text-xs mt-0.5 text-gray-400">kWh Capacidad</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-black">${fmt(portafolio.bess_capex)}</div>
+                    <div className="text-2xl font-black">${fmtCompact(portafolio.bess_capex)}</div>
                     <div className="text-xs mt-0.5 text-gray-400">CAPEX total</div>
                   </div>
                 </div>
@@ -112,11 +108,11 @@ export default function EpcistaDashboardClient({ initialProyectos, initialPortaf
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-2xl font-black">{fmt(portafolio.fv_kwp)}</div>
+                    <div className="text-2xl font-black">{fmtCompact(portafolio.fv_kwp)}</div>
                     <div className="text-xs mt-0.5 text-gray-400">kWp instalados</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-black">${fmt(portafolio.fv_capex)}</div>
+                    <div className="text-2xl font-black">${fmtCompact(portafolio.fv_capex)}</div>
                     <div className="text-xs mt-0.5 text-gray-400">CAPEX total</div>
                   </div>
                 </div>

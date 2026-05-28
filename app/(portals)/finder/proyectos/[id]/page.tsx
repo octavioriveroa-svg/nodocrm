@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import DetalleProyecto from '@/components/DetalleProyecto'
 import type { Proyecto, Comentario, Archivo, Profile, Sitio, ProyectoSitioProducto, ConfiguracionTecnica } from '@/lib/types'
 
-export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: string }> }) {
+export default function DetalleFinderPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = createClient()
   const [data, setData] = useState<{
     proyecto: Proyecto

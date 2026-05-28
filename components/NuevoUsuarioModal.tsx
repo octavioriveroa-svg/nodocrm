@@ -11,23 +11,26 @@ const ROL_LABELS: Record<string, string> = {
   cliente_final: 'Cliente Final',
   financiero: 'Financiero',
   suministrador: 'Suministrador',
+  finder: 'Finder Comercial',
 }
 
-const ROLES_ASIGNABLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador']
+const ROLES_ASIGNABLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
 
 interface Props {
   onClose: () => void
   onSuccess: () => void
+  allowedRoles?: string[]
+  defaultRol?: string
 }
 
-export default function NuevoUsuarioModal({ onClose, onSuccess }: Props) {
+export default function NuevoUsuarioModal({ onClose, onSuccess, allowedRoles, defaultRol }: Props) {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   
   const [nombre, setNombre] = useState('')
   const [empresa, setEmpresa] = useState('')
   const [email, setEmail] = useState('')
-  const [rol, setRol] = useState('cliente_final')
+  const [rol, setRol] = useState(defaultRol || 'cliente_final')
   const [password, setPassword] = useState('')
   const [sendInvite, setSendInvite] = useState(true)
 
@@ -121,7 +124,7 @@ export default function NuevoUsuarioModal({ onClose, onSuccess }: Props) {
                   <ShieldCheck size={12} className="inline mr-1 -mt-0.5" /> Rol de la cuenta
                 </label>
                 <select value={rol} onChange={e => setRol(e.target.value)} className={inp}>
-                  {ROLES_ASIGNABLES.map(r => <option key={r} value={r}>{ROL_LABELS[r]}</option>)}
+                  {(allowedRoles || ROLES_ASIGNABLES).map(r => <option key={r} value={r}>{ROL_LABELS[r] ?? r}</option>)}
                 </select>
               </div>
             </div>

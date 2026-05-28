@@ -1,6 +1,7 @@
 'use client'
 
 import { Battery, BatteryCharging, Zap } from 'lucide-react'
+import { fmtNum } from '@/lib/format'
 
 interface BatteryStatusProps {
   chargePct: number
@@ -64,7 +65,7 @@ export default function BatteryStatus({ chargePct, isCharging }: BatteryStatusPr
           </svg>
           <div className="absolute flex flex-col items-center justify-center">
             <span className="text-3xl font-black text-principal tracking-tighter">
-              {chargePct.toFixed(0)}<span className="text-xl">%</span>
+              {fmtNum(chargePct, 0)}<span className="text-xl">%</span>
             </span>
           </div>
         </div>

@@ -41,9 +41,10 @@ interface Props {
   canCreateWithPassword: boolean
   /** If true, user can manage all roles. If false, only cliente_final & financiero */
   canManageAllRoles: boolean
+  readOnly?: boolean
 }
 
-export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers, onUsersChanged, canCreateWithPassword, canManageAllRoles }: Props) {
+export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers, onUsersChanged, canCreateWithPassword, canManageAllRoles, readOnly = false }: Props) {
   const [showModal, setShowModal] = useState(false)
   const [mode, setMode] = useState<'invite' | 'create'>('invite')
   const [newNombre, setNewNombre] = useState('')
@@ -151,30 +152,36 @@ export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers,
             {linkedUsers.length}
           </span>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => openModal('invite')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-borde hover:bg-gray-50 transition-colors"
-          >
-            <Mail size={13} /> Invitar
-          </button>
-          {canCreateWithPassword && (
+        {!readOnly && (
+          <div className="flex gap-2">
             <button
-              onClick={() => openModal('create')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-acento text-principal transition-colors hover:opacity-90"
+              onClick={() => openModal('invite')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-borde hover:bg-gray-50 transition-colors"
             >
-              <UserPlus size={13} /> Crear usuario
+              <Mail size={13} /> Invitar
             </button>
-          )}
-        </div>
+            {canCreateWithPassword && (
+              <button
+                onClick={() => openModal('create')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-acento text-principal transition-colors hover:opacity-90"
+              >
+                <UserPlus size={13} /> Crear usuario
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Linked users list */}
       {linkedUsers.length === 0 ? (
         <div className="p-8 text-center text-gray-400 text-sm">
           No hay usuarios vinculados a este cliente.
-          <br />
-          <span className="text-xs">Invita o crea usuarios para darles acceso a la plataforma.</span>
+          {!readOnly && (
+            <>
+              <br />
+              <span className="text-xs">Invita o crea usuarios para darles acceso a la plataforma.</span>
+            </>
+          )}
         </div>
       ) : (
         <div>
@@ -199,29 +206,31 @@ export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers,
                 >
                   {ROL_LABELS[u.rol] ?? u.rol}
                 </span>
-                {confirmUnlink === u.id ? (
-                  <div className="flex items-center gap-1">
+                {!readOnly && (
+                  confirmUnlink === u.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleUnlink(u.id)}
+                        className="text-[10px] font-bold text-red-600 hover:text-red-800 px-2 py-1 border border-red-200 rounded-md"
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        onClick={() => setConfirmUnlink(null)}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleUnlink(u.id)}
-                      className="text-[10px] font-bold text-red-600 hover:text-red-800 px-2 py-1 border border-red-200 rounded-md"
+                      onClick={() => setConfirmUnlink(u.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      title="Desvincular usuario"
                     >
-                      Confirmar
+                      <Unlink size={14} />
                     </button>
-                    <button
-                      onClick={() => setConfirmUnlink(null)}
-                      className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmUnlink(u.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                    title="Desvincular usuario"
-                  >
-                    <Unlink size={14} />
-                  </button>
+                  )
                 )}
               </div>
             </div>

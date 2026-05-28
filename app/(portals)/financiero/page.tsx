@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { TrendingUp, Activity, DollarSign, Briefcase, ChevronRight } from 'lucide-react'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import Link from 'next/link'
+import { fmtNum, fmtCurrency, fmtUnit } from '@/lib/format'
 
 interface PortfolioMetrics {
   activeProjectsCount: number
@@ -160,7 +161,7 @@ export default function FinancieroDashboard() {
               </div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-1">Generación Global (24h)</h2>
               <p className="text-3xl font-black text-principal">
-                {metrics?.totalGeneratedKwh.toLocaleString('es-MX', { maximumFractionDigits: 1 })} <span className="text-sm font-medium text-gray-400">kWh</span>
+                {fmtNum(metrics?.totalGeneratedKwh, 1)} <span className="text-sm font-medium text-gray-400">kWh</span>
               </p>
             </div>
 
@@ -170,7 +171,7 @@ export default function FinancieroDashboard() {
               </div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-1">Retorno Estimado (24h)</h2>
               <p className="text-3xl font-black text-green-600">
-                ${metrics?.estimatedSavingsMxn.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm font-medium text-gray-400">MXN</span>
+                {fmtCurrency(metrics?.estimatedSavingsMxn, 'MXN')} <span className="text-sm font-medium text-gray-400">MXN</span>
               </p>
             </div>
 
@@ -180,7 +181,7 @@ export default function FinancieroDashboard() {
               </div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-1">Ciclos de Batería (Est.)</h2>
               <p className="text-3xl font-black text-principal">
-                {metrics?.batteryCycles.toLocaleString('es-MX')} <span className="text-sm font-medium text-gray-400">ciclos</span>
+                {fmtNum(metrics?.batteryCycles)} <span className="text-sm font-medium text-gray-400">ciclos</span>
               </p>
             </div>
           </div>
@@ -218,13 +219,13 @@ export default function FinancieroDashboard() {
                       <td className="py-4 px-4 font-bold text-principal">{p.nombre_proyecto}</td>
                       <td className="py-4 px-4 text-sm text-gray-600">{p.cliente_final_empresa}</td>
                       <td className="py-4 px-4 font-mono text-sm">
-                        ${(p.capex_estimado || 0).toLocaleString('es-MX')}
+                        {fmtCurrency(p.capex_estimado || 0, 'MXN')}
                       </td>
                       <td className="py-4 px-4 font-mono text-sm">
-                        {p.totalGeneratedKwh.toLocaleString('es-MX', { maximumFractionDigits: 1 })} kWh
+                        {fmtUnit(p.totalGeneratedKwh, 'kWh', 1)}
                       </td>
                       <td className="py-4 px-4 font-mono text-sm text-green-600 font-medium">
-                        ${p.estimatedSavingsMxn.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fmtCurrency(p.estimatedSavingsMxn, 'MXN')}
                       </td>
                       <td className="py-4 px-4">
                         <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${p.estado === 'operativo' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>

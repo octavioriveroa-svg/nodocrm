@@ -23,7 +23,6 @@ function formatDate(dateStr: string) {
   })
 }
 
-/** Segment tabs configuration */
 type Segment = 'todos' | EstadoProyecto
 const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'todos', label: 'Todos' },
@@ -34,14 +33,13 @@ const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'cliente_interesado', label: 'Cliente interesado' },
 ]
 
-/** Type filter options */
 const TYPE_OPTIONS = ['BESS', 'MEM', 'BESS+MEM', 'FV', 'FV+BESS'] as const
 
 interface Props {
   initialProyectos: Proyecto[]
 }
 
-export default function EpcistaProyectosClient({ initialProyectos }: Props) {
+export default function FinderProyectosClient({ initialProyectos }: Props) {
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<Proyecto[]>(initialProyectos)
 
@@ -51,10 +49,10 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
   const [tipoFilter, setTipoFilter] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
 
-  // Realtime: sync changes from admin/analista
+  // Realtime
   useEffect(() => {
     const channel = supabase
-      .channel('proyectos-epcista')
+      .channel('proyectos-finder')
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'proyectos' }, payload => {
         setProyectos(prev => prev.filter(p => p.id !== (payload.old as { id: string }).id))
       })
@@ -66,18 +64,14 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** Filtered & searched projects */
   const filtered = useMemo(() => {
     let result = proyectos
-    // Segment filter
     if (segment !== 'todos') {
       result = result.filter(p => p.estado === segment)
     }
-    // Type filter
     if (tipoFilter) {
       result = result.filter(p => p.tipo === tipoFilter)
     }
-    // Search
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(p =>
@@ -90,7 +84,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
     return result
   }, [proyectos, segment, search, tipoFilter])
 
-  /** Segment counts */
   const counts = useMemo(() => {
     const c: Record<string, number> = { todos: proyectos.length }
     for (const s of SEGMENTS) {
@@ -107,10 +100,10 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black tracking-tight">Proyectos</h1>
-          <p className="text-sm text-gray-500 mt-1">Busca y gestiona tu cartera de proyectos</p>
+          <p className="text-sm text-gray-500 mt-1">Busca y gestiona tus proyectos originados</p>
         </div>
         <Link
-          href="/epc/nuevo"
+          href="/finder/nuevo"
           className="flex items-center gap-2 px-5 py-2.5 font-semibold text-sm bg-acento text-principal rounded-lg shadow-sm hover:shadow-md hover:bg-acento-hover transition-all active:scale-[0.97]"
         >
           <Plus size={16} />
@@ -121,12 +114,10 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
       {/* Segment Tabs + Search Bar */}
       <div className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          {/* Tabs */}
           <div className="flex items-center gap-1 glass-card border-none rounded-xl p-1 shadow-sm overflow-x-auto">
             {SEGMENTS.map(s => {
               const count = counts[s.key] ?? 0
               const active = segment === s.key
-              // Hide tabs with 0 count (except "todos")
               if (s.key !== 'todos' && count === 0) return null
               return (
                 <button
@@ -149,7 +140,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
             })}
           </div>
 
-          {/* Search + Filter Controls */}
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -178,7 +168,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
           </div>
         </div>
 
-        {/* Filter Dropdown */}
         {showFilters && (
           <div className="flex items-center gap-2 px-1 mb-4 animate-in fade-in slide-in-from-top-1">
             <span className="text-xs text-gray-400 font-medium mr-1">Tipo:</span>
@@ -208,9 +197,9 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
       {/* Projects Grid */}
       {proyectos.length === 0 ? (
         <div className="rounded-xl glass-panel border-dashed border-white/50 p-16 flex flex-col items-center text-center">
-          <p className="font-semibold text-lg">Aún no tienes proyectos</p>
+          <p className="font-semibold text-lg">Aún no tienes proyectos creados</p>
           <p className="text-sm mt-2 mb-6 text-gray-400">Crea tu primer proyecto para comenzar</p>
-          <Link href="/epc/nuevo" className="flex items-center gap-2 px-5 py-2.5 font-semibold text-sm bg-acento text-principal rounded-lg shadow-sm hover:shadow-md transition-all">
+          <Link href="/finder/nuevo" className="flex items-center gap-2 px-5 py-2.5 font-semibold text-sm bg-acento text-principal rounded-lg shadow-sm hover:shadow-md transition-all">
             <Plus size={16} />
             Nuevo proyecto
           </Link>
@@ -233,10 +222,9 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
             return (
               <Link
                 key={p.id}
-                href={`/epc/proyectos/${p.id}`}
+                href={`/finder/proyectos/${p.id}`}
                 className="glass-card p-5 shadow-sm hover:shadow-lg hover:border-gray-300 transition-all group flex flex-col h-full"
               >
-                {/* Card Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-sm text-principal truncate" title={p.nombre_proyecto}>
@@ -252,7 +240,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
                   <BadgeEstado estado={p.estado} historial={p.historial_estados} />
                 </div>
 
-                {/* Card Body — Metadata */}
                 <div className="flex flex-wrap items-center gap-2 mb-4">
                   <BadgeTipo tipo={p.tipo} />
                   {p.ubicacion_estado && (
@@ -263,7 +250,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
                   )}
                 </div>
 
-                {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs flex-1">
                   {p.capex_estimado != null && (
                     <div>
@@ -293,7 +279,6 @@ export default function EpcistaProyectosClient({ initialProyectos }: Props) {
                   )}
                 </div>
 
-                {/* Card Footer */}
                 <div className="mt-auto pt-4 border-t border-borde flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium uppercase tracking-wider">
                     <Calendar size={11} />
