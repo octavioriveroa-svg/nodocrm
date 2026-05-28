@@ -20,17 +20,17 @@ interface Usuario {
 const ROL_LABELS: Record<string, string> = {
   epc: 'EPC', nodo_analista: 'Analista Nodo', nodo_admin: 'Admin Nodo',
   cliente_final: 'Cliente Final', financiero: 'Financiero', suministrador: 'Suministrador',
-  pendiente: 'Pendiente',
+  pendiente: 'Pendiente', finder: 'Finder Comercial',
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
   epc: { bg: '#E8E8E8', color: '#444' }, nodo_analista: { bg: '#D7FF2F', color: '#000' },
   nodo_admin: { bg: '#000', color: '#fff' }, cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
   financiero: { bg: '#DCFCE7', color: '#15803D' }, suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
-  pendiente: { bg: '#FFF3CD', color: '#856404' },
+  pendiente: { bg: '#FFF3CD', color: '#856404' }, finder: { bg: '#FDE68A', color: '#92400E' },
 }
 
-const ROLES_ASIGNABLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador']
+const ROLES_ASIGNABLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })

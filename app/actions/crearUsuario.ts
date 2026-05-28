@@ -32,19 +32,25 @@ export async function crearUsuarioAdmin(data: {
   // - epc: can only create cliente_final or financiero (for their own clients)
   const isNodo = ['nodo_admin', 'nodo_analista'].includes(profile.rol)
   const isEpc = profile.rol === 'epc'
+  const isFinder = profile.rol === 'finder'
 
-  if (!isNodo && !isEpc) {
+  if (!isNodo && !isEpc && !isFinder) {
     return { error: 'No autorizado para crear usuarios.' }
   }
 
   // 2. Validate role
-  const VALID_ROLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador']
+  const VALID_ROLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
   if (!VALID_ROLES.includes(data.rol)) {
     return { error: 'Rol inválido: ' + data.rol }
   }
 
   // EPC can only create client-facing roles
   if (isEpc && !['cliente_final', 'financiero'].includes(data.rol)) {
+    return { error: 'No autorizado para crear este tipo de usuario.' }
+  }
+
+  // Finder can only create epc users
+  if (isFinder && data.rol !== 'epc') {
     return { error: 'No autorizado para crear este tipo de usuario.' }
   }
 

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -50,6 +50,16 @@ interface FormData {
   moneda: Moneda
   notas_adicionales: string
   incluye_mem: boolean
+}
+
+interface CreationConfig {
+  tempId: string
+  nombre: string
+  descripcion: string
+  vehiculo_inversion: string
+  ahorro_estimado_mensual: string
+  sitiosSeleccionados: string[]
+  productosMap: Record<string, Producto[]>
 }
 
 // ── Valores vacíos ─────────────────────────────────────────────
@@ -215,10 +225,44 @@ export default function NuevoProyectoPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [clientesCargados, setClientesCargados] = useState(false)
   const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
-  const [sitiosSeleccionados, setSitiosSeleccionados] = useState<string[]>([])
 
-  // Productos por sitio (in-memory)
-  const [productosMap, setProductosMap] = useState<Record<string, Producto[]>>({})
+  // Alternative Technical Configurations
+  const [configs, setConfigs] = useState<CreationConfig[]>([
+    {
+      tempId: 'default',
+      nombre: 'Configuración A',
+      descripcion: '',
+      vehiculo_inversion: 'credito',
+      ahorro_estimado_mensual: '',
+      sitiosSeleccionados: [],
+      productosMap: {}
+    }
+  ])
+  const [activeConfigId, setActiveConfigId] = useState<string>('default')
+
+  const activeConfig = configs.find(c => c.tempId === activeConfigId) || configs[0]
+  const sitiosSeleccionados = activeConfig.sitiosSeleccionados
+  const productosMap = activeConfig.productosMap
+
+  const setSitiosSeleccionados = (updateFnOrVal: string[] | ((prev: string[]) => string[])) => {
+    setConfigs(prevConfigs => prevConfigs.map(c => {
+      if (c.tempId === activeConfigId) {
+        const nextVal = typeof updateFnOrVal === 'function' ? updateFnOrVal(c.sitiosSeleccionados) : updateFnOrVal
+        return { ...c, sitiosSeleccionados: nextVal }
+      }
+      return c
+    }))
+  }
+
+  const setProductosMap = (updateFnOrVal: Record<string, Producto[]> | ((prev: Record<string, Producto[]>) => Record<string, Producto[]>)) => {
+    setConfigs(prevConfigs => prevConfigs.map(c => {
+      if (c.tempId === activeConfigId) {
+        const nextMap = typeof updateFnOrVal === 'function' ? updateFnOrVal(c.productosMap) : updateFnOrVal
+        return { ...c, productosMap: nextMap }
+      }
+      return c
+    }))
+  }
   const [addingToSitioId, setAddingToSitioId] = useState<string | null>(null)
   const [productTipo, setProductTipo] = useState<'fv' | 'bess' | null>(null)
   const [fvForm, setFvForm] = useState<FVForm>(emptyFv)
@@ -261,8 +305,8 @@ export default function NuevoProyectoPage() {
     setClienteManual(false)
     setForm(prev => ({ ...prev, cliente_id: '' }))
     setSitiosCliente([])
-    setSitiosSeleccionados([])
-    setProductosMap({})
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', sitiosSeleccionados: [], productosMap: {} }])
+    setActiveConfigId('default')
     if (!epcId) { setClientes([]); setClientesCargados(true); return }
     const { data } = await supabase.from('clientes').select('*').eq('epcista_id', epcId).order('razon_social')
     setClientes((data ?? []) as Cliente[])
@@ -270,11 +314,16 @@ export default function NuevoProyectoPage() {
   }
 
   async function cargarSitios(clienteId: string) {
-    if (!clienteId) { setSitiosCliente([]); setSitiosSeleccionados([]); return }
+    if (!clienteId) {
+      setSitiosCliente([])
+      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', sitiosSeleccionados: [], productosMap: {} }])
+      setActiveConfigId('default')
+      return
+    }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setSitiosSeleccionados([])
-    setProductosMap({})
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', sitiosSeleccionados: [], productosMap: {} }])
+    setActiveConfigId('default')
   }
 
   function seleccionarCliente(clienteId: string) {
@@ -504,15 +553,29 @@ export default function NuevoProyectoPage() {
     return ''
   }
 
-  function validarPaso1() {
-    if (sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio a cotizar (marca la casilla ☑ del sitio).'
-    const sinProductos = sitiosSeleccionados
-      .filter(sid => (productosMap[sid] ?? []).length === 0)
+  function validarConfig(c: CreationConfig, idx: number): string {
+    if (!c.nombre.trim()) return `La configuración ${idx + 1} debe tener un nombre.`
+    if (c.sitiosSeleccionados.length === 0) return `La configuración "${c.nombre}" debe tener al menos un sitio seleccionado (marca la casilla ☑ del sitio).`
+    
+    const sinProductos = c.sitiosSeleccionados
+      .filter(sid => (c.productosMap[sid] ?? []).length === 0)
       .map(sid => sitiosCliente.find(s => s.id === sid)?.nombre ?? sid)
     if (sinProductos.length > 0) {
       return sinProductos.length === 1
-        ? `El sitio "${sinProductos[0]}" no tiene productos. Agrega al menos un producto (FV o BESS) a cada sitio seleccionado.`
-        : `Los sitios ${sinProductos.map(n => `"${n}"`).join(', ')} no tienen productos. Agrega al menos un producto a cada sitio seleccionado, o desmarca los que no necesites.`
+        ? `El sitio "${sinProductos[0]}" en la configuración "${c.nombre}" no tiene productos. Agrega al menos un producto (FV o BESS) a cada sitio seleccionado.`
+        : `Los sitios ${sinProductos.map(n => `"${n}"`).join(', ')} en la configuración "${c.nombre}" no tienen productos. Agrega al menos un producto a cada sitio seleccionado.`
+    }
+    return ''
+  }
+
+  function validarPaso1() {
+    const nombres = configs.map(c => c.nombre.trim())
+    if (new Set(nombres).size !== nombres.length) {
+      return 'Cada configuración debe tener un nombre único.'
+    }
+    for (let i = 0; i < configs.length; i++) {
+      const err = validarConfig(configs[i], i)
+      if (err) return err
     }
     return ''
   }
@@ -526,6 +589,10 @@ export default function NuevoProyectoPage() {
     setError('')
     const err = step === 0 ? validarPaso0() : step === 1 ? validarPaso1() : ''
     if (err) { setError(err); return }
+    if (step === 1) {
+      const vehicles = Array.from(new Set(configs.map(c => c.vehiculo_inversion as ModalidadFinanciamiento))).filter(Boolean)
+      setF('modalidad_financiamiento', vehicles)
+    }
     setStep(s => s + 1)
   }
 
@@ -540,12 +607,24 @@ export default function NuevoProyectoPage() {
     if (!user) { setError('Sesión expirada.'); setLoading(false); return }
 
     const cliente = clientes.find(c => c.id === form.cliente_id)
-    const allProds = sitiosSeleccionados.flatMap(sid => productosMap[sid] ?? [])
-    const hasFV = allProds.some(p => p.tipo === 'fv')
-    const hasBESS = allProds.some(p => p.tipo === 'bess')
+    
+    let hasFV = false
+    let hasBESS = false
+    for (const c of configs) {
+      const prods = Object.values(c.productosMap).flat()
+      if (prods.some(p => p.tipo === 'fv')) hasFV = true
+      if (prods.some(p => p.tipo === 'bess')) hasBESS = true
+    }
     const tipo = hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS'
 
-    const ubicacion_estado = sitiosCliente.find(s => s.id === sitiosSeleccionados[0])?.ubicacion_estado ?? ''
+    const primerSitioId = configs[0].sitiosSeleccionados[0]
+    const ubicacion_estado = sitiosCliente.find(s => s.id === primerSitioId)?.ubicacion_estado ?? ''
+
+    const firstConfigProducts = Object.values(configs[0].productosMap).flat()
+    const firstConfigCapex = firstConfigProducts.reduce((sum, p) => {
+      const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
+      return sum + pCapex
+    }, 0)
 
     const payload: Record<string, unknown> = {
       epcista_id: selectedEpcId,
@@ -560,10 +639,10 @@ export default function NuevoProyectoPage() {
       cliente_final_nombre: clienteManual ? manualCliente.nombre : (cliente?.contacto_nombre ?? ''),
       cliente_final_empresa: clienteManual ? manualCliente.empresa : (cliente?.razon_social ?? ''),
       cliente_final_contacto: clienteManual ? manualCliente.contacto : (cliente?.contacto_email ?? cliente?.contacto_telefono ?? ''),
-      capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
+      capex_estimado: firstConfigCapex,
       moneda: form.moneda,
       ubicacion_estado,
-      modalidad_financiamiento: form.modalidad_financiamiento,
+      modalidad_financiamiento: [configs[0].vehiculo_inversion as ModalidadFinanciamiento],
       notas_adicionales: form.notas_adicionales || null,
       capacidad_mwh: null, capacidad_mw: null, tecnologia_bateria: null,
       duracion_descarga_hrs: null, punto_interconexion: null,
@@ -573,24 +652,72 @@ export default function NuevoProyectoPage() {
     const { data: proyecto, error: dbErr } = await supabase.from('proyectos').insert(payload).select('id').single()
     if (dbErr) { setError('Error al guardar: ' + dbErr.message); setLoading(false); return }
 
-    // Insertar proyecto_sitios
-    if (sitiosSeleccionados.length > 0) {
-      await supabase.from('proyecto_sitios').insert(
-        sitiosSeleccionados.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id }))
+    const todosSitios = Array.from(new Set(configs.flatMap(c => c.sitiosSeleccionados)))
+    if (todosSitios.length > 0) {
+      const { error: sitiosErr } = await supabase.from('proyecto_sitios').insert(
+        todosSitios.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id }))
       )
+      if (sitiosErr) { setError('Error al vincular sitios: ' + sitiosErr.message); setLoading(false); return }
     }
 
-    // Insertar productos
-    const productosRows = sitiosSeleccionados.flatMap(sitio_id =>
-      (productosMap[sitio_id] ?? []).map(p => ({
+    const configsToInsert = configs.map((c, idx) => {
+      const activeConfigProducts = Object.values(c.productosMap).flat()
+      const inversion_total = activeConfigProducts.reduce((sum, p) => {
+        const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
+        return sum + pCapex
+      }, 0)
+
+      return {
         proyecto_id: proyecto.id,
-        sitio_id,
-        tipo: p.tipo,
-        datos: p.tipo === 'fv' ? p.fv : p.bess,
-      }))
-    )
+        nombre: c.nombre,
+        descripcion: c.descripcion || null,
+        inversion_total,
+        moneda: form.moneda,
+        vehiculo_inversion: c.vehiculo_inversion || null,
+        ahorro_estimado_mensual: c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) : null,
+        seleccionada: idx === 0,
+      }
+    })
+
+    const { data: insertedConfigs, error: configsErr } = await supabase
+      .from('configuraciones_tecnicas')
+      .insert(configsToInsert)
+      .select('id, nombre')
+
+    if (configsErr) {
+      setError('Error al guardar configuraciones: ' + configsErr.message)
+      setLoading(false)
+      return
+    }
+
+    const productosRows: {
+      proyecto_id: string
+      configuracion_id: string
+      sitio_id: string
+      tipo: 'fv' | 'bess'
+      datos: Record<string, unknown>
+    }[] = []
+    for (const c of configs) {
+      const dbConfig = insertedConfigs?.find(ic => ic.nombre === c.nombre)
+      if (!dbConfig) continue
+      
+      for (const sitio_id of c.sitiosSeleccionados) {
+        const products = c.productosMap[sitio_id] ?? []
+        for (const p of products) {
+          productosRows.push({
+            proyecto_id: proyecto.id,
+            configuracion_id: dbConfig.id,
+            sitio_id,
+            tipo: p.tipo,
+            datos: (p.tipo === 'fv' ? p.fv : p.bess) as unknown as Record<string, unknown>,
+          })
+        }
+      }
+    }
+
     if (productosRows.length > 0) {
-      await supabase.from('proyecto_sitio_productos').insert(productosRows)
+      const { error: prodErr } = await supabase.from('proyecto_sitio_productos').insert(productosRows)
+      if (prodErr) { setError('Error al guardar productos: ' + prodErr.message); setLoading(false); return }
     }
 
     router.push(`/admin/proyectos/${proyecto.id}`)
@@ -599,6 +726,12 @@ export default function NuevoProyectoPage() {
   const fvCalc = calcFV(fvForm)
   const bessCalc = calcBESS(bessForm)
   const anyHighDemanda = sitiosSeleccionados.some(id => (sitiosCliente.find(s => s.id === id)?.demanda_contratada_kw ?? 0) > 1000)
+
+  const activeConfigProducts = Object.values(activeConfig.productosMap).flat()
+  const activeConfigCapex = activeConfigProducts.reduce((sum, p) => {
+    const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
+    return sum + pCapex
+  }, 0)
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -756,6 +889,130 @@ export default function NuevoProyectoPage() {
         {step === 1 && (
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Sitios y productos</h2>
+
+            {/* Configurations Tab Bar */}
+            <div className="flex flex-wrap gap-2 pb-2 border-b border-borde">
+              {configs.map((c, idx) => (
+                <button
+                  key={c.tempId}
+                  type="button"
+                  onClick={() => {
+                    setActiveConfigId(c.tempId)
+                    setAddingToSitioId(null)
+                  }}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
+                  style={{
+                    backgroundColor: activeConfigId === c.tempId ? '#000' : '#fff',
+                    color: activeConfigId === c.tempId ? '#D7FF2F' : '#666',
+                    borderColor: activeConfigId === c.tempId ? '#000' : '#E5E5E5',
+                  }}
+                >
+                  <span>{c.nombre || `Configuración ${idx + 1}`}</span>
+                  {configs.length > 1 && (
+                    <X
+                      size={14}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfigs(prev => {
+                          const next = prev.filter(item => item.tempId !== c.tempId)
+                          if (activeConfigId === c.tempId) {
+                            setActiveConfigId(next[0].tempId)
+                          }
+                          return next
+                        })
+                      }}
+                      className="hover:text-red-500 transition-colors"
+                    />
+                  )}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const newId = `config-${Date.now()}`
+                  setConfigs(prev => [
+                    ...prev,
+                    {
+                      tempId: newId,
+                      nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
+                      descripcion: '',
+                      vehiculo_inversion: 'credito',
+                      ahorro_estimado_mensual: '',
+                      sitiosSeleccionados: [],
+                      productosMap: {}
+                    }
+                  ])
+                  setActiveConfigId(newId)
+                }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-dashed border-borde bg-white hover:border-black transition-all flex items-center gap-1"
+              >
+                <Plus size={14} /> Nueva alternativa
+              </button>
+            </div>
+
+            {/* Active Configuration Details Form */}
+            <div className="bg-fondo/35 p-4 rounded-xl border border-borde flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted">Detalles de esta alternativa</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    value={activeConfig.nombre}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, nombre: e.target.value } : c))
+                    }}
+                    className={inp}
+                    placeholder="Ej: Opción A - Solo FV"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Vehículo de inversión *</label>
+                  <select
+                    value={activeConfig.vehiculo_inversion}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, vehiculo_inversion: e.target.value } : c))
+                    }}
+                    className={inp}
+                  >
+                    <option value="credito">Crédito</option>
+                    <option value="arrendamiento">Arrendamiento</option>
+                    <option value="ensaas">EnSaaS</option>
+                    <option value="mem">Mercado Eléctrico Mayorista</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Ahorro mensual estimado ($) *</label>
+                  <input
+                    type="number"
+                    value={activeConfig.ahorro_estimado_mensual}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: e.target.value } : c))
+                    }}
+                    className={inp}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    value={activeConfig.descripcion}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, descripcion: e.target.value } : c))
+                    }}
+                    className={inp}
+                    placeholder="Ej: Opción con 150 kWp y sin baterías"
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
+                <span>Inversión total estimada (CAPEX acumulado):</span>
+                <span className="font-bold text-sm text-principal">
+                  ${activeConfigCapex.toLocaleString('es-MX')} {form.moneda}
+                </span>
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>

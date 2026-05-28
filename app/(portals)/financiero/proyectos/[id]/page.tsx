@@ -8,6 +8,7 @@ import BatteryStatus from '@/components/telemetry/BatteryStatus'
 import { ChevronLeft, Zap, MapPin, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto } from '@/lib/types'
+import { fmtNum, fmtCurrency } from '@/lib/format'
 
 interface TelemetriaDB {
   timestamp: string
@@ -124,19 +125,19 @@ export default function FinancieroProyectoDetalle() {
         <div className="glass-card p-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">CAPEX Estimado</p>
           <p className="text-xl font-black text-principal">
-            ${(proyecto.capex_estimado || 0).toLocaleString('es-MX')} <span className="text-sm font-medium text-gray-500">{proyecto.moneda}</span>
+            {fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN')}
           </p>
         </div>
         <div className="glass-card p-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Generación Total</p>
           <p className="text-xl font-black text-principal">
-            {metrics.totalGenerated.toLocaleString('es-MX', { maximumFractionDigits: 1 })} <span className="text-sm font-medium text-gray-500">kWh</span>
+            {fmtNum(metrics.totalGenerated, 1)} <span className="text-sm font-medium text-gray-500">kWh</span>
           </p>
         </div>
         <div className="glass-card p-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Retorno (Ahorro)</p>
           <p className="text-xl font-black text-green-600">
-            ${metrics.savingsMxn.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm font-medium text-green-600/70">MXN</span>
+            {fmtCurrency(metrics.savingsMxn, 'MXN')} <span className="text-sm font-medium text-green-600/70">MXN</span>
           </p>
         </div>
         <div className="glass-card p-5">

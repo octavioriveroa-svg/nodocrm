@@ -7,13 +7,13 @@ export async function invitarUsuario(data: {
   email: string
   nombre: string
   empresa: string
-  rol: 'cliente_final' | 'financiero'
+  rol: 'cliente_final' | 'financiero' | 'epc'
   proyecto_id?: string
   cliente_crm_id?: string
 }) {
   const supabase = await createClient()
   
-  // 1. Validate permissions (EPC, Admin, or Analyst can invite)
+  // 1. Validate permissions (EPC, Admin, Analyst, or Finder can invite)
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return { error: 'No autenticado' }
 
@@ -23,12 +23,17 @@ export async function invitarUsuario(data: {
     .eq('id', session.user.id)
     .single()
   
-  if (!profile || !['epc', 'nodo_admin', 'nodo_analista'].includes(profile.rol)) {
+  if (!profile || !['epc', 'nodo_admin', 'nodo_analista', 'finder'].includes(profile.rol)) {
     return { error: 'No autorizado para enviar invitaciones' }
   }
 
   // 2. EPC can only invite cliente_final or financiero
   if (profile.rol === 'epc' && !['cliente_final', 'financiero'].includes(data.rol)) {
+    return { error: 'No autorizado para invitar este tipo de usuario' }
+  }
+
+  // Finder can only invite epc users
+  if (profile.rol === 'finder' && data.rol !== 'epc') {
     return { error: 'No autorizado para invitar este tipo de usuario' }
   }
 

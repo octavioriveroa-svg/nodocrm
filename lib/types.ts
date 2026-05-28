@@ -1,4 +1,4 @@
-export type Rol = 'epc' | 'nodo_analista' | 'nodo_admin' | 'cliente_final' | 'financiero' | 'suministrador' | 'pendiente'
+export type Rol = 'epc' | 'nodo_analista' | 'nodo_admin' | 'cliente_final' | 'financiero' | 'suministrador' | 'pendiente' | 'finder'
 export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
 export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
 export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'enviada' | 'negociacion' | 'aprobado' | 'en_construccion' | 'operativo' | 'completado' | 'cliente_interesado'
@@ -6,7 +6,7 @@ export type TecnologiaBateria = 'Li-ion' | 'LFP' | 'NMC' | 'Otra'
 export type Moneda = 'MXN' | 'USD'
 export type ModalidadFinanciamiento = 'credito' | 'arrendamiento' | 'ensaas' | 'mem' | 'no_sabe'
 export type TipoArchivo = 'recibo_cfe' | 'propuesta' | 'machote_contrato' | 'adjunto_epcista' | 'propuesta_analista' | 'evidencia_hito' | 'oferta_suministrador' | 'documento_general'
-
+ 
 export interface Profile {
   id: string
   nombre: string
@@ -16,12 +16,13 @@ export interface Profile {
   cliente_crm_id: string | null
   created_at: string
 }
-
+ 
 export interface Proyecto {
   id: string
   epcista_id: string
   responsable_nodo_id: string | null
   cliente_id: string | null
+  finder_id: string | null
   financiero_id: string | null
   tipo: TipoProyecto
   nombre_proyecto: string
@@ -49,17 +50,32 @@ export interface Proyecto {
   historial_estados?: Record<string, string>
   profiles?: Profile
 }
-
+ 
 export interface ProyectoSitioProducto {
   id: string
   proyecto_id: string
   sitio_id: string
+  configuracion_id: string | null
   tipo: 'fv' | 'bess'
   datos: Record<string, unknown>
   created_at: string
   sitios?: { nombre: string }
 }
-
+ 
+export interface ConfiguracionTecnica {
+  id: string
+  proyecto_id: string
+  nombre: string
+  descripcion: string | null
+  inversion_total: number | null
+  moneda: string
+  vehiculo_inversion: string | null
+  ahorro_estimado_mensual: number | null
+  seleccionada: boolean
+  created_at: string
+  updated_at: string
+}
+ 
 export interface Comentario {
   id: string
   proyecto_id: string
@@ -68,7 +84,7 @@ export interface Comentario {
   created_at: string
   profiles?: Profile
 }
-
+ 
 export interface Sitio {
   id: string
   cliente_id: string
@@ -84,17 +100,18 @@ export interface Sitio {
   created_at: string
   updated_at: string
 }
-
+ 
 export interface ProyectoSitio {
   id: string
   proyecto_id: string
   sitio_id: string
   sitios?: Sitio
 }
-
+ 
 export interface Cliente {
   id: string
   epcista_id: string
+  finder_id: string | null
   razon_social: string
   rfc: string | null
   industria: string | null

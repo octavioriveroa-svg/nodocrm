@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from './ui/Button'
 import { Plus, MapPin, FileText, Pencil, Trash2, Upload, ExternalLink, Eye } from 'lucide-react'
 import type { Sitio } from '@/lib/types'
+import { fmtUnit } from '@/lib/format'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -286,7 +287,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
                   {s.demanda_contratada_kw != null && (
                     <div>
                       <div className="text-xs font-medium mb-0.5 text-gray-400">Demanda contratada</div>
-                      <div className="font-medium">{s.demanda_contratada_kw.toLocaleString('es-MX')} kW</div>
+                      <div className="font-medium">{fmtUnit(s.demanda_contratada_kw, 'kW')}</div>
                     </div>
                   )}
                   {s.recibo_url && (

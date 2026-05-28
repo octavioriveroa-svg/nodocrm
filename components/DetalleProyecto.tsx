@@ -7,14 +7,23 @@ import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto } from '@/lib/types'
-import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink } from 'lucide-react'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda } from '@/lib/types'
+import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { fmtNum, fmtCurrency, fmtUnit } from '@/lib/format'
 import GanttChart from './gantt/GanttChart'
 import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
 import DocumentCenter from './DocumentCenter'
+
+const ESTADOS_MX = [
+  'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
+  'Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero',
+  'Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro',
+  'Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala',
+  'Veracruz','Yucatán','Zacatecas',
+]
 
 const MODALIDAD_LABELS: Record<ModalidadFinanciamiento, string> = {
   credito: 'Crédito',
@@ -79,10 +88,7 @@ function Campo({ label, value }: { label: string; value?: string | number | null
   )
 }
 
-function n2(v: number | null | undefined, dec = 2) {
-  if (v == null) return '—'
-  return Number(v).toLocaleString('es-MX', { maximumFractionDigits: dec })
-}
+// Removed local n2 function
 
 interface Props {
   proyecto: Proyecto
@@ -92,9 +98,10 @@ interface Props {
   sitios?: Sitio[]
   productos?: ProyectoSitioProducto[]
   hitos?: import('@/lib/types').HitoConstruccion[]
+  configuraciones?: ConfiguracionTecnica[]
 }
 
-export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [], hitos = [] }: Props) {
+export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [], hitos = [], configuraciones = [] }: Props) {
   const supabase = createClient()
   const [proyecto, setProyecto] = useState(initial)
   const [comentarios, setComentarios] = useState(initialComentarios)
@@ -111,15 +118,35 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState<Partial<Proyecto>>(initial)
 
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+  const [configsList, setConfigsList] = useState<ConfiguracionTecnica[]>([])
+  const [seleccionandoConfig, setSeleccionandoConfig] = useState(false)
+  const [errorEstado, setErrorEstado] = useState<string | null>(null)
+
+  useEffect(() => {
+    const list = configuraciones ?? []
+    setConfigsList(list)
+    const selected = list.find(c => c.seleccionada)
+    if (selected) {
+      setSelectedConfigId(selected.id)
+    } else if (list.length > 0) {
+      setSelectedConfigId(list[0].id)
+    }
+  }, [configuraciones])
+
   const isAnalista = currentUser.rol === 'nodo_analista'
   const isAdmin = currentUser.rol === 'nodo_admin'
   const isEpcista = currentUser.rol === 'epc'
+  const isFinder = currentUser.rol === 'finder'
   const canChangeEstado = isAnalista || isAdmin
-  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : '/epc'
+  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : isFinder ? '/finder' : '/epc'
 
   // Fetch responsable nodo profile
   const [responsableProfile, setResponsableProfile] = useState<{nombre: string; empresa: string; calendario_url: string | null} | null>(null)
   const [nodoUsers, setNodoUsers] = useState<{id: string; nombre: string; empresa: string}[]>([])
+  const [allClientes, setAllClientes] = useState<{id: string; razon_social: string}[]>([])
+  const [allEpcistas, setAllEpcistas] = useState<{id: string; nombre: string; empresa: string}[]>([])
+
   useEffect(() => {
     if (initial.responsable_nodo_id) {
       supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).single()
@@ -130,17 +157,87 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       supabase.from('profiles').select('id, nombre, empresa').in('rol', ['nodo_admin', 'nodo_analista']).order('nombre')
         .then(({ data }) => { if (data) setNodoUsers(data) })
     }
-  }, [])
+
+    if (isAdmin || isAnalista) {
+      // Admins/Analysts can see all clients
+      supabase.from('clientes').select('id, razon_social').order('razon_social')
+        .then(({ data }) => { if (data) setAllClientes(data as {id: string; razon_social: string}[]) })
+      
+      // Admins/Analysts can see all EPCistas
+      supabase.from('profiles').select('id, nombre, empresa').eq('rol', 'epc').order('nombre')
+        .then(({ data }) => { if (data) setAllEpcistas(data as {id: string; nombre: string; empresa: string}[]) })
+    } else if (isFinder) {
+      // Finders can only see their own clients
+      supabase.from('clientes').select('id, razon_social').eq('finder_id', currentUser.id).order('razon_social')
+        .then(({ data }) => { if (data) setAllClientes(data as {id: string; razon_social: string}[]) })
+
+      // Finders can see all EPCistas to assign to the project
+      supabase.from('profiles').select('id, nombre, empresa').eq('rol', 'epc').order('nombre')
+        .then(({ data }) => { if (data) setAllEpcistas(data as {id: string; nombre: string; empresa: string}[]) })
+    }
+  }, [isAdmin, isAnalista, isFinder, currentUser.id, initial.responsable_nodo_id])
+
+  async function handleSelectConfig(configId: string) {
+    if (configId === 'legacy') return
+    setSeleccionandoConfig(true)
+    setErrorEstado(null)
+    try {
+      // 1. Reset all to false
+      const { error: err1 } = await supabase.from('configuraciones_tecnicas').update({ seleccionada: false }).eq('proyecto_id', proyecto.id)
+      if (err1) throw err1
+      
+      // 2. Set target to true
+      const { error: err2 } = await supabase.from('configuraciones_tecnicas').update({ seleccionada: true }).eq('id', configId)
+      if (err2) throw err2
+
+      // 3. Update local state
+      const updatedList = configsList.map(c => ({ ...c, seleccionada: c.id === configId }))
+      setConfigsList(updatedList)
+
+      // 4. Update project table fields (capex, currency, vehicle)
+      const targetConfig = updatedList.find(c => c.id === configId)
+      if (targetConfig) {
+        const { data: updatedProj, error: projErr } = await supabase.from('proyectos').update({
+          capex_estimado: targetConfig.inversion_total,
+          moneda: targetConfig.moneda,
+          modalidad_financiamiento: targetConfig.vehiculo_inversion ? [targetConfig.vehiculo_inversion as ModalidadFinanciamiento] : proyecto.modalidad_financiamiento,
+        }).eq('id', proyecto.id).select().single()
+        
+        if (projErr) throw projErr
+        if (updatedProj) setProyecto(updatedProj as Proyecto)
+      }
+    } catch (err) {
+      console.error(err)
+      setErrorEstado(err instanceof Error ? err.message : 'Error al seleccionar configuración')
+    } finally {
+      setSeleccionandoConfig(false)
+    }
+  }
 
   async function cambiarEstado(estado: EstadoProyecto) {
-    // Record state transition timestamp in historial_estados
+    setErrorEstado(null)
+    const configRequired = ['aprobado', 'en_construccion', 'operativo', 'completado'].includes(estado)
+    if (configRequired) {
+      const hasSelectedConfig = configsList.some(c => c.seleccionada)
+      if (!hasSelectedConfig) {
+        const msg = 'Se debe seleccionar una configuración técnica ganadora antes de aprobar el proyecto o avanzar en el pipeline.'
+        setErrorEstado(msg)
+        alert(msg)
+        return
+      }
+    }
+
     const prevHistorial = (proyecto.historial_estados ?? {}) as Record<string, string>
     const historial_estados = {
       ...prevHistorial,
       [estado]: new Date().toISOString(),
     }
-    const { data } = await supabase.from('proyectos').update({ estado, historial_estados }).eq('id', proyecto.id).select().single()
-    if (data) setProyecto(data as Proyecto)
+    const { data, error } = await supabase.from('proyectos').update({ estado, historial_estados }).eq('id', proyecto.id).select().single()
+    if (error) {
+      setErrorEstado('Error al cambiar de estado: ' + error.message)
+    } else if (data) {
+      setProyecto(data as Proyecto)
+    }
   }
 
   async function enviarComentario() {
@@ -160,7 +257,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   async function handleGuardar() {
     setGuardando(true)
-    const { data } = await supabase.from('proyectos').update({
+
+    const updatePayload: Record<string, any> = {
       nombre_proyecto: form.nombre_proyecto,
       cliente_final_nombre: form.cliente_final_nombre,
       cliente_final_empresa: form.cliente_final_empresa,
@@ -168,8 +266,25 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       capex_estimado: form.capex_estimado ? Number(form.capex_estimado) : null,
       ubicacion_estado: form.ubicacion_estado,
       notas_adicionales: form.notas_adicionales,
-      responsable_nodo_id: form.responsable_nodo_id || null,
-    }).eq('id', proyecto.id).select().single()
+    }
+
+    if (isAdmin || isAnalista) {
+      updatePayload.responsable_nodo_id = form.responsable_nodo_id || null
+      updatePayload.cliente_id = form.cliente_id || null
+    }
+
+    if (isAdmin || isAnalista || isFinder) {
+      updatePayload.epcista_id = form.epcista_id || null
+    }
+
+    if (isAdmin || isAnalista || isEpcista) {
+      updatePayload.tipo_instalacion = form.tipo_instalacion || null
+      updatePayload.incluye_mem = !!form.incluye_mem
+      updatePayload.modalidad_financiamiento = form.modalidad_financiamiento || []
+      updatePayload.moneda = form.moneda || 'MXN'
+    }
+
+    const { data } = await supabase.from('proyectos').update(updatePayload).eq('id', proyecto.id).select().single()
     if (data) {
       setProyecto(data as Proyecto)
       setForm(data as Proyecto)
@@ -272,7 +387,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               )}
             </div>
             {canChangeEstado && !editando && (
-              <div className="w-40">
+              <div className="w-40 flex flex-col">
                 <label className="block text-xs font-semibold mb-1.5 text-gray-500 uppercase tracking-wide">Cambiar estado</label>
                 <select
                   value={proyecto.estado}
@@ -283,6 +398,9 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     <option key={val} value={val}>{lbl}</option>
                   ))}
                 </select>
+                {errorEstado && (
+                  <p className="text-[10px] text-red-500 font-bold mt-1.5 leading-tight">{errorEstado}</p>
+                )}
               </div>
             )}
           </div>
@@ -351,46 +469,176 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
       {editando && (
         <Seccion title="Modo edición">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-xs font-medium mb-1">Nombre contacto final</label>
-              <input type="text" value={form.cliente_final_nombre || ''} onChange={e => setForm(f => ({...f, cliente_final_nombre: e.target.value}))} className="w-full border rounded p-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Empresa cliente final</label>
-              <input type="text" value={form.cliente_final_empresa || ''} onChange={e => setForm(f => ({...f, cliente_final_empresa: e.target.value}))} className="w-full border rounded p-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Email / Teléfono de contacto</label>
-              <input type="text" value={form.cliente_final_contacto || ''} onChange={e => setForm(f => ({...f, cliente_final_contacto: e.target.value}))} className="w-full border rounded p-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">CAPEX estimado ({proyecto.moneda})</label>
-              <input type="number" value={form.capex_estimado || ''} onChange={e => setForm(f => ({...f, capex_estimado: e.target.value ? Number(e.target.value) : undefined}))} className="w-full border rounded p-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Estado (Ubicación)</label>
-              <input type="text" value={form.ubicacion_estado || ''} onChange={e => setForm(f => ({...f, ubicacion_estado: e.target.value}))} className="w-full border rounded p-2 text-sm" />
-            </div>
-            {(isAdmin || isAnalista) && (
-              <div>
-                <label className="block text-xs font-medium mb-1">Responsable Nodo</label>
-                <select
-                  value={form.responsable_nodo_id || ''}
-                  onChange={e => setForm(f => ({...f, responsable_nodo_id: e.target.value || null}))}
-                  className="w-full border rounded p-2 text-sm border-borde rounded-xl"
-                >
-                  <option value="">Sin asignar</option>
-                  {nodoUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>
-                  ))}
-                </select>
+          <div className="flex flex-col gap-6 mb-4">
+            {/* Group 1 — Información básica */}
+            {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id) || (isFinder && proyecto.finder_id === currentUser.id)) && (
+              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 1: Información básica</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium mb-1">Nombre del proyecto *</label>
+                    <input type="text" value={form.nombre_proyecto || ''} onChange={e => setForm(f => ({...f, nombre_proyecto: e.target.value}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Nombre contacto final</label>
+                    <input type="text" value={form.cliente_final_nombre || ''} onChange={e => setForm(f => ({...f, cliente_final_nombre: e.target.value}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Empresa cliente final</label>
+                    <input type="text" value={form.cliente_final_empresa || ''} onChange={e => setForm(f => ({...f, cliente_final_empresa: e.target.value}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Email / Teléfono de contacto</label>
+                    <input type="text" value={form.cliente_final_contacto || ''} onChange={e => setForm(f => ({...f, cliente_final_contacto: e.target.value}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Estado (Ubicación)</label>
+                    <select
+                      value={form.ubicacion_estado || ''}
+                      onChange={e => setForm(f => ({...f, ubicacion_estado: e.target.value}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                    >
+                      <option value="">Selecciona un estado</option>
+                      {ESTADOS_MX.map(est => (
+                        <option key={est} value={est}>{est}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium mb-1">Notas adicionales</label>
+                    <textarea rows={3} value={form.notas_adicionales || ''} onChange={e => setForm(f => ({...f, notas_adicionales: e.target.value}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                </div>
               </div>
             )}
-            <div className="col-span-2">
-              <label className="block text-xs font-medium mb-1">Notas adicionales</label>
-              <textarea rows={3} value={form.notas_adicionales || ''} onChange={e => setForm(f => ({...f, notas_adicionales: e.target.value}))} className="w-full border rounded p-2 text-sm" />
-            </div>
+
+            {/* Group 2 — Instalación y financiamiento */}
+            {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
+              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 2: Instalación y financiamiento</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Tipo de instalación</label>
+                    <select
+                      value={form.tipo_instalacion || ''}
+                      onChange={e => setForm(f => ({...f, tipo_instalacion: e.target.value as any || null}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                    >
+                      <option value="">Selecciona</option>
+                      <option value="nodo_busca">Nodo busca</option>
+                      <option value="epcista_instala">EPCista instala</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">CAPEX estimado ({form.moneda || 'MXN'})</label>
+                    <input type="number" value={form.capex_estimado || ''} onChange={e => setForm(f => ({...f, capex_estimado: e.target.value ? Number(e.target.value) : undefined}))} className="w-full border rounded p-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Moneda</label>
+                    <select
+                      value={form.moneda || 'MXN'}
+                      onChange={e => setForm(f => ({...f, moneda: e.target.value as Moneda}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                    >
+                      <option value="MXN">MXN</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center mt-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!form.incluye_mem}
+                        onChange={e => setForm(f => ({...f, incluye_mem: e.target.checked}))}
+                      />
+                      <span>Incluye MEM</span>
+                    </label>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium mb-2">Modalidad de financiamiento</label>
+                    <div className="flex flex-wrap gap-3">
+                      {(['credito', 'arrendamiento', 'ensaas', 'mem', 'no_sabe'] as ModalidadFinanciamiento[]).map(m => {
+                        const isSelected = (form.modalidad_financiamiento ?? []).includes(m)
+                        return (
+                          <label key={m} className="flex items-center gap-1.5 cursor-pointer text-xs">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={e => {
+                                let list = [...(form.modalidad_financiamiento ?? [])]
+                                if (m === 'no_sabe') {
+                                  list = e.target.checked ? ['no_sabe'] : []
+                                } else {
+                                  list = list.filter(x => x !== 'no_sabe')
+                                  if (e.target.checked) list.push(m)
+                                  else list = list.filter(x => x !== m)
+                                }
+                                setForm(f => ({...f, modalidad_financiamiento: list}))
+                              }}
+                            />
+                            <span>{MODALIDAD_LABELS[m]}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Group 3 — Asignaciones */}
+            {(isAdmin || isAnalista || isFinder) && (
+              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 3: Asignaciones</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {(isAdmin || isAnalista) && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Responsable Nodo</label>
+                        <select
+                          value={form.responsable_nodo_id || ''}
+                          onChange={e => setForm(f => ({...f, responsable_nodo_id: e.target.value || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                        >
+                          <option value="">Sin asignar</option>
+                          {nodoUsers.map(u => (
+                            <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Cliente</label>
+                        <select
+                          value={form.cliente_id || ''}
+                          onChange={e => setForm(f => ({...f, cliente_id: e.target.value || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                        >
+                          <option value="">Sin asignar</option>
+                          {allClientes.map(c => (
+                            <option key={c.id} value={c.id}>{c.razon_social}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {(isAdmin || isAnalista || isFinder) && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1">EPC Asignado</label>
+                      <select
+                        value={form.epcista_id || ''}
+                        onChange={e => setForm(f => ({...f, epcista_id: e.target.value || ''}))}
+                        className="w-full border rounded p-2 text-sm bg-white"
+                      >
+                        <option value="">Sin asignar</option>
+                        {allEpcistas.map(epc => (
+                          <option key={epc.id} value={epc.id}>{epc.nombre} — {epc.empresa}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
             <Button variant="outline" size="sm" onClick={() => { setEditando(false); setForm(proyecto) }}>Cancelar</Button>
@@ -553,7 +801,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                   )}
                   {s.rpu && <span className="text-xs font-medium text-gray-500">RPU: {s.rpu}</span>}
                   {s.demanda_contratada_kw != null && (
-                    <span className="text-xs font-medium text-gray-500">Demanda: {s.demanda_contratada_kw.toLocaleString('es-MX')} kW</span>
+                    <span className="text-xs font-medium text-gray-500">Demanda: {fmtUnit(s.demanda_contratada_kw, 'kW')}</span>
                   )}
                   {s.recibo_url && (
                     <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
@@ -585,7 +833,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* Solución técnica */}
       {(() => {
         if (productos.length === 0) {
-          // Show fallback only if the project has a tipo set (meaning products should exist)
           if (proyecto.tipo && ['FV', 'BESS', 'FV+BESS'].includes(proyecto.tipo)) {
             return (
               <Seccion title="Solución técnica">
@@ -595,18 +842,38 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           }
           return null
         }
+
+        const configsToUse = configsList.length > 0 ? configsList : [{
+          id: 'legacy',
+          proyecto_id: proyecto.id,
+          nombre: 'Configuración original',
+          descripcion: 'Configuración importada del proyecto original',
+          inversion_total: proyecto.capex_estimado,
+          moneda: proyecto.moneda,
+          vehiculo_inversion: proyecto.modalidad_financiamiento?.[0] || 'no_sabe',
+          ahorro_estimado_mensual: null,
+          seleccionada: true,
+          created_at: '',
+          updated_at: ''
+        }]
+
+        const activeConfigId = selectedConfigId || configsToUse[0]?.id
+        const activeConfig = configsToUse.find(c => c.id === activeConfigId) || configsToUse[0]
+
+        const activeProducts = productos.filter(p => p.configuracion_id === activeConfig.id || (activeConfig.id === 'legacy' && !p.configuracion_id))
+
         const bySitio: Record<string, { nombre: string; items: ProyectoSitioProducto[] }> = {}
-        for (const p of productos) {
+        for (const p of activeProducts) {
           if (!bySitio[p.sitio_id]) bySitio[p.sitio_id] = { nombre: p.sitios?.nombre ?? 'Sitio', items: [] }
           bySitio[p.sitio_id].items.push(p)
         }
+
         const usoLabel: Record<string, string> = {
           load_shifting: 'Load Shifting', ups: 'UPS', load_shifting_ups: 'Load Shifting + UPS',
         }
 
-        // Calculate totals for summary
         let totalKwp = 0, totalKwh = 0, totalFvCapex = 0, totalBessCapex = 0
-        for (const p of productos) {
+        for (const p of activeProducts) {
           const d = p.datos as Record<string, unknown>
           if (p.tipo === 'fv') {
             const nm = Number(d.num_modulos) || 0
@@ -619,31 +886,119 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           }
         }
 
+        const canSelectConfig = (isAdmin || isAnalista) || (isEpcista && proyecto.epcista_id === currentUser.id)
+
         return (
           <Seccion title="Solución técnica">
-            {/* Summary row */}
+            {/* Warning if no config selected and state is negociacion or beyond */}
+            {!configsList.some(c => c.seleccionada) && ['negociacion', 'aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
+              <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5 text-amber-800 text-xs font-semibold">
+                <AlertTriangle className="shrink-0 text-amber-500" size={16} />
+                <div>
+                  <p className="font-bold text-amber-900">Configuración técnica requerida</p>
+                  <p className="font-medium text-amber-800 mt-0.5">Se debe seleccionar una configuración técnica ganadora antes de poder avanzar en el pipeline del proyecto.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Config Tabs */}
+            {configsToUse.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-4 border-b border-borde pb-3">
+                {configsToUse.map(c => {
+                  const isActive = activeConfig.id === c.id
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedConfigId(c.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
+                        isActive
+                          ? 'bg-principal text-acento border-principal shadow-sm'
+                          : 'border-borde bg-white text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {c.nombre}
+                      {c.seleccionada && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" title="Seleccionada como ganadora" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Active Config Overview */}
+            <div className="bg-gray-50/50 border border-borde rounded-xl p-5 mb-5">
+              <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+                <div>
+                  <h4 className="text-sm font-bold text-principal flex items-center gap-2">
+                    {activeConfig.nombre}
+                    {activeConfig.seleccionada && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                        Ganadora
+                      </span>
+                    )}
+                  </h4>
+                  {activeConfig.descripcion && (
+                    <p className="text-xs text-gray-500 mt-1">{activeConfig.descripcion}</p>
+                  )}
+                </div>
+                {canSelectConfig && !activeConfig.seleccionada && activeConfig.id !== 'legacy' && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={seleccionandoConfig}
+                    onClick={() => handleSelectConfig(activeConfig.id)}
+                  >
+                    {seleccionandoConfig ? 'Seleccionando...' : 'Seleccionar como ganadora'}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
+                  <div className="text-[10px] uppercase font-bold text-gray-400">Inversión total</div>
+                  <div className="text-base font-black text-principal mt-1">
+                    {fmtCurrency(activeConfig.inversion_total, activeConfig.moneda)}
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
+                  <div className="text-[10px] uppercase font-bold text-gray-400">Financiamiento</div>
+                  <div className="text-base font-bold text-principal mt-1">
+                    {MODALIDAD_LABELS[activeConfig.vehiculo_inversion as ModalidadFinanciamiento] || activeConfig.vehiculo_inversion || '—'}
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
+                  <div className="text-[10px] uppercase font-bold text-gray-400">Ahorro mensual</div>
+                  <div className="text-base font-black text-green-600 mt-1">
+                    {fmtCurrency(activeConfig.ahorro_estimado_mensual, activeConfig.moneda)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Technical metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               {totalKwp > 0 && (
                 <div className="bg-[#fafff0] border border-[#e0f0c0] rounded-xl p-3 text-center">
-                  <div className="text-lg font-black text-[#4a5e1e]">{n2(totalKwp, 1)}</div>
+                  <div className="text-lg font-black text-[#4a5e1e]">{fmtNum(totalKwp, 1)}</div>
                   <div className="text-[10px] font-bold uppercase text-[#6a8e2e] tracking-wider">kWp total FV</div>
                 </div>
               )}
               {totalKwh > 0 && (
                 <div className="bg-[#f0f8ff] border border-[#c0e0f0] rounded-xl p-3 text-center">
-                  <div className="text-lg font-black text-[#1a5a8f]">{n2(totalKwh, 1)}</div>
+                  <div className="text-lg font-black text-[#1a5a8f]">{fmtNum(totalKwh, 1)}</div>
                   <div className="text-[10px] font-bold uppercase text-[#3a7abf] tracking-wider">kWh total BESS</div>
                 </div>
               )}
               {totalFvCapex > 0 && (
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
-                  <div className="text-lg font-black">${totalFvCapex.toLocaleString('es-MX')}</div>
+                  <div className="text-lg font-black">{fmtCurrency(totalFvCapex, activeConfig.moneda)}</div>
                   <div className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">CAPEX FV</div>
                 </div>
               )}
               {totalBessCapex > 0 && (
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
-                  <div className="text-lg font-black">${totalBessCapex.toLocaleString('es-MX')}</div>
+                  <div className="text-lg font-black">{fmtCurrency(totalBessCapex, activeConfig.moneda)}</div>
                   <div className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">CAPEX BESS</div>
                 </div>
               )}
@@ -675,13 +1030,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                             <div className="grid grid-cols-3 gap-y-4 gap-x-2">
                               <Campo label="Módulos" value={`${d.num_modulos} × ${d.potencia_modulos_w} W`} />
                               <Campo label="Marca módulos" value={d.marca_modulos as string} />
-                              <Campo label="kWp sistema" value={kwpSistema !== null ? `${n2(kwpSistema, 1)} kWp` : undefined} />
+                              <Campo label="kWp sistema" value={kwpSistema !== null ? fmtUnit(kwpSistema, 'kWp', 1) : undefined} />
                               <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
                               <Campo label="Marca inversores" value={d.marca_inversores as string} />
-                              <Campo label="kWp inversores" value={kwpInv !== null ? `${n2(kwpInv, 1)} kW` : undefined} />
-                              <Campo label="Generación anual" value={`${Number(d.generacion_anual_kwh).toLocaleString('es-MX')} kWh/año`} />
-                              <Campo label="CAPEX" value={`$${capex.toLocaleString('es-MX')}`} />
-                              <Campo label="Precio por Watt" value={precioWatt !== null ? `$${n2(precioWatt, 4)}/W` : undefined} />
+                              <Campo label="kWp inversores" value={kwpInv !== null ? fmtUnit(kwpInv, 'kW', 1) : undefined} />
+                              <Campo label="Generación anual" value={Number(d.generacion_anual_kwh) ? fmtUnit(Number(d.generacion_anual_kwh), 'kWh/año') : undefined} />
+                              <Campo label="CAPEX" value={fmtCurrency(capex, activeConfig.moneda)} />
+                              <Campo label="Precio por Watt" value={precioWatt !== null ? `$${fmtNum(precioWatt, 4)}/W` : undefined} />
                             </div>
                           </div>
                         )
@@ -700,8 +1055,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                               <Campo label="Capacidad" value={`${d.capacidad_kwh} kWh`} />
                               <Campo label="Marca" value={d.marca as string} />
                               <Campo label="Uso" value={usoLabel[d.uso as string] ?? d.uso as string} />
-                              <Campo label="CAPEX" value={`$${capex.toLocaleString('es-MX')}`} />
-                              <Campo label="Precio por kWh" value={precioKwh !== null ? `$${n2(precioKwh, 2)}/kWh` : undefined} />
+                              <Campo label="CAPEX" value={fmtCurrency(capex, activeConfig.moneda)} />
+                              <Campo label="Precio por kWh" value={precioKwh !== null ? `${fmtCurrency(precioKwh, activeConfig.moneda)}/kWh` : undefined} />
                             </div>
                           </div>
                         )
@@ -750,7 +1105,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {!editando && (
         <Seccion title="Financiamiento y ubicación">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? `${proyecto.moneda} ${proyecto.capex_estimado.toLocaleString('es-MX')}` : null} />
+            <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN') : null} />
             <Campo label="Estado" value={proyecto.ubicacion_estado} />
           </div>
           <div>

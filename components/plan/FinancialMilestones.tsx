@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DollarSign, Plus, Pencil, Trash2, ExternalLink, CheckCircle2, Clock, CircleDot, CreditCard } from 'lucide-react'
 import FinancialMilestoneModal from './FinancialMilestoneModal'
 import CommentThread from './CommentThread'
+import { fmtCurrency } from '@/lib/format'
 
 const ESTADO_CONFIG: Record<EstadoHitoFinanciero, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
   pendiente: { color: '#9CA3AF', bg: '#F3F4F6', icon: <Clock size={12} />, label: 'Pendiente' },
@@ -70,7 +71,7 @@ export default function FinancialMilestones({
             <DollarSign size={16} /> Hitos Financieros
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            {sorted.length} hitos · {totalMonto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} total
+            {sorted.length} hitos · {fmtCurrency(totalMonto, 'MXN')} total
           </p>
         </div>
         {!readOnly && !isFinanciero && (
@@ -88,8 +89,8 @@ export default function FinancialMilestones({
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-bold text-gray-500">Desembolso total</span>
           <span className="text-xs font-mono font-bold text-principal">
-            {totalPagado.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
-            <span className="text-gray-400"> / {totalMonto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}</span>
+            {fmtCurrency(totalPagado, 'MXN')}
+            <span className="text-gray-400"> / {fmtCurrency(totalMonto, 'MXN')}</span>
           </span>
         </div>
         <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
@@ -105,7 +106,7 @@ export default function FinancialMilestones({
                   backgroundColor: cfg.color,
                   opacity: h.estado === 'pendiente' ? 0.3 : 1,
                 }}
-                title={`${h.nombre}: ${h.monto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} (${h.estado})`}
+                title={`${h.nombre}: ${fmtCurrency(h.monto, 'MXN')} (${h.estado})`}
               />
             )
           })}
@@ -114,7 +115,7 @@ export default function FinancialMilestones({
           <span className="text-[10px] text-gray-400">{pctPagado}% pagado</span>
           {capexEstimado && (
             <span className="text-[10px] text-gray-400">
-              CAPEX: {capexEstimado.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+              CAPEX: {fmtCurrency(capexEstimado, 'MXN')}
             </span>
           )}
         </div>
@@ -158,7 +159,7 @@ export default function FinancialMilestones({
                 {/* Amount */}
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-black font-mono text-principal">
-                    {h.monto.toLocaleString('es-MX', { style: 'currency', currency: h.moneda || 'MXN' })}
+                    {fmtCurrency(h.monto, h.moneda || 'MXN')}
                   </p>
                   {h.porcentaje_del_total && (
                     <p className="text-[10px] text-gray-400">{h.porcentaje_del_total}%</p>

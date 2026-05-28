@@ -5,12 +5,7 @@ import { useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Minus, Folder, DollarSign, Zap, Target, Clock, Activity, Users, BarChart3, AlertTriangle, Map, PieChart } from 'lucide-react'
 import { TimePeriodButtons, filterProjects, computePipeline, computeFinancial, type TimePeriod } from './TimePeriodSelector'
 
-// ─── Helpers ───
-function fmt(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })}M`
-  if (n >= 1_000) return `${(n / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })}k`
-  return n.toLocaleString('es-MX', { maximumFractionDigits: 1 })
-}
+import { fmtNum, fmtCurrency, fmtCompact, fmtPct } from '@/lib/format'
 
 function Trend({ current, previous, suffix = '' }: { current: number; previous: number; suffix?: string }) {
   if (previous === 0 && current === 0) return <span className="text-xs text-gray-400">—</span>
@@ -66,9 +61,9 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         {[
           { label: 'Proyectos', value: kpis.totalProjects, icon: Folder, color: 'bg-acento/20 text-principal' },
-          { label: 'Pipeline activo', value: `$${fmt(kpis.activePipelineCapex)}`, icon: DollarSign, color: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Capacidad instalada', value: `${fmt(kpis.installedCapacityKwp)} kWp`, icon: Zap, color: 'bg-amber-50 text-amber-600' },
-          { label: 'Tasa de cierre', value: `${kpis.winRate.toFixed(0)}%`, icon: Target, color: 'bg-blue-50 text-blue-600' },
+          { label: 'Pipeline activo', value: fmtCurrency(kpis.activePipelineCapex, 'MXN'), icon: DollarSign, color: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Capacidad instalada', value: `${fmtCompact(kpis.installedCapacityKwp)} kWp`, icon: Zap, color: 'bg-amber-50 text-amber-600' },
+          { label: 'Tasa de cierre', value: fmtPct(kpis.winRate, 0), icon: Target, color: 'bg-blue-50 text-blue-600' },
           { label: 'Días hasta cierre', value: kpis.avgDaysToClose ?? '—', icon: Clock, color: 'bg-purple-50 text-purple-600' },
           { label: 'Días hasta instalar', value: kpis.avgDaysToInstall ?? '—', icon: Activity, color: 'bg-teal-50 text-teal-600' },
         ].map(({ label, value, icon: Icon, color }) => (
@@ -93,7 +88,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
         {/* Projects by stage - bar chart */}
         <div className="glass-card p-6 mb-4">
           <h3 className="text-sm font-bold mb-1">Proyectos por etapa</h3>
-          <p className="text-[11px] text-gray-400 mb-4">{filteredPipeline.total} proyectos · Tasa de cierre: {filteredPipeline.winRate.toFixed(0)}%</p>
+          <p className="text-[11px] text-gray-400 mb-4">{filteredPipeline.total} proyectos · Tasa de cierre: {fmtPct(filteredPipeline.winRate, 0)}</p>
           <div className="space-y-2.5">
             {Object.entries(filteredPipeline.byStage).map(([stage, count]) => {
               const maxCount = Math.max(...Object.values(filteredPipeline.byStage), 1)
@@ -169,10 +164,10 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           {[
-            { label: 'CAPEX total', value: `$${fmt(filteredFinancial.totalCapex)}` },
-            { label: 'CAPEX FV', value: `$${fmt(filteredFinancial.fvCapex)}` },
-            { label: 'CAPEX BESS', value: `$${fmt(filteredFinancial.bessCapex)}` },
-            { label: 'CAPEX prom/proyecto', value: `$${fmt(filteredFinancial.avgCapexPerProject)}` },
+            { label: 'CAPEX total', value: fmtCurrency(filteredFinancial.totalCapex, 'MXN') },
+            { label: 'CAPEX FV', value: fmtCurrency(filteredFinancial.fvCapex, 'MXN') },
+            { label: 'CAPEX BESS', value: fmtCurrency(filteredFinancial.bessCapex, 'MXN') },
+            { label: 'CAPEX prom/proyecto', value: fmtCurrency(filteredFinancial.avgCapexPerProject, 'MXN') },
           ].map(s => (
             <div key={s.label} className="glass-card p-5">
               <div className="text-xl font-black">{s.value}</div>
@@ -182,15 +177,15 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="glass-card p-5">
-            <div className="text-xl font-black">${fmt(filteredFinancial.totalSavingsMonthly)}</div>
+            <div className="text-xl font-black">{fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN')}</div>
             <div className="text-xs text-gray-500 mt-1">Ahorro mensual estimado</div>
           </div>
           <div className="glass-card p-5">
-            <div className="text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmt(filteredFinancial.avgPaybackMonths)} meses` : '—'}</div>
+            <div className="text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmtNum(filteredFinancial.avgPaybackMonths, 1)} meses` : '—'}</div>
             <div className="text-xs text-gray-500 mt-1">Payback promedio</div>
           </div>
           <div className="glass-card p-5">
-            <div className="text-xl font-black">{filteredFinancial.totalSavingsMonthly > 0 && filteredFinancial.totalCapex > 0 ? `${((filteredFinancial.totalSavingsMonthly * 12 * 25) / filteredFinancial.totalCapex * 100).toFixed(0)}%` : '—'}</div>
+            <div className="text-xl font-black">{filteredFinancial.totalSavingsMonthly > 0 && filteredFinancial.totalCapex > 0 ? fmtPct(((filteredFinancial.totalSavingsMonthly * 12 * 25) / filteredFinancial.totalCapex * 100), 0) : '—'}</div>
             <div className="text-xs text-gray-500 mt-1">ROI proyectado (25 años)</div>
           </div>
         </div>
@@ -200,9 +195,9 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
       <Section title="Rendimiento técnico" icon={Zap} id="technical">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="glass-card p-5"><div className="text-xl font-black">{technical.operativeProjects}</div><div className="text-xs text-gray-500 mt-1">Proyectos operativos</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmt(technical.totalSolarKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Producción solar total</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmt(technical.totalGridKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Consumo de red</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmt(technical.totalBatteryDischargeKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Descarga batería</div></div>
+          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalSolarKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Producción solar total</div></div>
+          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalGridKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Consumo de red</div></div>
+          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalBatteryDischargeKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Descarga batería</div></div>
         </div>
         {technical.constructionProjects.length > 0 && (
           <div className="glass-card p-6 mt-4">
@@ -262,7 +257,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
                   <td className="px-5 py-3 font-medium">{ep.nombre}</td>
                   <td className="px-5 py-3 text-gray-500">{ep.empresa}</td>
                   <td className="px-5 py-3 text-right font-bold">{ep.totalProjects}</td>
-                  <td className="px-5 py-3 text-right">${fmt(ep.totalCapex)}</td>
+                  <td className="px-5 py-3 text-right">{fmtCurrency(ep.totalCapex, 'MXN')}</td>
                   <td className="px-5 py-3 text-right"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">{ep.closedProjects}</span></td>
                 </tr>
               ))}</tbody>
@@ -343,7 +338,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
               {Object.entries(geoCAPEX).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([state, capex]) => (
                 <div key={state} className="flex items-center justify-between">
                   <span className="text-xs font-medium truncate max-w-[120px]">{state}</span>
-                  <span className="text-xs font-black">${fmt(capex)}</span>
+                  <span className="text-xs font-black">{fmtCurrency(capex, 'MXN')}</span>
                 </div>
               ))}
               {Object.entries(geoCAPEX).every(([, v]) => v === 0) && <p className="text-xs text-gray-400">Sin datos</p>}
