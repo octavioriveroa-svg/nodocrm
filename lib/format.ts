@@ -59,3 +59,45 @@ export function fmtPct(n: number | null | undefined, decimals = 1): string {
     maximumFractionDigits: decimals,
   })}%`;
 }
+
+/** Parse string with commas to a raw number */
+export function parseNum(v: string | number | null | undefined): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'number') return v;
+  const clean = v.replace(/,/g, '').trim();
+  if (!clean || isNaN(Number(clean))) return 0;
+  return Number(clean);
+}
+
+/** Formats a text input value dynamically to include thousands separators */
+export function formatNumberInput(value: string): string {
+  // Remove everything except digits and dot
+  const clean = value.replace(/[^\d.]/g, '');
+  
+  // Handle decimal dots
+  const parts = clean.split('.');
+  if (parts.length > 2) {
+    parts[1] = parts.slice(1).join('').replace(/\./g, '');
+    parts.length = 2;
+  }
+  
+  let [integerPart, decimalPart] = parts;
+  
+  // Format the integer part with commas
+  if (integerPart) {
+    // Strip leading zeros unless it's just '0'
+    if (integerPart.length > 1 && integerPart.startsWith('0')) {
+      integerPart = integerPart.replace(/^0+/, '');
+      if (integerPart === '') integerPart = '0';
+    }
+    const num = Number(integerPart);
+    if (!isNaN(num)) {
+      integerPart = num.toLocaleString('es-MX', { maximumFractionDigits: 0 });
+    }
+  }
+  
+  if (parts.length === 2) {
+    return `${integerPart}.${decimalPart}`;
+  }
+  return integerPart;
+}
