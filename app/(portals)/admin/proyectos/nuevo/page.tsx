@@ -139,7 +139,7 @@ function StepIndicator({ current }: { current: number }) {
 }
 
 // ── Tarjeta de producto (display) ────────────────────────────
-function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: string }) {
+function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: Moneda }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
     return (
@@ -159,7 +159,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
           <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
           <span><span className="text-muted">Generación: </span>{fmtNum(parseNum(p.fv.generacion_anual_kwh))} kWh/año</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda as any)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda)}</span>
           <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
         </div>
       </div>
@@ -188,7 +188,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
           <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
           <span><span className="text-muted">Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda as any)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda)}</span>
           <span><span className="text-muted">Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
         </div>
       </div>
@@ -561,12 +561,6 @@ export default function NuevoProyectoPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function toggleModalidad(m: ModalidadFinanciamiento) {
-    if (m === 'no_sabe') { setF('modalidad_financiamiento', ['no_sabe']); return }
-    const current = form.modalidad_financiamiento.filter(x => x !== 'no_sabe')
-    if (current.includes(m)) setF('modalidad_financiamiento', current.filter(x => x !== m))
-    else setF('modalidad_financiamiento', [...current, m])
-  }
 
   // ── Validaciones ─────────────────────────────────────────────
   function validarPaso0() {
