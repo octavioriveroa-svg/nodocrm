@@ -59,10 +59,18 @@ interface CreationConfig {
   tempId: string
   nombre: string
   descripcion: string
-  vehiculo_inversion: string
-  ahorro_estimado_mensual: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
+}
+
+interface CreationFinancingOption {
+  tempId: string
+  nombre: string
+  vehiculo_inversion: string
+  ahorro_estimado_mensual: string
+  plazo_meses: string
+  notas: string
+  linkedConfigIds: string[]
 }
 
 // ── Valores vacíos ─────────────────────────────────────────────
@@ -133,7 +141,7 @@ function StepIndicator({ current }: { current: number }) {
 }
 
 // ── Tarjeta de producto (display) ────────────────────────────
-function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: string }) {
+function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: Moneda }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
     return (
@@ -153,7 +161,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
           <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
           <span><span className="text-muted">Generación: </span>{fmtNum(parseNum(p.fv.generacion_anual_kwh))} kWh/año</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda as any)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda)}</span>
           <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
         </div>
       </div>
@@ -182,7 +190,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
           <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
           <span><span className="text-muted">Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda as any)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda)}</span>
           <span><span className="text-muted">Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
         </div>
       </div>
@@ -227,13 +235,24 @@ export default function FinderNuevoProyectoPage() {
       tempId: 'default',
       nombre: 'Configuración A',
       descripcion: '',
-      vehiculo_inversion: 'credito',
-      ahorro_estimado_mensual: '',
       sitiosSeleccionados: [],
       productosMap: {}
     }
   ])
   const [activeConfigId, setActiveConfigId] = useState<string>('default')
+
+  const [financingOptions, setFinancingOptions] = useState<CreationFinancingOption[]>([
+    {
+      tempId: 'fin-default',
+      nombre: 'Financiamiento 1',
+      vehiculo_inversion: 'credito',
+      ahorro_estimado_mensual: '',
+      plazo_meses: '',
+      notas: '',
+      linkedConfigIds: ['default']
+    }
+  ])
+  const [isRecomendacionNodo, setIsRecomendacionNodo] = useState(false)
 
   const activeConfig = configs.find(c => c.tempId === activeConfigId) || configs[0]
   const sitiosSeleccionados = activeConfig.sitiosSeleccionados
@@ -313,14 +332,18 @@ export default function FinderNuevoProyectoPage() {
   async function cargarSitios(clienteId: string) {
     if (!clienteId) {
       setSitiosCliente([])
-      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', sitiosSeleccionados: [], productosMap: {} }])
+      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
       setActiveConfigId('default')
+      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+      setIsRecomendacionNodo(false)
       return
     }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', sitiosSeleccionados: [], productosMap: {} }])
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
     setActiveConfigId('default')
+    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+    setIsRecomendacionNodo(false)
   }
 
   function seleccionarCliente(clienteId: string) {
@@ -502,12 +525,6 @@ export default function FinderNuevoProyectoPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function toggleModalidad(m: ModalidadFinanciamiento) {
-    if (m === 'no_sabe') { setF('modalidad_financiamiento', ['no_sabe']); return }
-    const current = form.modalidad_financiamiento.filter(x => x !== 'no_sabe')
-    if (current.includes(m)) setF('modalidad_financiamiento', current.filter(x => x !== m))
-    else setF('modalidad_financiamiento', [...current, m])
-  }
 
   // ── Validaciones ─────────────────────────────────────────────
   function validarPaso0() {
@@ -544,7 +561,17 @@ export default function FinderNuevoProyectoPage() {
   }
 
   function validarPaso2() {
-    if (form.modalidad_financiamiento.length === 0) return 'Selecciona al menos una modalidad de financiamiento.'
+    if (isRecomendacionNodo) return ''
+    if (financingOptions.length === 0) return 'Agrega al menos una opción de financiamiento o selecciona que Nodo te recomiende las mejores alternativas.'
+    
+    for (let i = 0; i < financingOptions.length; i++) {
+      const opt = financingOptions[i]
+      if (!opt.nombre.trim()) return `La opción de financiamiento ${i + 1} debe tener un nombre.`
+      if (!opt.vehiculo_inversion) return `La opción de financiamiento "${opt.nombre}" debe tener un vehículo de inversión.`
+      if (opt.linkedConfigIds.length === 0) {
+        return `La opción de financiamiento "${opt.nombre}" debe estar vinculada a al menos una configuración técnica.`
+      }
+    }
     return ''
   }
 
@@ -552,10 +579,6 @@ export default function FinderNuevoProyectoPage() {
     setError('')
     const err = step === 0 ? validarPaso0() : step === 1 ? validarPaso1() : ''
     if (err) { setError(err); return }
-    if (step === 1) {
-      const vehicles = Array.from(new Set(configs.map(c => c.vehiculo_inversion as ModalidadFinanciamiento))).filter(Boolean)
-      setF('modalidad_financiamiento', vehicles)
-    }
     setStep(s => s + 1)
   }
 
@@ -589,6 +612,10 @@ export default function FinderNuevoProyectoPage() {
       return sum + pCapex
     }, 0)
 
+    const vehiclesArray = isRecomendacionNodo 
+      ? ['no_sabe'] 
+      : Array.from(new Set(financingOptions.map(o => o.vehiculo_inversion)))
+
     const payload = {
       finder_id: session.user.id,
       epcista_id: form.epcista_id,
@@ -606,7 +633,7 @@ export default function FinderNuevoProyectoPage() {
       capex_estimado: firstConfigCapex,
       moneda: form.moneda,
       ubicacion_estado,
-      modalidad_financiamiento: [configs[0].vehiculo_inversion as ModalidadFinanciamiento],
+      modalidad_financiamiento: vehiclesArray as ModalidadFinanciamiento[],
       notas_adicionales: form.notas_adicionales || null,
     }
 
@@ -634,8 +661,6 @@ export default function FinderNuevoProyectoPage() {
         descripcion: c.descripcion || null,
         inversion_total,
         moneda: form.moneda,
-        vehiculo_inversion: c.vehiculo_inversion || null,
-        ahorro_estimado_mensual: c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) : null,
         seleccionada: idx === 0,
       }
     })
@@ -649,6 +674,80 @@ export default function FinderNuevoProyectoPage() {
       setError('Error al guardar configuraciones: ' + configsErr.message)
       setLoading(false)
       return
+    }
+
+    const optionsToInsert = isRecomendacionNodo 
+      ? [{
+          proyecto_id: proyecto.id,
+          nombre: 'Recomendación de Nodo',
+          vehiculo_inversion: 'no_sabe',
+          ahorro_estimado_mensual: null,
+          plazo_meses: null,
+          notas: null,
+          seleccionada: true
+        }]
+      : financingOptions.map((o, idx) => ({
+          proyecto_id: proyecto.id,
+          nombre: o.nombre,
+          vehiculo_inversion: o.vehiculo_inversion,
+          ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
+          plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
+          notas: o.notas || null,
+          seleccionada: idx === 0
+        }))
+
+    const { data: insertedOptions, error: optionsErr } = await supabase
+      .from('opciones_financiamiento')
+      .insert(optionsToInsert)
+      .select('id, nombre, vehiculo_inversion')
+
+    if (optionsErr) {
+      setError('Error al guardar opciones de financiamiento: ' + optionsErr.message)
+      setLoading(false)
+      return
+    }
+
+    const junctionRows: { configuracion_id: string; opcion_financiamiento_id: string }[] = []
+    
+    if (isRecomendacionNodo) {
+      const optId = insertedOptions?.[0]?.id
+      if (optId && insertedConfigs) {
+        for (const ic of insertedConfigs) {
+          junctionRows.push({
+            configuracion_id: ic.id,
+            opcion_financiamiento_id: optId
+          })
+        }
+      }
+    } else {
+      for (const o of financingOptions) {
+        const dbOpt = insertedOptions?.find(io => io.nombre === o.nombre && io.vehiculo_inversion === o.vehiculo_inversion)
+        if (!dbOpt) continue
+        
+        for (const configTempId of o.linkedConfigIds) {
+          const origConfig = configs.find(c => c.tempId === configTempId)
+          if (!origConfig) continue
+          const dbConfig = insertedConfigs?.find(ic => ic.nombre === origConfig.nombre)
+          if (!dbConfig) continue
+          
+          junctionRows.push({
+            configuracion_id: dbConfig.id,
+            opcion_financiamiento_id: dbOpt.id
+          })
+        }
+      }
+    }
+
+    if (junctionRows.length > 0) {
+      const { error: junctionErr } = await supabase
+        .from('config_financiamiento')
+        .insert(junctionRows)
+      
+      if (junctionErr) {
+        setError('Error al vincular financiamiento y configuraciones: ' + junctionErr.message)
+        setLoading(false)
+        return
+      }
     }
 
     const productosRows: {
@@ -853,8 +952,6 @@ export default function FinderNuevoProyectoPage() {
                       tempId: newId,
                       nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
                       descripcion: '',
-                      vehiculo_inversion: 'credito',
-                      ahorro_estimado_mensual: '',
                       sitiosSeleccionados: [],
                       productosMap: {}
                     }
@@ -880,33 +977,6 @@ export default function FinderNuevoProyectoPage() {
                     }}
                     className={inp}
                     placeholder="Ej: Opción A - Solo FV"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Vehículo de inversión *</label>
-                  <select
-                    value={activeConfig.vehiculo_inversion}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, vehiculo_inversion: e.target.value } : c))
-                    }}
-                    className={inp}
-                  >
-                    <option value="credito">Crédito</option>
-                    <option value="arrendamiento">Arrendamiento</option>
-                    <option value="ensaas">EnSaaS</option>
-                    <option value="mem">Mercado Eléctrico Mayorista</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Ahorro mensual estimado ($) *</label>
-                  <input
-                    type="number"
-                    value={activeConfig.ahorro_estimado_mensual}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: e.target.value } : c))
-                    }}
-                    className={inp}
-                    placeholder="0"
                   />
                 </div>
                 <div>
@@ -1361,47 +1431,182 @@ export default function FinderNuevoProyectoPage() {
           <div className="flex flex-col gap-5">
             <h2 className="font-bold text-lg">Financiamiento</h2>
 
+            {/* Modo Selection */}
             <div>
-              <label className="block text-sm font-medium mb-3">
-                ¿Qué esquema de financiamiento busca el cliente? *
-              </label>
-              <div className="flex flex-col gap-3">
-                {([
-                  { key: 'credito', title: 'Crédito', desc: 'El cliente adquiere el activo mediante un crédito y es dueño desde el inicio.' },
-                  { key: 'arrendamiento', title: 'Arrendamiento financiero / puro', desc: 'Renta del sistema con opción a compra al finalizar el plazo.' },
-                  { key: 'ensaas', title: 'Energía como Servicio (EnSaaS)', desc: 'Contrato de venta de energía (PPA). El inversionista es dueño del activo.' },
-                  { key: 'mem', title: 'Participación en MEM', desc: 'Contrato de suministro calificado para Mercado Eléctrico Mayorista.' },
-                  { key: 'no_sabe', title: 'Aún no define / Que el analista lo determine', desc: 'El equipo de Nodo analizará las opciones óptimas para la empresa.' },
-                ] as { key: ModalidadFinanciamiento; title: string; desc: string }[]).map(opt => {
-                  const selected = form.modalidad_financiamiento.includes(opt.key)
-                  return (
-                    <button key={opt.key} type="button"
-                      onClick={() => toggleModalidad(opt.key)}
-                      className="flex items-start gap-4 rounded-xl border p-4 text-left w-full transition-all duration-200"
-                      style={{
-                        borderColor: selected ? '#000' : '#E5E5E5',
-                        backgroundColor: selected ? '#000' : '#fff',
-                        boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)'
-                      }}>
-                      <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
-                        style={{ borderColor: selected ? '#D7FF2F' : '#CFCFCF' }}>
-                        {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#D7FF2F' }} />}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm" style={{ color: selected ? '#D7FF2F' : '#000' }}>
-                          {opt.title}
-                        </div>
-                        <div className="text-xs mt-1.5" style={{ color: selected ? '#aaa' : '#666' }}>
-                          {opt.desc}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+              <label className="block text-sm font-semibold mb-3">¿Cómo prefieres definir las opciones de financiamiento? *</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setIsRecomendacionNodo(true)}
+                  className="border rounded-xl p-4 text-left transition-all"
+                  style={{
+                    borderColor: isRecomendacionNodo ? '#000' : '#E5E5E5',
+                    backgroundColor: isRecomendacionNodo ? '#000' : '#fff',
+                    color: isRecomendacionNodo ? '#D7FF2F' : '#000',
+                  }}
+                >
+                  <p className="font-bold text-sm">Nodo Recomienda</p>
+                  <p className="text-xs opacity-75 mt-1">El analista de Nodo definirá y presentará las mejores opciones para el cliente.</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRecomendacionNodo(false)}
+                  className="border rounded-xl p-4 text-left transition-all"
+                  style={{
+                    borderColor: !isRecomendacionNodo ? '#000' : '#E5E5E5',
+                    backgroundColor: !isRecomendacionNodo ? '#000' : '#fff',
+                    color: !isRecomendacionNodo ? '#D7FF2F' : '#000',
+                  }}
+                >
+                  <p className="font-bold text-sm">Ingresar opciones manualmente</p>
+                  <p className="text-xs opacity-75 mt-1">Configura y vincula múltiples opciones de financiamiento a tus alternativas técnicas.</p>
+                </button>
               </div>
             </div>
 
-            <hr className="border-borde rounded-xl" />
+            {!isRecomendacionNodo && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-2 border-b border-borde">
+                  <h3 className="font-bold text-sm text-principal">Opciones de Financiamiento</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `fin-${Date.now()}`
+                      setFinancingOptions(prev => [
+                        ...prev,
+                        {
+                          tempId: newId,
+                          nombre: `Financiamiento ${prev.length + 1}`,
+                          vehiculo_inversion: 'credito',
+                          ahorro_estimado_mensual: '',
+                          plazo_meses: '',
+                          notas: '',
+                          linkedConfigIds: configs.map(c => c.tempId)
+                        }
+                      ])
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-borde font-semibold rounded-xl bg-white hover:border-black transition-all"
+                  >
+                    <Plus size={12} /> Agregar opción
+                  </button>
+                </div>
+
+                {financingOptions.map((opt, oIdx) => (
+                  <div key={opt.tempId} className="border border-borde p-4 rounded-xl bg-fondo/10 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-muted uppercase">Opción #{oIdx + 1}</span>
+                      {financingOptions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFinancingOptions(prev => prev.filter(item => item.tempId !== opt.tempId))
+                          }}
+                          className="text-red-500 hover:text-red-700 transition-colors p-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Nombre de la opción *</label>
+                        <input
+                          type="text"
+                          value={opt.nombre}
+                          onChange={e => {
+                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, nombre: e.target.value } : o))
+                          }}
+                          className={inp}
+                          placeholder="Ej: Crédito a 5 años"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Vehículo de inversión *</label>
+                        <select
+                          value={opt.vehiculo_inversion}
+                          onChange={e => {
+                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, vehiculo_inversion: e.target.value } : o))
+                          }}
+                          className={inp}
+                        >
+                          <option value="credito">Crédito</option>
+                          <option value="arrendamiento">Arrendamiento</option>
+                          <option value="ensaas">EnSaaS</option>
+                          <option value="mem">Mercado Eléctrico Mayorista</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Ahorro mensual estimado ($)</label>
+                        <input
+                          type="text"
+                          value={opt.ahorro_estimado_mensual}
+                          onChange={e => {
+                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : o))
+                          }}
+                          className={inp}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Plazo (meses)</label>
+                        <input
+                          type="text"
+                          value={opt.plazo_meses}
+                          onChange={e => {
+                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, plazo_meses: formatNumberInput(e.target.value) } : o))
+                          }}
+                          className={inp}
+                          placeholder="60"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium mb-1">Notas</label>
+                        <input
+                          type="text"
+                          value={opt.notas}
+                          onChange={e => {
+                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, notas: e.target.value } : o))
+                          }}
+                          className={inp}
+                          placeholder="Detalles sobre tasa de interés, enganche u observaciones…"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-semibold mb-2 text-muted uppercase">Vincular a Alternativas Técnicas *</span>
+                      <div className="flex flex-wrap gap-4 bg-white p-3 rounded-lg border border-borde">
+                        {configs.map(c => {
+                          const isLinked = opt.linkedConfigIds.includes(c.tempId)
+                          return (
+                            <label key={c.tempId} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isLinked}
+                                onChange={() => {
+                                  setFinancingOptions(prev => prev.map(o => {
+                                    if (o.tempId === opt.tempId) {
+                                      const nextIds = o.linkedConfigIds.includes(c.tempId)
+                                        ? o.linkedConfigIds.filter(id => id !== c.tempId)
+                                        : [...o.linkedConfigIds, c.tempId]
+                                      return { ...o, linkedConfigIds: nextIds }
+                                    }
+                                    return o
+                                  }))
+                                }}
+                                className="w-3.5 h-3.5"
+                              />
+                              <span>{c.nombre}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Moneda y CAPEX */}
             <div className="grid grid-cols-2 gap-4">

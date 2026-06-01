@@ -81,7 +81,8 @@ export function formatNumberInput(value: string): string {
     parts.length = 2;
   }
   
-  let [integerPart, decimalPart] = parts;
+  let integerPart = parts[0];
+  const decimalPart = parts[1];
   
   // Format the integer part with commas
   if (integerPart) {

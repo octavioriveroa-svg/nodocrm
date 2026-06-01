@@ -69,12 +69,31 @@ export interface ConfiguracionTecnica {
   descripcion: string | null
   inversion_total: number | null
   moneda: string
-  vehiculo_inversion: string | null
-  ahorro_estimado_mensual: number | null
   seleccionada: boolean
   created_at: string
   updated_at: string
 }
+
+export interface OpcionFinanciamiento {
+  id: string
+  proyecto_id: string
+  nombre: string
+  vehiculo_inversion: string
+  ahorro_estimado_mensual: number | null
+  plazo_meses: number | null
+  notas: string | null
+  seleccionada: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ConfigFinanciamiento {
+  id: string
+  configuracion_id: string
+  opcion_financiamiento_id: string
+  created_at: string
+}
+
  
 export interface Comentario {
   id: string
