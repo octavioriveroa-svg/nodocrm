@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import DetalleProyecto from '@/components/DetalleProyecto'
-import type { Proyecto, Comentario, Archivo, Profile, Sitio, ProyectoSitioProducto, ConfiguracionTecnica } from '@/lib/types'
+import type { Proyecto, Comentario, Archivo, Profile, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, OpcionFinanciamiento, ConfigFinanciamiento } from '@/lib/types'
 
 export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = createClient()
@@ -16,6 +16,8 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
     productos: ProyectoSitioProducto[]
     configuraciones: ConfiguracionTecnica[]
     hitos: import('@/lib/types').HitoConstruccion[]
+    opcionesFinanciamiento: OpcionFinanciamiento[]
+    configFinanciamientoLinks: ConfigFinanciamiento[]
   } | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -36,6 +38,7 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
           { data: prods },
           { data: configs },
           { data: hitos },
+          { data: options },
         ] = await Promise.all([
           supabase.from('proyectos').select('*').eq('id', id).single(),
           supabase.from('comentarios').select('*, profiles(*)').eq('proyecto_id', id).order('created_at', { ascending: true }),
@@ -45,10 +48,16 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
           supabase.from('proyecto_sitio_productos').select('*, sitios(nombre)').eq('proyecto_id', id),
           supabase.from('configuraciones_tecnicas').select('*').eq('proyecto_id', id).order('created_at', { ascending: true }),
           supabase.from('hitos_construccion').select('*').eq('proyecto_id', id).order('orden', { ascending: true }),
+          supabase.from('opciones_financiamiento').select('*').eq('proyecto_id', id).order('created_at', { ascending: true }),
         ])
 
         if (pErr || !proyecto) { setNotFound(true); return }
         if (!profile) { setNotFound(true); return }
+
+        const configIds = (configs ?? []).map(c => c.id)
+        const { data: configFinLinks } = configIds.length > 0
+          ? await supabase.from('config_financiamiento').select('*').in('configuracion_id', configIds)
+          : { data: [] }
 
         const sitios = (ps ?? []).map((r: { sitios: Sitio }) => r.sitios).filter(Boolean) as Sitio[]
 
@@ -61,6 +70,8 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
           productos: (prods ?? []) as ProyectoSitioProducto[],
           configuraciones: (configs ?? []) as ConfiguracionTecnica[],
           hitos: (hitos ?? []) as import('@/lib/types').HitoConstruccion[],
+          opcionesFinanciamiento: (options ?? []) as OpcionFinanciamiento[],
+          configFinanciamientoLinks: (configFinLinks ?? []) as ConfigFinanciamiento[],
         })
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : 'Error al cargar el proyecto')
@@ -84,5 +95,5 @@ export default function DetalleEpcistaPage({ params }: { params: Promise<{ id: s
   )
   if (!data) return null
 
-  return <DetalleProyecto {...data} productos={data.productos} hitos={data.hitos} />
+  return <DetalleProyecto {...data} productos={data.productos} hitos={data.hitos} opcionesFinanciamiento={data.opcionesFinanciamiento} configFinanciamientoLinks={data.configFinanciamientoLinks} />
 }

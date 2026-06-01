@@ -7,7 +7,7 @@ import BadgeEstado from './BadgeEstado'
 import BadgeTipo from './BadgeTipo'
 import { Button } from './ui/Button'
 import { Card, CardTitle } from './ui/Card'
-import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda, TipoProyecto, TecnologiaBateria } from '@/lib/types'
+import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda, TipoProyecto, TecnologiaBateria, OpcionFinanciamiento, ConfigFinanciamiento } from '@/lib/types'
 import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -17,6 +17,7 @@ import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
 import DocumentCenter from './DocumentCenter'
 import EditarSolucionTecnicaModal from './EditarSolucionTecnicaModal'
+import EditarFinanciamientoModal from './EditarFinanciamientoModal'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -100,9 +101,11 @@ interface Props {
   productos?: ProyectoSitioProducto[]
   hitos?: import('@/lib/types').HitoConstruccion[]
   configuraciones?: ConfiguracionTecnica[]
+  opcionesFinanciamiento?: OpcionFinanciamiento[]
+  configFinanciamientoLinks?: ConfigFinanciamiento[]
 }
 
-export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [], hitos = [], configuraciones = [] }: Props) {
+export default function DetalleProyecto({ proyecto: initial, comentarios: initialComentarios, archivos: initialArchivos, currentUser, sitios = [], productos = [], hitos = [], configuraciones = [], opcionesFinanciamiento = [], configFinanciamientoLinks = [] }: Props) {
   const supabase = createClient()
   const [proyecto, setProyecto] = useState(initial)
   const [comentarios, setComentarios] = useState(initialComentarios)
@@ -121,8 +124,12 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [configsList, setConfigsList] = useState<ConfiguracionTecnica[]>([])
+  const [opcionesFin, setOpcionesFin] = useState<OpcionFinanciamiento[]>([])
+  const [configFinLinks, setConfigFinLinks] = useState<ConfigFinanciamiento[]>([])
   const [showEditTecnica, setShowEditTecnica] = useState(false)
+  const [showEditFinanciamiento, setShowEditFinanciamiento] = useState(false)
   const [seleccionandoConfig, setSeleccionandoConfig] = useState(false)
+  const [seleccionandoFinancing, setSeleccionandoFinancing] = useState(false)
   const [errorEstado, setErrorEstado] = useState<string | null>(null)
 
   useEffect(() => {
@@ -135,6 +142,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       setSelectedConfigId(list[0].id)
     }
   }, [configuraciones])
+
+  useEffect(() => {
+    setOpcionesFin(opcionesFinanciamiento ?? [])
+    setConfigFinLinks(configFinanciamientoLinks ?? [])
+  }, [opcionesFinanciamiento, configFinanciamientoLinks])
 
   const isAnalista = currentUser.rol === 'nodo_analista'
   const isAdmin = currentUser.rol === 'nodo_admin'
@@ -178,7 +190,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         .then(({ data }) => { if (data) setAllEpcistas(data as {id: string; nombre: string; empresa: string}[]) })
     }
   }, [isAdmin, isAnalista, isFinder, currentUser.id, initial.responsable_nodo_id])
-
   async function handleSelectConfig(configId: string) {
     if (configId === 'legacy') return
     setSeleccionandoConfig(true)
@@ -196,13 +207,12 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       const updatedList = configsList.map(c => ({ ...c, seleccionada: c.id === configId }))
       setConfigsList(updatedList)
 
-      // 4. Update project table fields (capex, currency, vehicle)
+      // 4. Update project table fields (capex, currency)
       const targetConfig = updatedList.find(c => c.id === configId)
       if (targetConfig) {
         const { data: updatedProj, error: projErr } = await supabase.from('proyectos').update({
           capex_estimado: targetConfig.inversion_total,
           moneda: targetConfig.moneda,
-          modalidad_financiamiento: targetConfig.vehiculo_inversion ? [targetConfig.vehiculo_inversion as ModalidadFinanciamiento] : proyecto.modalidad_financiamiento,
         }).eq('id', proyecto.id).select().single()
         
         if (projErr) throw projErr
@@ -216,13 +226,48 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     }
   }
 
+  async function handleSelectFinancing(optionId: string) {
+    setSeleccionandoFinancing(true)
+    setErrorEstado(null)
+    try {
+      // 1. Reset all to false
+      const { error: err1 } = await supabase.from('opciones_financiamiento').update({ seleccionada: false }).eq('proyecto_id', proyecto.id)
+      if (err1) throw err1
+      
+      // 2. Set target to true
+      const { error: err2 } = await supabase.from('opciones_financiamiento').update({ seleccionada: true }).eq('id', optionId)
+      if (err2) throw err2
+
+      // 3. Update local state
+      const updatedList = opcionesFin.map(o => ({ ...o, seleccionada: o.id === optionId }))
+      setOpcionesFin(updatedList)
+
+      // 4. Sync project-level modalidad_financiamiento
+      const targetOption = updatedList.find(o => o.id === optionId)
+      if (targetOption) {
+        const { data: updatedProj, error: projErr } = await supabase.from('proyectos').update({
+          modalidad_financiamiento: [targetOption.vehiculo_inversion as ModalidadFinanciamiento],
+        }).eq('id', proyecto.id).select().single()
+        
+        if (projErr) throw projErr
+        if (updatedProj) setProyecto(updatedProj as Proyecto)
+      }
+    } catch (err) {
+      console.error(err)
+      setErrorEstado(err instanceof Error ? err.message : 'Error al seleccionar opción de financiamiento')
+    } finally {
+      setSeleccionandoFinancing(false)
+    }
+  }
+
   async function cambiarEstado(estado: EstadoProyecto) {
     setErrorEstado(null)
     const configRequired = ['aprobado', 'en_construccion', 'operativo', 'completado'].includes(estado)
     if (configRequired) {
       const hasSelectedConfig = configsList.some(c => c.seleccionada)
-      if (!hasSelectedConfig) {
-        const msg = 'Se debe seleccionar una configuración técnica ganadora antes de aprobar el proyecto o avanzar en el pipeline.'
+      const hasSelectedFin = opcionesFin.some(o => o.seleccionada)
+      if (!hasSelectedConfig || !hasSelectedFin) {
+        const msg = 'Se deben seleccionar una configuración técnica ganadora Y una opción de financiamiento ganadora antes de aprobar el proyecto o avanzar en el pipeline.'
         setErrorEstado(msg)
         alert(msg)
         return
@@ -577,35 +622,28 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                       <span>Incluye MEM</span>
                     </label>
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium mb-2">Modalidad de financiamiento</label>
-                    <div className="flex flex-wrap gap-3">
-                      {(['credito', 'arrendamiento', 'ensaas', 'mem', 'no_sabe'] as ModalidadFinanciamiento[]).map(m => {
-                        const isSelected = (form.modalidad_financiamiento ?? []).includes(m)
-                        return (
-                          <label key={m} className="flex items-center gap-1.5 cursor-pointer text-xs">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={e => {
-                                let list = [...(form.modalidad_financiamiento ?? [])]
-                                if (m === 'no_sabe') {
-                                  list = e.target.checked ? ['no_sabe'] : []
-                                } else {
-                                  list = list.filter(x => x !== 'no_sabe')
-                                  if (e.target.checked) list.push(m)
-                                  else list = list.filter(x => x !== m)
-                                }
-                                setForm(f => ({...f, modalidad_financiamiento: list}))
-                              }}
-                            />
-                            <span>{MODALIDAD_LABELS[m]}</span>
-                          </label>
-                        )
-                      })}
+                  <div className="col-span-2 border-t border-gray-200/60 pt-4 mt-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2">Vehículos de financiamiento</label>
+                    <div className="bg-white border border-borde rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+                      <div>
+                        <p className="text-xs font-bold text-principal">Opciones de financiamiento alternativas</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Puedes configurar múltiples alternativas de financiamiento, sus plazos, y vincularlos a las configuraciones técnicas.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const saved = await handleGuardar(false)
+                          if (saved) {
+                            setShowEditFinanciamiento(true)
+                          }
+                        }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold bg-principal text-acento rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
+                      >
+                        <Pencil size={12} /> Configurar Opciones de Financiamiento
+                      </button>
                     </div>
                   </div>
-                </div>
+                </div>              
               </div>
             )}
 
@@ -1034,8 +1072,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           descripcion: 'Configuración importada del proyecto original',
           inversion_total: proyecto.capex_estimado,
           moneda: proyecto.moneda,
-          vehiculo_inversion: proyecto.modalidad_financiamiento?.[0] || 'no_sabe',
-          ahorro_estimado_mensual: null,
           seleccionada: true,
           created_at: '',
           updated_at: ''
@@ -1145,23 +1181,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
-                  <div className="text-[10px] uppercase font-bold text-gray-400">Inversión total</div>
-                  <div className="text-base font-black text-principal mt-1">
-                    {fmtCurrency(activeConfig.inversion_total, activeConfig.moneda)}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-borde shadow-sm flex justify-between items-center">
+                  <div>
+                    <div className="text-xs uppercase font-bold text-gray-400">Inversión total</div>
+                    <div className="text-xl font-black text-principal mt-1">
+                      {fmtCurrency(activeConfig.inversion_total, activeConfig.moneda)}
+                    </div>
                   </div>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
-                  <div className="text-[10px] uppercase font-bold text-gray-400">Financiamiento</div>
-                  <div className="text-base font-bold text-principal mt-1">
-                    {MODALIDAD_LABELS[activeConfig.vehiculo_inversion as ModalidadFinanciamiento] || activeConfig.vehiculo_inversion || '—'}
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-borde shadow-sm">
-                  <div className="text-[10px] uppercase font-bold text-gray-400">Ahorro mensual</div>
-                  <div className="text-base font-black text-green-600 mt-1">
-                    {fmtCurrency(activeConfig.ahorro_estimado_mensual, activeConfig.moneda)}
+                  <div className="text-right">
+                    <div className="text-xs uppercase font-bold text-gray-400">Moneda</div>
+                    <div className="text-sm font-bold text-gray-600 mt-1">
+                      {activeConfig.moneda}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1262,6 +1294,117 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         )
       })()}
 
+      {/* Opciones de financiamiento */}
+      {!editando && (
+        <Seccion title="Opciones de financiamiento">
+          {configsList.length > 0 && (isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
+            <div className="flex justify-end mb-4">
+              <Button size="sm" variant="outline" onClick={() => setShowEditFinanciamiento(true)} className="flex items-center gap-1">
+                <Pencil size={11} /> Editar Opciones de Financiamiento
+              </Button>
+            </div>
+          )}
+
+          {opcionesFin.length === 0 ? (
+            <p className="text-sm text-gray-400">Sin opciones de financiamiento configuradas para este proyecto.</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {/* Warning if no financing selected and state is negociacion or beyond */}
+              {!opcionesFin.some(o => o.seleccionada) && ['negociacion', 'aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
+                <div className="mb-2 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5 text-amber-800 text-xs font-semibold">
+                  <AlertTriangle className="shrink-0 text-amber-500" size={16} />
+                  <div>
+                    <p className="font-bold text-amber-900">Opción de financiamiento requerida</p>
+                    <p className="font-medium text-amber-800 mt-0.5">Se debe seleccionar una opción de financiamiento ganadora antes de poder avanzar en el pipeline del proyecto.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {opcionesFin.map(o => {
+                  const isSelected = o.seleccionada
+                  const linkedConfigs = configFinLinks.filter(link => link.opcion_financiamiento_id === o.id)
+                    .map(link => configsList.find(c => c.id === link.configuracion_id)?.nombre)
+                    .filter(Boolean)
+                  const canSelect = (isAdmin || isAnalista) || (isEpcista && proyecto.epcista_id === currentUser.id)
+
+                  return (
+                    <div key={o.id} className={`border rounded-xl p-5 relative transition-all shadow-sm ${
+                      isSelected ? 'border-green-500 bg-green-50/10' : 'border-borde bg-white'
+                    }`}>
+                      {isSelected && (
+                        <span className="absolute top-4 right-4 text-xs font-bold uppercase tracking-wider bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          ✓ Ganadora
+                        </span>
+                      )}
+
+                      <h4 className="font-bold text-sm text-principal mb-2 pr-20">{o.nombre}</h4>
+                      
+                      {o.vehiculo_inversion === 'no_sabe' ? (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 p-2 rounded-lg font-medium">
+                          Nodo definirá las mejores alternativas de financiamiento para este proyecto.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                          <div>
+                            <span className="text-muted block">Vehículo:</span>
+                            <span className="font-bold text-principal">{MODALIDAD_LABELS[o.vehiculo_inversion as ModalidadFinanciamiento] || o.vehiculo_inversion}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted block">Ahorro mensual:</span>
+                            <span className="font-bold text-green-600">
+                              {o.ahorro_estimado_mensual !== null ? fmtCurrency(o.ahorro_estimado_mensual, proyecto.moneda) : '—'}
+                            </span>
+                          </div>
+                          {o.plazo_meses && (
+                            <div>
+                              <span className="text-muted block">Plazo:</span>
+                              <span className="font-semibold text-principal">{o.plazo_meses} meses</span>
+                            </div>
+                          )}
+                          {o.notas && (
+                            <div className="col-span-2">
+                              <span className="text-muted block">Notas:</span>
+                              <span className="text-gray-600 break-words">{o.notas}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {o.vehiculo_inversion !== 'no_sabe' && linkedConfigs.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">Alternativas compatibles:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {linkedConfigs.map(name => (
+                              <span key={name} className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-semibold border border-gray-200">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {canSelect && !isSelected && (
+                        <div className="mt-4 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            disabled={seleccionandoFinancing}
+                            onClick={() => handleSelectFinancing(o.id)}
+                          >
+                            {seleccionandoFinancing ? 'Seleccionando...' : 'Seleccionar como ganadora'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </Seccion>
+      )}
+
       {/* MEM */}
       {proyecto.incluye_mem && (
         <Seccion title="Mercado Eléctrico Mayorista">
@@ -1292,35 +1435,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Financiamiento */}
+      {/* Ubicación y Notas */}
       {!editando && (
-        <Seccion title="Financiamiento y ubicación">
+        <Seccion title="Ubicación y Notas">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <Campo label="CAPEX estimado" value={proyecto.capex_estimado ? fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN') : null} />
+            <Campo label="CAPEX estimado (Ganador)" value={proyecto.capex_estimado ? fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN') : null} />
             <Campo label="Estado" value={proyecto.ubicacion_estado} />
           </div>
-          <div>
-            <div className="text-xs font-medium mb-2 text-gray-400">Modalidad de financiamiento</div>
-            {noSabe ? (
-              <span className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-acento text-principal">
-                Analista define modalidad
-              </span>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {modalidades.map(m => (
-                  <span key={m} className="inline-flex items-center px-3 py-1 border border-white/40 text-xs font-medium">
-                    {MODALIDAD_LABELS[m]}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          {proyecto.notas_adicionales && (
-            <div className="mt-4">
+          {proyecto.notas_adicionales ? (
+            <div className="mt-4 pt-4 border-t border-gray-100">
               <div className="text-xs font-medium mb-1 text-gray-400">Notas adicionales</div>
               <p className="text-sm whitespace-pre-wrap">{proyecto.notas_adicionales}</p>
             </div>
-          )}
+          ) : null}
         </Seccion>
       )}
 
@@ -1424,6 +1551,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         sitios={sitios}
         onSave={() => {
           setShowEditTecnica(false)
+          window.location.reload()
+        }}
+      />
+
+      <EditarFinanciamientoModal
+        isOpen={showEditFinanciamiento}
+        onClose={() => setShowEditFinanciamiento(false)}
+        proyecto={proyecto}
+        configuraciones={configsList}
+        opcionesFinanciamiento={opcionesFin}
+        configFinanciamientoLinks={configFinLinks}
+        onSave={() => {
+          setShowEditFinanciamiento(false)
           window.location.reload()
         }}
       />

@@ -39,8 +39,6 @@ interface CreationConfig {
   tempId: string
   nombre: string
   descripcion: string
-  vehiculo_inversion: string
-  ahorro_estimado_mensual: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
 }
@@ -148,8 +146,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           tempId: c.id,
           nombre: c.nombre,
           descripcion: c.descripcion || '',
-          vehiculo_inversion: c.vehiculo_inversion || 'credito',
-          ahorro_estimado_mensual: c.ahorro_estimado_mensual !== null ? String(c.ahorro_estimado_mensual) : '',
           sitiosSeleccionados,
           productosMap
         }
@@ -160,8 +156,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           tempId: 'default',
           nombre: 'Configuración A',
           descripcion: '',
-          vehiculo_inversion: 'credito',
-          ahorro_estimado_mensual: '',
           sitiosSeleccionados: [],
           productosMap: {}
         })
@@ -309,9 +303,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const { error: err } = await supabase.from('configuraciones_tecnicas').update({
           nombre: c.nombre,
           descripcion: c.descripcion || null,
-          inversion_total,
-          vehiculo_inversion: c.vehiculo_inversion,
-          ahorro_estimado_mensual: c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) : null
+          inversion_total
         }).eq('id', c.id!)
         if (err) throw err
       }
@@ -327,8 +319,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           descripcion: c.descripcion || null,
           inversion_total,
           moneda: proyecto.moneda || 'MXN',
-          vehiculo_inversion: c.vehiculo_inversion,
-          ahorro_estimado_mensual: c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) : null,
           seleccionada: false
         }
       })
@@ -425,8 +415,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       const winningInversion = Object.values(selectedConfig.productosMap).flat().reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
       await supabase.from('proyectos').update({
-        capex_estimado: winningInversion,
-        modalidad_financiamiento: [selectedConfig.vehiculo_inversion as ModalidadFinanciamiento]
+        capex_estimado: winningInversion
       }).eq('id', proyecto.id)
 
       onSave()
@@ -523,8 +512,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                         tempId: newId,
                         nombre: `Alternativa ${String.fromCharCode(65 + prev.length)}`,
                         descripcion: '',
-                        vehiculo_inversion: 'credito',
-                        ahorro_estimado_mensual: '',
                         sitiosSeleccionados: [],
                         productosMap: {}
                       }
@@ -551,33 +538,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                       }}
                       className={inp}
                       placeholder="Ej: Opción A - Solo FV"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Vehículo de inversión *</label>
-                    <select
-                      value={activeConfig.vehiculo_inversion}
-                      onChange={e => {
-                        setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, vehiculo_inversion: e.target.value } : c))
-                      }}
-                      className={inp}
-                    >
-                      <option value="credito">Crédito</option>
-                      <option value="arrendamiento">Arrendamiento</option>
-                      <option value="ensaas">EnSaaS</option>
-                      <option value="mem">Mercado Eléctrico Mayorista</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Ahorro mensual estimado ($)</label>
-                    <input
-                      type="number"
-                      value={activeConfig.ahorro_estimado_mensual}
-                      onChange={e => {
-                        setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: e.target.value } : c))
-                      }}
-                      className={inp}
-                      placeholder="0"
                     />
                   </div>
                   <div>
