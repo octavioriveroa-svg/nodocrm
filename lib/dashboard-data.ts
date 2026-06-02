@@ -318,7 +318,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const d = prod.datos as Record<string, unknown> | null
     if (!d) continue
     const pid = prod.proyecto_id as string
-    const capex = parseNum(d.capex as any) || 0
+    const capex = parseNum(d.capex as string) || 0
     if (prod.tipo === 'fv') fvCapex += capex
     else if (prod.tipo === 'bess') bessCapex += capex
     projectCapex[pid] = (projectCapex[pid] || 0) + capex

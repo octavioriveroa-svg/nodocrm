@@ -1096,13 +1096,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         for (const p of activeProducts) {
           const d = p.datos as Record<string, unknown>
           if (p.tipo === 'fv') {
-            const nm = parseNum(d.num_modulos as any) || 0
-            const pw = parseNum(d.potencia_modulos_w as any) || 0
+            const nm = parseNum(d.num_modulos as string) || 0
+            const pw = parseNum(d.potencia_modulos_w as string) || 0
             totalKwp += nm > 0 && pw > 0 ? (nm * pw) / 1000 : 0
-            totalFvCapex += parseNum(d.capex as any) || 0
+            totalFvCapex += parseNum(d.capex as string) || 0
           } else if (p.tipo === 'bess') {
-            totalKwh += parseNum(d.capacidad_kwh as any) || 0
-            totalBessCapex += parseNum(d.capex as any) || 0
+            totalKwh += parseNum(d.capacidad_kwh as string) || 0
+            totalBessCapex += parseNum(d.capex as string) || 0
           }
         }
 
@@ -1237,11 +1237,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     {items.map(p => {
                       const d = p.datos as Record<string, unknown>
                       if (p.tipo === 'fv') {
-                        const nm = parseNum(d.num_modulos as any) || 0
-                        const pw = parseNum(d.potencia_modulos_w as any) || 0
-                        const ni = parseNum(d.num_inversores as any) || 0
-                        const pi = parseNum(d.potencia_inversores_kw as any) || 0
-                        const capex = parseNum(d.capex as any) || 0
+                        const nm = parseNum(d.num_modulos as string) || 0
+                        const pw = parseNum(d.potencia_modulos_w as string) || 0
+                        const ni = parseNum(d.num_inversores as string) || 0
+                        const pi = parseNum(d.potencia_inversores_kw as string) || 0
+                        const capex = parseNum(d.capex as string) || 0
                         const kwpSistema = nm > 0 && pw > 0 ? nm * pw / 1000 : null
                         const kwpInv = ni > 0 && pi > 0 ? ni * pi : null
                         const precioWatt = capex > 0 && nm > 0 && pw > 0 ? capex / (nm * pw) : null
@@ -1257,7 +1257,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                               <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
                               <Campo label="Marca inversores" value={d.marca_inversores as string} />
                               <Campo label="kWp inversores" value={kwpInv !== null ? fmtUnit(kwpInv, 'kW', 1) : undefined} />
-                              <Campo label="Generación anual" value={parseNum(d.generacion_anual_kwh as any) ? fmtUnit(parseNum(d.generacion_anual_kwh as any), 'kWh/año') : undefined} />
+                              <Campo label="Generación anual" value={parseNum(d.generacion_anual_kwh as string) ? fmtUnit(parseNum(d.generacion_anual_kwh as string), 'kWh/año') : undefined} />
                               <Campo label="CAPEX" value={fmtCurrency(capex, (d.capex_moneda as string) || 'USD')} />
                               <Campo label="Precio por Watt" value={precioWatt !== null ? `$${fmtNum(precioWatt, 4)}/W` : undefined} />
                             </div>
@@ -1265,8 +1265,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                         )
                       }
                       if (p.tipo === 'bess') {
-                        const capacidad = parseNum(d.capacidad_kwh as any) || 0
-                        const capex = parseNum(d.capex as any) || 0
+                        const capacidad = parseNum(d.capacidad_kwh as string) || 0
+                        const capex = parseNum(d.capex as string) || 0
                         const precioKwh = capacidad > 0 && capex > 0 ? capex / capacidad : null
                         return (
                           <div key={p.id} className="border border-white/40 rounded-xl p-5 bg-[#f0f8ff] shadow-sm">

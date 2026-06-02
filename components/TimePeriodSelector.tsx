@@ -112,7 +112,7 @@ export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: R
 
   for (const prod of filtered) {
     const d = prod.datos; if (!d) continue
-    const c = parseNum(d.capex as any) || 0
+    const c = parseNum(d.capex as string) || 0
     if (prod.tipo === 'fv') fv += c; else if (prod.tipo === 'bess') bess += c
     pCapex[prod.proyecto_id] = (pCapex[prod.proyecto_id]||0) + c
   }

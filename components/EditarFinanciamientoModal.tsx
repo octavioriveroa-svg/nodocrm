@@ -63,7 +63,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
             ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null ? formatNumberInput(String(o.ahorro_estimado_mensual)) : '',
-            ahorro_moneda: (o as any).moneda || 'MXN',
+            ahorro_moneda: (o.moneda as Moneda) || 'MXN',
             plazo_meses: o.plazo_meses !== null ? String(o.plazo_meses) : '',
             notas: o.notas || '',
             linkedConfigIds
@@ -384,7 +384,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                         <div className="w-24">
                           <select
                             value={opt.ahorro_moneda || 'MXN'}
-                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_moneda: e.target.value as any })}
+                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_moneda: e.target.value as Moneda })}
                             className={inp}
                           >
                             <option value="MXN">MXN</option>

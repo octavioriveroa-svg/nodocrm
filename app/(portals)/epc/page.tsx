@@ -31,12 +31,12 @@ export default async function EpcistaDashboard() {
       const d = prod.datos as Record<string, unknown> | null
       if (!d) continue
       if (prod.tipo === 'bess') {
-        bess_kw += parseNum(d.potencia_kw as any) || 0
-        bess_kwh += parseNum(d.capacidad_kwh as any) || 0
-        bess_capex += parseNum(d.capex as any) || 0
+        bess_kw += parseNum(d.potencia_kw as string) || 0
+        bess_kwh += parseNum(d.capacidad_kwh as string) || 0
+        bess_capex += parseNum(d.capex as string) || 0
       } else if (prod.tipo === 'fv') {
-        fv_kwp += ((parseNum(d.num_modulos as any) || 0) * (parseNum(d.potencia_modulos_w as any) || 0)) / 1000
-        fv_capex += parseNum(d.capex as any) || 0
+        fv_kwp += ((parseNum(d.num_modulos as string) || 0) * (parseNum(d.potencia_modulos_w as string) || 0)) / 1000
+        fv_capex += parseNum(d.capex as string) || 0
       }
     }
   }

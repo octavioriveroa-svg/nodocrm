@@ -562,7 +562,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                 <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
                   <span>Inversión total estimada (CAPEX acumulado):</span>
                   <span className="font-bold text-sm text-principal">
-                    {fmtCurrency(activeConfigCapex, proyecto.moneda as any)}
+                    {fmtCurrency(activeConfigCapex, proyecto.moneda)}
                   </span>
                 </div>
               </div>
