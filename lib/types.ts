@@ -80,6 +80,7 @@ export interface OpcionFinanciamiento {
   nombre: string
   vehiculo_inversion: string
   ahorro_estimado_mensual: number | null
+  moneda: string
   plazo_meses: number | null
   notas: string | null
   seleccionada: boolean

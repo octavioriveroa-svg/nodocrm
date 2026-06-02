@@ -1,6 +1,7 @@
 'use client'
 
-import type { RawProject, RawProduct } from '@/lib/dashboard-data'
+import type { RawProject, RawProduct, RawFinancingOption } from '@/lib/dashboard-data'
+import { parseNum } from '@/lib/format'
 
 export type TimePeriod = 'all' | 'last_year' | 'ytd' | 'last_quarter' | 'qtd' | 'last_month' | 'mtd'
 
@@ -102,20 +103,25 @@ export function computePipeline(prs: RawProject[]) {
   return { byStage, funnel, velocity, winRate, total }
 }
 
-export function computeFinancial(prs: RawProject[], prods: RawProduct[]) {
+export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: RawFinancingOption[] = []) {
   const ids = new Set(prs.map(p => p.id))
   const filtered = prods.filter(p => ids.has(p.proyecto_id))
+  const filteredOpts = opts.filter(o => ids.has(o.proyecto_id))
   let fv = 0, bess = 0, savings = 0
   const pCapex: Record<string, number> = {}, pSav: Record<string, number> = {}
 
   for (const prod of filtered) {
     const d = prod.datos; if (!d) continue
-    const c = Number(d.capex) || 0
+    const c = parseNum(d.capex as any) || 0
     if (prod.tipo === 'fv') fv += c; else if (prod.tipo === 'bess') bess += c
     pCapex[prod.proyecto_id] = (pCapex[prod.proyecto_id]||0) + c
-    const s = Number(d.ahorro_mensual_estimado) || 0
-    pSav[prod.proyecto_id] = (pSav[prod.proyecto_id]||0) + s
-    savings += s
+  }
+  for (const opt of filteredOpts) {
+    if (opt.seleccionada) {
+      const s = Number(opt.ahorro_estimado_mensual) || 0
+      pSav[opt.proyecto_id] = (pSav[opt.proyecto_id]||0) + s
+      savings += s
+    }
   }
   const total = fv + bess
   const paybacks: number[] = []

@@ -52,8 +52,8 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
 
   const filteredFinancial = useMemo(() => {
     const fp = filterProjects(data.rawProjects, financialPeriod)
-    return computeFinancial(fp, data.rawProducts)
-  }, [data.rawProjects, data.rawProducts, financialPeriod])
+    return computeFinancial(fp, data.rawProducts, data.rawFinancingOptions)
+  }, [data.rawProjects, data.rawProducts, data.rawFinancingOptions, financialPeriod])
 
   return (
     <div>

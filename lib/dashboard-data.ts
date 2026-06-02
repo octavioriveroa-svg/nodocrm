@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
+import { parseNum } from '@/lib/format'
 
 // ─── Types ───────────────────────────────────────────
+export interface RawFinancingOption {
+  proyecto_id: string
+  ahorro_estimado_mensual: number | null
+  moneda: string
+  seleccionada: boolean
+}
+
 export interface DashboardData {
   kpis: KPIs
   pipeline: PipelineData
@@ -16,6 +24,7 @@ export interface DashboardData {
   recentProjects: RecentProject[]
   rawProjects: RawProject[]
   rawProducts: RawProduct[]
+  rawFinancingOptions?: RawFinancingOption[]
 }
 
 export interface RawProject {
@@ -156,7 +165,7 @@ function endOfLastMonth(): string {
 export async function fetchDashboardData(): Promise<DashboardData> {
   const supabase = await createClient()
 
-  // Parallel fetches
+    // Parallel fetches
   const [
     { data: proyectos },
     { data: productos },
@@ -166,6 +175,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     { data: hitos },
     { data: archivos },
     { data: comentarios },
+    { data: opcionesFinanciamiento },
   ] = await Promise.all([
     supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, historial_estados, capex_estimado, moneda, ubicacion_estado, modalidad_financiamiento, epcista_id, created_at, updated_at').order('created_at', { ascending: false }),
     supabase.from('proyecto_sitio_productos').select('proyecto_id, tipo, datos'),
@@ -175,6 +185,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     supabase.from('hitos_construccion').select('id, proyecto_id, estado, fecha_estimada_fin, fecha_real_fin'),
     supabase.from('archivos').select('id, created_at'),
     supabase.from('comentarios').select('id, created_at'),
+    supabase.from('opciones_financiamiento').select('proyecto_id, ahorro_estimado_mensual, moneda, seleccionada'),
   ])
 
   const prs = (proyectos ?? []) as Record<string, unknown>[]
@@ -299,7 +310,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
   })
 
-  // ─── Financial ───
+    // ─── Financial ───
   let fvCapex = 0, bessCapex = 0, totalSavingsMonthly = 0
   const projectCapex: Record<string, number> = {}
   const projectSavings: Record<string, number> = {}
@@ -307,13 +318,18 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const d = prod.datos as Record<string, unknown> | null
     if (!d) continue
     const pid = prod.proyecto_id as string
-    const capex = Number(d.capex) || 0
+    const capex = parseNum(d.capex as any) || 0
     if (prod.tipo === 'fv') fvCapex += capex
     else if (prod.tipo === 'bess') bessCapex += capex
     projectCapex[pid] = (projectCapex[pid] || 0) + capex
-    const savings = Number(d.ahorro_mensual_estimado) || 0
-    projectSavings[pid] = (projectSavings[pid] || 0) + savings
-    totalSavingsMonthly += savings
+  }
+  for (const opt of opcionesFinanciamiento ?? []) {
+    if (opt.seleccionada) {
+      const pid = opt.proyecto_id
+      const savings = Number(opt.ahorro_estimado_mensual) || 0
+      projectSavings[pid] = (projectSavings[pid] || 0) + savings
+      totalSavingsMonthly += savings
+    }
   }
   const totalCapex = fvCapex + bessCapex
   const avgCapexPerProject = totalProjects > 0 ? totalCapex / totalProjects : 0
@@ -466,6 +482,13 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     datos: p.datos as Record<string, unknown> | null,
   }))
 
+  const rawFinancingOptions: RawFinancingOption[] = (opcionesFinanciamiento ?? []).map(o => ({
+    proyecto_id: o.proyecto_id as string,
+    ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null ? Number(o.ahorro_estimado_mensual) : null,
+    moneda: o.moneda as string || 'MXN',
+    seleccionada: !!o.seleccionada
+  }))
+
   return {
     kpis: { totalProjects, activePipelineCapex, installedCapacityKwp: installedKwp, winRate, avgDaysToClose, avgDaysToInstall },
     pipeline: { byStage, funnelPercents },
@@ -481,5 +504,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     recentProjects,
     rawProjects,
     rawProducts,
+    rawFinancingOptions,
   }
 }

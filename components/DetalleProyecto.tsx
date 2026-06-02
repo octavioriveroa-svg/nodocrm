@@ -11,7 +11,7 @@ import type { Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadF
 import { Send, ChevronLeft, MapPin, Zap, Battery, Wrench, HelpCircle, Trash2, Pencil, CalendarDays, ExternalLink, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { fmtNum, fmtCurrency, fmtUnit } from '@/lib/format'
+import { fmtNum, fmtCurrency, fmtUnit, parseNum } from '@/lib/format'
 import GanttChart from './gantt/GanttChart'
 import ModalHito from './gantt/ModalHito'
 import type { HitoConstruccion } from '@/lib/types'
@@ -1096,13 +1096,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         for (const p of activeProducts) {
           const d = p.datos as Record<string, unknown>
           if (p.tipo === 'fv') {
-            const nm = Number(d.num_modulos) || 0
-            const pw = Number(d.potencia_modulos_w) || 0
+            const nm = parseNum(d.num_modulos as any) || 0
+            const pw = parseNum(d.potencia_modulos_w as any) || 0
             totalKwp += nm > 0 && pw > 0 ? (nm * pw) / 1000 : 0
-            totalFvCapex += Number(d.capex) || 0
+            totalFvCapex += parseNum(d.capex as any) || 0
           } else if (p.tipo === 'bess') {
-            totalKwh += Number(d.capacidad_kwh) || 0
-            totalBessCapex += Number(d.capex) || 0
+            totalKwh += parseNum(d.capacidad_kwh as any) || 0
+            totalBessCapex += parseNum(d.capex as any) || 0
           }
         }
 
@@ -1237,11 +1237,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     {items.map(p => {
                       const d = p.datos as Record<string, unknown>
                       if (p.tipo === 'fv') {
-                        const nm = Number(d.num_modulos) || 0
-                        const pw = Number(d.potencia_modulos_w) || 0
-                        const ni = Number(d.num_inversores) || 0
-                        const pi = Number(d.potencia_inversores_kw) || 0
-                        const capex = Number(d.capex) || 0
+                        const nm = parseNum(d.num_modulos as any) || 0
+                        const pw = parseNum(d.potencia_modulos_w as any) || 0
+                        const ni = parseNum(d.num_inversores as any) || 0
+                        const pi = parseNum(d.potencia_inversores_kw as any) || 0
+                        const capex = parseNum(d.capex as any) || 0
                         const kwpSistema = nm > 0 && pw > 0 ? nm * pw / 1000 : null
                         const kwpInv = ni > 0 && pi > 0 ? ni * pi : null
                         const precioWatt = capex > 0 && nm > 0 && pw > 0 ? capex / (nm * pw) : null
@@ -1257,16 +1257,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                               <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
                               <Campo label="Marca inversores" value={d.marca_inversores as string} />
                               <Campo label="kWp inversores" value={kwpInv !== null ? fmtUnit(kwpInv, 'kW', 1) : undefined} />
-                              <Campo label="Generación anual" value={Number(d.generacion_anual_kwh) ? fmtUnit(Number(d.generacion_anual_kwh), 'kWh/año') : undefined} />
-                              <Campo label="CAPEX" value={fmtCurrency(capex, activeConfig.moneda)} />
+                              <Campo label="Generación anual" value={parseNum(d.generacion_anual_kwh as any) ? fmtUnit(parseNum(d.generacion_anual_kwh as any), 'kWh/año') : undefined} />
+                              <Campo label="CAPEX" value={fmtCurrency(capex, (d.capex_moneda as string) || 'USD')} />
                               <Campo label="Precio por Watt" value={precioWatt !== null ? `$${fmtNum(precioWatt, 4)}/W` : undefined} />
                             </div>
                           </div>
                         )
                       }
                       if (p.tipo === 'bess') {
-                        const capacidad = Number(d.capacidad_kwh) || 0
-                        const capex = Number(d.capex) || 0
+                        const capacidad = parseNum(d.capacidad_kwh as any) || 0
+                        const capex = parseNum(d.capex as any) || 0
                         const precioKwh = capacidad > 0 && capex > 0 ? capex / capacidad : null
                         return (
                           <div key={p.id} className="border border-white/40 rounded-xl p-5 bg-[#f0f8ff] shadow-sm">
@@ -1278,8 +1278,8 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                               <Campo label="Capacidad" value={`${d.capacidad_kwh} kWh`} />
                               <Campo label="Marca" value={d.marca as string} />
                               <Campo label="Uso" value={usoLabel[d.uso as string] ?? d.uso as string} />
-                              <Campo label="CAPEX" value={fmtCurrency(capex, activeConfig.moneda)} />
-                              <Campo label="Precio por kWh" value={precioKwh !== null ? `${fmtCurrency(precioKwh, activeConfig.moneda)}/kWh` : undefined} />
+                              <Campo label="CAPEX" value={fmtCurrency(capex, (d.capex_moneda as string) || 'USD')} />
+                              <Campo label="Precio por kWh" value={precioKwh !== null ? `${fmtCurrency(precioKwh, (d.capex_moneda as string) || 'USD')}/kWh` : undefined} />
                             </div>
                           </div>
                         )
@@ -1353,7 +1353,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                           <div>
                             <span className="text-muted block">Ahorro mensual:</span>
                             <span className="font-bold text-green-600">
-                              {o.ahorro_estimado_mensual !== null ? fmtCurrency(o.ahorro_estimado_mensual, proyecto.moneda) : '—'}
+                              {o.ahorro_estimado_mensual !== null ? fmtCurrency(o.ahorro_estimado_mensual, o.moneda || 'MXN') : '—'}
                             </span>
                           </div>
                           {o.plazo_meses && (
