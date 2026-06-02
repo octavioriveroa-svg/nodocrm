@@ -16,6 +16,7 @@ interface FVForm {
   marca_inversores: string
   generacion_anual_kwh: string
   capex: string
+  capex_moneda: string
 }
 
 interface BESSForm {
@@ -24,6 +25,7 @@ interface BESSForm {
   marca: string
   uso: string
   capex: string
+  capex_moneda: string
 }
 
 interface Producto {
@@ -70,6 +72,7 @@ const emptyFv: FVForm = {
   marca_inversores: '',
   generacion_anual_kwh: '',
   capex: '',
+  capex_moneda: 'USD',
 }
 
 const emptyBess: BESSForm = {
@@ -78,6 +81,7 @@ const emptyBess: BESSForm = {
   marca: '',
   uso: 'load_shifting',
   capex: '',
+  capex_moneda: 'USD',
 }
 
 export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, configuraciones, productos, sitios, onSave }: Props) {
@@ -121,7 +125,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
             id: p.id,
             tempId: p.id,
             tipo: p.tipo,
-            fv: p.tipo === 'fv' ? {
+                        fv: p.tipo === 'fv' ? {
               num_modulos: formatNumberInput(String(d.num_modulos ?? '')),
               potencia_modulos_w: formatNumberInput(String(d.potencia_modulos_w ?? '')),
               marca_modulos: String(d.marca_modulos ?? ''),
@@ -130,6 +134,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
               marca_inversores: String(d.marca_inversores ?? ''),
               generacion_anual_kwh: formatNumberInput(String(d.generacion_anual_kwh ?? '')),
               capex: formatNumberInput(String(d.capex ?? '')),
+              capex_moneda: String(d.capex_moneda ?? 'USD'),
             } : undefined,
             bess: p.tipo === 'bess' ? {
               potencia_kw: formatNumberInput(String(d.potencia_kw ?? '')),
@@ -137,6 +142,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
               marca: String(d.marca ?? ''),
               uso: String(d.uso ?? 'load_shifting'),
               capex: formatNumberInput(String(d.capex ?? '')),
+              capex_moneda: String(d.capex_moneda ?? 'USD'),
             } : undefined
           })
         }
@@ -556,7 +562,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                 <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
                   <span>Inversión total estimada (CAPEX acumulado):</span>
                   <span className="font-bold text-sm text-principal">
-                    {fmtCurrency(activeConfigCapex, proyecto.moneda as any)}
+                    {fmtCurrency(activeConfigCapex, proyecto.moneda)}
                   </span>
                 </div>
               </div>
@@ -684,9 +690,15 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                         <label className="block text-[10px] font-medium mb-0.5">Generación anual (kWh) *</label>
                                         <input type="text" value={fvForm.generacion_anual_kwh} onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
                                       </div>
-                                      <div>
-                                        <label className="block text-[10px] font-medium mb-0.5">CAPEX ($) *</label>
-                                        <input type="text" value={fvForm.capex} onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
+                                                                            <div>
+                                        <label className="block text-[10px] font-medium mb-0.5">CAPEX *</label>
+                                        <div className="flex gap-1">
+                                          <input type="text" value={fvForm.capex} onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="flex-1 border rounded p-1 text-xs" />
+                                          <select value={fvForm.capex_moneda || 'USD'} onChange={e => setFvForm(f => ({ ...f, capex_moneda: e.target.value }))} className="w-16 border rounded p-1 text-xs bg-white">
+                                            <option value="USD">USD</option>
+                                            <option value="MXN">MXN</option>
+                                          </select>
+                                        </div>
                                       </div>
 
                                       {/* Calculations */}
@@ -728,9 +740,15 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                           <option value="load_shifting_ups">Load Shifting + UPS</option>
                                         </select>
                                       </div>
-                                      <div>
-                                        <label className="block text-[10px] font-medium mb-0.5">CAPEX ($) *</label>
-                                        <input type="text" value={bessForm.capex} onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
+                                                                            <div>
+                                        <label className="block text-[10px] font-medium mb-0.5">CAPEX *</label>
+                                        <div className="flex gap-1">
+                                          <input type="text" value={bessForm.capex} onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="flex-1 border rounded p-1 text-xs" />
+                                          <select value={bessForm.capex_moneda || 'USD'} onChange={e => setBessForm(f => ({ ...f, capex_moneda: e.target.value }))} className="w-16 border rounded p-1 text-xs bg-white">
+                                            <option value="USD">USD</option>
+                                            <option value="MXN">MXN</option>
+                                          </select>
+                                        </div>
                                       </div>
 
                                       {/* Calculations */}

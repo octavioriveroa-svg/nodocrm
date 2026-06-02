@@ -25,6 +25,7 @@ interface FVForm {
   marca_inversores: string
   generacion_anual_kwh: string
   capex: string
+  capex_moneda: Moneda
 }
 
 interface BESSForm {
@@ -33,6 +34,7 @@ interface BESSForm {
   marca: string
   uso: string
   capex: string
+  capex_moneda: Moneda
 }
 
 interface Producto {
@@ -66,6 +68,7 @@ interface CreationFinancingOption {
   nombre: string
   vehiculo_inversion: string
   ahorro_estimado_mensual: string
+  ahorro_moneda: Moneda
   plazo_meses: string
   notas: string
   linkedConfigIds: string[]
@@ -78,9 +81,9 @@ const borde = {};
 const emptyFv: FVForm = {
   num_modulos: '', potencia_modulos_w: '', marca_modulos: '',
   num_inversores: '', potencia_inversores_kw: '', marca_inversores: '',
-  generacion_anual_kwh: '', capex: '',
+  generacion_anual_kwh: '', capex: '', capex_moneda: 'USD',
 }
-const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '' }
+const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '', capex_moneda: 'USD' }
 const emptyNuevoSitio = { nombre: '', nombre_recibo: '', ciudad: '', ubicacion_estado: '', rpu: '', demanda_contratada_kw: '' }
 const initialForm: FormData = {
   nombre_proyecto: '', cliente_id: '', tipo_instalacion: '',
@@ -139,7 +142,7 @@ function StepIndicator({ current }: { current: number }) {
 }
 
 // ── Tarjeta de producto (display) ────────────────────────────
-function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => void; moneda?: Moneda }) {
+function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
     return (
@@ -159,7 +162,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
           <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
           <span><span className="text-muted">Generación: </span>{fmtNum(parseNum(p.fv.generacion_anual_kwh))} kWh/año</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), moneda)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), p.fv.capex_moneda || 'USD')}</span>
           <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
         </div>
       </div>
@@ -188,7 +191,7 @@ function ProductoCard({ p, onRemove, moneda }: { p: Producto; onRemove: () => vo
           <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
           <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
           <span><span className="text-muted">Uso: </span>{usoLabel[p.bess.uso] ?? p.bess.uso}</span>
-          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), moneda)}</span>
+          <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.bess.capex), p.bess.capex_moneda || 'USD')}</span>
           <span><span className="text-muted">Precio/kWh: </span>${n2(precioKwh, 2)}/kWh</span>
         </div>
       </div>
@@ -243,6 +246,7 @@ export default function NuevoProyectoPage() {
       nombre: 'Financiamiento 1',
       vehiculo_inversion: 'credito',
       ahorro_estimado_mensual: '',
+      ahorro_moneda: 'MXN',
       plazo_meses: '',
       notas: '',
       linkedConfigIds: ['default']
@@ -314,7 +318,7 @@ export default function NuevoProyectoPage() {
       setSitiosCliente([])
       setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
       setActiveConfigId('default')
-      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
       setIsRecomendacionNodo(false)
       return
     }
@@ -322,7 +326,7 @@ export default function NuevoProyectoPage() {
     setSitiosCliente((data ?? []) as Sitio[])
     setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
     setActiveConfigId('default')
-    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
   }
 
@@ -657,12 +661,13 @@ export default function NuevoProyectoPage() {
       return
     }
 
-    const optionsToInsert = isRecomendacionNodo 
+        const optionsToInsert = isRecomendacionNodo 
       ? [{
           proyecto_id: proyecto.id,
           nombre: 'Recomendación de Nodo',
           vehiculo_inversion: 'no_sabe',
           ahorro_estimado_mensual: null,
+          moneda: 'MXN',
           plazo_meses: null,
           notas: null,
           seleccionada: true
@@ -672,6 +677,7 @@ export default function NuevoProyectoPage() {
           nombre: o.nombre,
           vehiculo_inversion: o.vehiculo_inversion,
           ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
+          moneda: o.ahorro_moneda || 'MXN',
           plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
           notas: o.notas || null,
           seleccionada: idx === 0
@@ -1125,7 +1131,7 @@ const Icon = opt.icon
                           {productos.length > 0 && (
                             <div className="flex flex-col gap-2 mb-3">
                               {productos.map(p => (
-                                  <ProductoCard key={p.tempId} p={p} moneda={form.moneda}
+                                  <ProductoCard key={p.tempId} p={p}
                                     onRemove={() => removeProduct(s.id, p.tempId)} />
                               ))}
                             </div>
@@ -1232,10 +1238,22 @@ const Icon = opt.icon
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
-                                        <input type="text" value={fvForm.capex}
-                                          onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
+                                        <label className="block text-xs font-medium mb-1">CAPEX *</label>
+                                        <div className="flex gap-2">
+                                          <div className="flex-1">
+                                            <input type="text" value={fvForm.capex}
+                                              onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
+                                              className={inp} style={borde} placeholder="0" />
+                                          </div>
+                                          <div className="w-24">
+                                            <select value={fvForm.capex_moneda || 'USD'}
+                                              onChange={e => setFvForm(f => ({ ...f, capex_moneda: e.target.value as Moneda }))}
+                                              className={inp} style={borde}>
+                                              <option value="USD">USD</option>
+                                              <option value="MXN">MXN</option>
+                                            </select>
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
                                     {/* Precio/Wp calculado */}
@@ -1283,7 +1301,7 @@ const Icon = opt.icon
                                       </select>
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
+                                      <label className="block text-xs font-medium mb-1">CAPEX *</label>
                                       <input type="text" value={bessForm.capex}
                                         onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
                                         className={inp} style={borde} placeholder="0" />
@@ -1469,6 +1487,7 @@ const Icon = opt.icon
                           nombre: `Financiamiento ${prev.length + 1}`,
                           vehiculo_inversion: 'credito',
                           ahorro_estimado_mensual: '',
+                          ahorro_moneda: 'MXN',
                           plazo_meses: '',
                           notas: '',
                           linkedConfigIds: configs.map(c => c.tempId)
@@ -1526,17 +1545,33 @@ const Icon = opt.icon
                           <option value="mem">Mercado Eléctrico Mayorista</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Ahorro mensual estimado ($)</label>
-                        <input
-                          type="text"
-                          value={opt.ahorro_estimado_mensual}
-                          onChange={e => {
-                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : o))
-                          }}
-                          className={inp}
-                          placeholder="0"
-                        />
+                                            <div>
+                        <label className="block text-xs font-medium mb-1">Ahorro mensual estimado</label>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={opt.ahorro_estimado_mensual}
+                              onChange={e => {
+                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : o))
+                              }}
+                              className={inp}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="w-24">
+                            <select
+                              value={opt.ahorro_moneda || 'MXN'}
+                              onChange={e => {
+                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_moneda: e.target.value as Moneda } : o))
+                              }}
+                              className={inp}
+                            >
+                              <option value="MXN">MXN</option>
+                              <option value="USD">USD</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium mb-1">Plazo (meses)</label>

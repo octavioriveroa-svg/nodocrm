@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Plus, Trash2, AlertCircle } from 'lucide-react'
-import type { Proyecto, ConfiguracionTecnica, OpcionFinanciamiento, ConfigFinanciamiento, ModalidadFinanciamiento } from '@/lib/types'
+import type { Proyecto, ConfiguracionTecnica, OpcionFinanciamiento, ConfigFinanciamiento, ModalidadFinanciamiento, Moneda } from '@/lib/types'
 import { parseNum, formatNumberInput, fmtCurrency } from '@/lib/format'
 
 interface CreationFinancingOption {
@@ -13,6 +13,7 @@ interface CreationFinancingOption {
   nombre: string
   vehiculo_inversion: string
   ahorro_estimado_mensual: string
+  ahorro_moneda: Moneda
   plazo_meses: string
   notas: string
   linkedConfigIds: string[]
@@ -54,7 +55,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
       if (hasNoSabe) {
         setOptions([])
       } else {
-        const mapped: CreationFinancingOption[] = list.map(o => {
+                const mapped: CreationFinancingOption[] = list.map(o => {
           const linkedConfigIds = links.filter(l => l.opcion_financiamiento_id === o.id).map(l => l.configuracion_id)
           return {
             id: o.id,
@@ -62,18 +63,20 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
             ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null ? formatNumberInput(String(o.ahorro_estimado_mensual)) : '',
+            ahorro_moneda: (o.moneda as Moneda) || 'MXN',
             plazo_meses: o.plazo_meses !== null ? String(o.plazo_meses) : '',
             notas: o.notas || '',
             linkedConfigIds
           }
         })
 
-        if (mapped.length === 0) {
+                if (mapped.length === 0) {
           mapped.push({
             tempId: 'default',
             nombre: 'Financiamiento 1',
             vehiculo_inversion: 'credito',
             ahorro_estimado_mensual: '',
+            ahorro_moneda: 'MXN',
             plazo_meses: '',
             notas: '',
             linkedConfigIds: configuraciones.map(c => c.id)
@@ -86,7 +89,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
 
   if (!isOpen) return null
 
-  function handleAddOption() {
+    function handleAddOption() {
     const newId = `fin-${Date.now()}`
     setOptions(prev => [
       ...prev,
@@ -95,6 +98,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
         nombre: `Financiamiento ${prev.length + 1}`,
         vehiculo_inversion: 'credito',
         ahorro_estimado_mensual: '',
+        ahorro_moneda: 'MXN',
         plazo_meses: '',
         notes: '',
         notas: '',
@@ -189,12 +193,13 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           if (delErr) throw delErr
         }
 
-        // B. Update existing ones
+                // B. Update existing ones
         for (const o of existingOpts) {
           const { error: updErr } = await supabase.from('opciones_financiamiento').update({
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
             ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
+            moneda: o.ahorro_moneda || 'MXN',
             plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
             notas: o.notas || null
           }).eq('id', o.id!)
@@ -209,6 +214,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
             ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
+            moneda: o.ahorro_moneda || 'MXN',
             plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
             notas: o.notas || null,
             seleccionada: false // will preserve or let them select later
@@ -363,15 +369,29 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                         <option value="mem">Mercado Eléctrico Mayorista</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Ahorro estimado mensual ($)</label>
-                      <input
-                        type="text"
-                        value={opt.ahorro_estimado_mensual}
-                        onChange={e => handleUpdateOption(opt.tempId, { ahorro_estimado_mensual: formatNumberInput(e.target.value) })}
-                        className={inp}
-                        placeholder="0"
-                      />
+                                        <div>
+                      <label className="block text-xs font-medium mb-1">Ahorro estimado mensual</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            value={opt.ahorro_estimado_mensual}
+                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_estimado_mensual: formatNumberInput(e.target.value) })}
+                            className={inp}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <select
+                            value={opt.ahorro_moneda || 'MXN'}
+                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_moneda: e.target.value as Moneda })}
+                            className={inp}
+                          >
+                            <option value="MXN">MXN</option>
+                            <option value="USD">USD</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Plazo (meses)</label>

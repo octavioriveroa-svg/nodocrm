@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import EpcistaDashboardClient from './EpcistaDashboardClient'
 import type { Proyecto } from '@/lib/types'
+import { parseNum } from '@/lib/format'
 
 export default async function EpcistaDashboard() {
   const supabase = await createClient()
@@ -30,12 +31,12 @@ export default async function EpcistaDashboard() {
       const d = prod.datos as Record<string, unknown> | null
       if (!d) continue
       if (prod.tipo === 'bess') {
-        bess_kw += Number(d.potencia_kw) || 0
-        bess_kwh += Number(d.capacidad_kwh) || 0
-        bess_capex += Number(d.capex) || 0
+        bess_kw += parseNum(d.potencia_kw as string) || 0
+        bess_kwh += parseNum(d.capacidad_kwh as string) || 0
+        bess_capex += parseNum(d.capex as string) || 0
       } else if (prod.tipo === 'fv') {
-        fv_kwp += ((Number(d.num_modulos) || 0) * (Number(d.potencia_modulos_w) || 0)) / 1000
-        fv_capex += Number(d.capex) || 0
+        fv_kwp += ((parseNum(d.num_modulos as string) || 0) * (parseNum(d.potencia_modulos_w as string) || 0)) / 1000
+        fv_capex += parseNum(d.capex as string) || 0
       }
     }
   }
