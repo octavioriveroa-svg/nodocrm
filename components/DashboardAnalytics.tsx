@@ -15,10 +15,11 @@ function Trend({ current, previous, suffix = '' }: { current: number; previous: 
   return <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${color}`}><Icon size={12} />{Math.abs(diff)}%{suffix}</span>
 }
 
+// Escala de marca: salvia → menta → lima → petróleo (tokens en globals.css @theme)
 const STAGE_COLORS: Record<string, string> = {
-  recibido: '#E5E7EB', en_analisis: '#D7FF2F', propuesta_lista: '#BFDBFE', enviada: '#FDE68A',
-  cliente_interesado: '#A7F3D0', negociacion: '#E9D5FF', aprobado: '#BBF7D0',
-  en_construccion: '#FED7AA', operativo: '#99F6E4', completado: '#1A1A1A',
+  recibido: 'var(--color-etapa-1)', en_analisis: 'var(--color-etapa-2)', propuesta_lista: 'var(--color-etapa-3)', enviada: 'var(--color-etapa-4)',
+  cliente_interesado: 'var(--color-etapa-5)', negociacion: 'var(--color-etapa-6)', aprobado: 'var(--color-etapa-7)',
+  en_construccion: 'var(--color-etapa-7)', operativo: 'var(--color-etapa-4)', completado: 'var(--color-etapa-final)',
 }
 
 const FINANCING_LABELS: Record<string, string> = {
@@ -70,7 +71,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
           <div key={label} className="glass-card p-5 group hover:shadow-md transition-all">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-2xl font-black tracking-tight">{value}</div>
+                <div className="num text-2xl font-black tracking-tight">{value}</div>
                 <div className="text-xs mt-1.5 text-gray-500">{label}</div>
               </div>
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}><Icon size={16} /></div>
@@ -99,7 +100,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
                     {filteredPipeline.funnel.find(f => f.stage === stage)?.label ?? stage}
                   </div>
                   <div className="flex-1 h-7 bg-gray-100 rounded-md overflow-hidden relative">
-                    <div className="h-full rounded-md transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: STAGE_COLORS[stage] || '#E5E7EB' }} />
+                    <div className="h-full rounded-md transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: STAGE_COLORS[stage] || 'var(--color-linea)' }} />
                     {count > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-700">{count}</span>}
                   </div>
                 </div>
@@ -119,7 +120,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
                   <div className="flex-1 h-6 bg-gray-50 rounded overflow-hidden relative">
                     <div className="h-full rounded transition-all duration-700" style={{
                       width: `${Math.max(f.pct, 3)}%`,
-                      backgroundColor: STAGE_COLORS[f.stage] || '#E5E7EB',
+                      backgroundColor: STAGE_COLORS[f.stage] || 'var(--color-linea)',
                       opacity: 0.6 + (i < 5 ? 0.4 : 0.4 * ((10 - i) / 10)),
                     }} />
                     <span className="absolute inset-0 flex items-center justify-end pr-2 text-[10px] font-bold text-gray-700">
@@ -170,22 +171,22 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
             { label: 'CAPEX prom/proyecto', value: fmtCurrency(filteredFinancial.avgCapexPerProject, 'MXN') },
           ].map(s => (
             <div key={s.label} className="glass-card p-5">
-              <div className="text-xl font-black">{s.value}</div>
+              <div className="num text-xl font-black">{s.value}</div>
               <div className="text-xs text-gray-500 mt-1">{s.label}</div>
             </div>
           ))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="glass-card p-5">
-            <div className="text-xl font-black">{fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN')}</div>
+            <div className="num text-xl font-black">{fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN')}</div>
             <div className="text-xs text-gray-500 mt-1">Ahorro mensual estimado</div>
           </div>
           <div className="glass-card p-5">
-            <div className="text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmtNum(filteredFinancial.avgPaybackMonths, 1)} meses` : '—'}</div>
+            <div className="num text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmtNum(filteredFinancial.avgPaybackMonths, 1)} meses` : '—'}</div>
             <div className="text-xs text-gray-500 mt-1">Payback promedio</div>
           </div>
           <div className="glass-card p-5">
-            <div className="text-xl font-black">{filteredFinancial.totalSavingsMonthly > 0 && filteredFinancial.totalCapex > 0 ? fmtPct(((filteredFinancial.totalSavingsMonthly * 12 * 25) / filteredFinancial.totalCapex * 100), 0) : '—'}</div>
+            <div className="num text-xl font-black">{filteredFinancial.totalSavingsMonthly > 0 && filteredFinancial.totalCapex > 0 ? fmtPct(((filteredFinancial.totalSavingsMonthly * 12 * 25) / filteredFinancial.totalCapex * 100), 0) : '—'}</div>
             <div className="text-xs text-gray-500 mt-1">ROI proyectado (25 años)</div>
           </div>
         </div>
@@ -194,10 +195,10 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
       {/* ═══ TECHNICAL ═══ */}
       <Section title="Rendimiento técnico" icon={Zap} id="technical">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="glass-card p-5"><div className="text-xl font-black">{technical.operativeProjects}</div><div className="text-xs text-gray-500 mt-1">Proyectos operativos</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalSolarKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Producción solar total</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalGridKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Consumo de red</div></div>
-          <div className="glass-card p-5"><div className="text-xl font-black">{fmtCompact(technical.totalBatteryDischargeKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Descarga batería</div></div>
+          <div className="glass-card p-5"><div className="num text-xl font-black">{technical.operativeProjects}</div><div className="text-xs text-gray-500 mt-1">Proyectos operativos</div></div>
+          <div className="glass-card p-5"><div className="num text-xl font-black">{fmtCompact(technical.totalSolarKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Producción solar total</div></div>
+          <div className="glass-card p-5"><div className="num text-xl font-black">{fmtCompact(technical.totalGridKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Consumo de red</div></div>
+          <div className="glass-card p-5"><div className="num text-xl font-black">{fmtCompact(technical.totalBatteryDischargeKwh)} kWh</div><div className="text-xs text-gray-500 mt-1">Descarga batería</div></div>
         </div>
         {technical.constructionProjects.length > 0 && (
           <div className="glass-card p-6 mt-4">
@@ -211,7 +212,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
                       <span className="text-xs font-medium">{cp.nombre}</span>
                       <span className="text-[11px] font-bold">{pct}%{cp.delayedHitos > 0 && <span className="text-red-500 ml-1">({cp.delayedHitos} retrasado{cp.delayedHitos > 1 ? 's' : ''})</span>}</span>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: cp.delayedHitos > 0 ? '#F59E0B' : '#10B981' }} /></div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: cp.delayedHitos > 0 ? 'var(--color-alerta)' : 'var(--color-exito)' }} /></div>
                   </div>
                 )
               })}
@@ -232,7 +233,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
           ].map(m => (
             <div key={m.label} className="glass-card p-5">
               <div className="flex items-end justify-between">
-                <div className="text-2xl font-black">{m.current}</div>
+                <div className="num text-2xl font-black">{m.current}</div>
                 <Trend current={m.current} previous={m.previous} />
               </div>
               <div className="text-xs text-gray-500 mt-1">{m.label} <span className="text-gray-300">este mes</span></div>
@@ -291,7 +292,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
               <tbody>{filteredStale.map((s, i) => (
                 <tr key={s.id} className={`border-t border-borde/50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                   <td className="px-5 py-3 font-medium">{s.nombre}</td>
-                  <td className="px-5 py-3"><span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ backgroundColor: STAGE_COLORS[s.estado] || '#E5E7EB' }}>{s.estadoLabel}</span></td>
+                  <td className="px-5 py-3"><span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ backgroundColor: STAGE_COLORS[s.estado] || 'var(--color-linea)' }}>{s.estadoLabel}</span></td>
                   <td className="px-5 py-3 text-gray-500">{s.epcistaNombre}</td>
                   <td className="px-5 py-3 text-right"><span className={`font-black ${s.daysInStage >= 60 ? 'text-red-600' : s.daysInStage >= 30 ? 'text-amber-600' : 'text-gray-600'}`}>{s.daysInStage}d</span></td>
                 </tr>

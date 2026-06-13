@@ -485,9 +485,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                       }}
                       className="px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-2"
                       style={{
-                        backgroundColor: isActive ? '#000' : '#fff',
-                        color: isActive ? '#D7FF2F' : '#666',
-                        borderColor: isActive ? '#000' : '#E5E5E5',
+                        backgroundColor: isActive ? 'var(--color-principal)' : '#fff',
+                        color: isActive ? 'var(--color-acento)' : 'var(--color-texto-suave)',
+                        borderColor: isActive ? 'var(--color-principal)' : '#E5E5E5',
                       }}
                     >
                       <span>{c.nombre || `Alt ${idx + 1}`}</span>
@@ -632,7 +632,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                     setAddingToSitioId(s.id)
                                     setProductTipo(null)
                                   }}
-                                  className="text-[10px] font-bold text-[#000] border border-dashed border-borde rounded-lg p-1.5 text-center hover:border-black transition-colors"
+                                  className="text-[10px] font-bold text-[#072B31] border border-dashed border-borde rounded-lg p-1.5 text-center hover:border-black transition-colors"
                                 >
                                   + Agregar producto
                                 </button>

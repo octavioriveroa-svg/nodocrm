@@ -1,35 +1,119 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --color-acento: #D7FF2F;
-  --color-acento-hover: #c4ec23;
-  --color-principal: #0F0F0F;
-  --color-fondo: #F9F6EF;
-  --color-borde: rgba(200, 200, 200, 0.25);
-  --color-muted: #888888;
+/* ───────────────────────────────────────────────────────────────
+   Tipografías de marca (Nodo Brandbook §3)
+   🔒 Articulat CF y BC Barell 1973 son fuentes COMERCIALES (de pago).
+   Coloca los .woff2 licenciados en /public/fonts/ (ver README ahí).
+   Si los archivos no existen, el navegador cae al fallback (Inter)
+   de forma transparente — no rompe nada.
+   ─────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Articulat CF';
+  src: url('/fonts/ArticulatCF-DemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BC Barell 1973';
+  src: url('/fonts/BCBarell-1973.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
-  --shadow-xl: 0 16px 48px rgba(0,0,0,0.10);
-  --shadow-glass: 0 8px 32px 0 rgba(0,0,0,0.04);
+@theme {
+  /* ── Marca: acentos ── */
+  --color-acento: #CEDC00;        /* Lima · Pantone 381 C (acento primario) */
+  --color-acento-hover: #B9C600;  /* Lima un paso más oscuro */
+  --color-menta: #00C19F;         /* Menta/Teal · Pantone 2240 C (acento secundario) */
+  --color-menta-hover: #00A98B;
+
+  /* ── Marca: tinta / superficies oscuras ── */
+  --color-principal: #072B31;     /* Petróleo · Pantone 546 C (NO negro puro) */
+
+  /* ── Marca: neutros ── */
+  --color-fondo: #F4F7F6;         /* Fondo de app, neutro frío claro */
+  --color-salvia: #9AB9AD;        /* Pantone 623 C */
+  --color-verde-claro: #D1E0D7;   /* Pantone 621 C */
+  --color-arena: #D6D9C7;         /* Pantone 6197 C */
+  --color-borde: rgba(7, 43, 49, 0.12);  /* Borde con tinte petróleo */
+  --color-muted: #5F7A77;         /* Texto secundario, gris con tinte petróleo */
+
+  /* ── Neutros de UI (única fuente; no usar hex crudos en componentes) ── */
+  --color-superficie: #FFFFFF;    /* Fondo de tarjetas */
+  --color-linea: #E3E8E6;         /* Bordes / divisores visibles (reemplaza #CFCFCF) */
+  --color-texto-suave: #5F7A77;   /* Texto secundario (= muted) */
+
+  /* ── Semánticos (alineados a marca donde aplica) ── */
+  --color-exito: #00A98B;         /* éxito → menta oscuro de marca */
+  --color-exito-suave: #DCFCE7;
+  --color-alerta: #F59E0B;        /* advertencia */
+  --color-alerta-suave: #FEF3C7;
+  --color-error: #EF4444;         /* error */
+  --color-error-suave: #FEE2E2;
+  --color-info: #0EA5E9;          /* informativo */
+
+  /* ── Escala de etapas del pipeline (petróleo → salvia → menta → lima) ── */
+  --color-etapa-1: #9AB9AD;       /* salvia */
+  --color-etapa-2: #6FB6A6;
+  --color-etapa-3: #3FC4A8;
+  --color-etapa-4: #00C19F;       /* menta */
+  --color-etapa-5: #6FD08C;
+  --color-etapa-6: #A9D94E;
+  --color-etapa-7: #CEDC00;       /* lima */
+  --color-etapa-final: #072B31;   /* petróleo (completado) */
+
+  /* ── Tipografía ── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Articulat CF', 'Inter', -apple-system, sans-serif;
+  --font-numeric: 'BC Barell 1973', 'Inter', sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(7,43,49,0.05);
+  --shadow-md: 0 4px 12px rgba(7,43,49,0.07);
+  --shadow-lg: 0 8px 24px rgba(7,43,49,0.09);
+  --shadow-xl: 0 16px 48px rgba(7,43,49,0.11);
+  --shadow-glass: 0 8px 32px 0 rgba(7,43,49,0.05);
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--color-fondo);
   color: var(--color-principal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  
-  /* Glassmorphism Dynamic Background Mesh */
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(64, 100%, 89%, 0.6) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(0, 0%, 96%, 0.8) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, hsla(64, 100%, 89%, 0.4) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, hsla(0, 0%, 96%, 1) 0px, transparent 50%);
+
+  /* Mesh de fondo sutil, en tintes de marca (menta / verde claro) — "claridad sin ruido" */
+  background-image:
+    radial-gradient(at 0% 0%, hsla(169, 60%, 88%, 0.40) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(150, 18%, 95%, 0.70) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(64, 70%, 90%, 0.30) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(150, 14%, 96%, 1) 0px, transparent 50%);
   background-attachment: fixed;
+}
+
+/* Tokens referenciados vía var() en estilos inline (style={{}}).
+   Tailwind v4 hace tree-shaking de las variables @theme que ninguna clase usa,
+   y NO escanea estilos inline — por eso las declaramos aquí en :root para
+   garantizar que existan en runtime. Valores idénticos a los de @theme. */
+:root {
+  --color-principal: #072B31;
+  --color-acento: #CEDC00;
+  --color-menta: #00C19F;
+  --color-linea: #E3E8E6;
+  --color-texto-suave: #5F7A77;
+  --color-exito: #00A98B;
+  --color-alerta: #F59E0B;
+  --color-error: #EF4444;
+  --color-etapa-1: #9AB9AD;
+  --color-etapa-2: #6FB6A6;
+  --color-etapa-3: #3FC4A8;
+  --color-etapa-4: #00C19F;
+  --color-etapa-5: #6FD08C;
+  --color-etapa-6: #A9D94E;
+  --color-etapa-7: #CEDC00;
+  --color-etapa-final: #072B31;
 }
 
 * {
@@ -43,8 +127,19 @@ input, textarea, select {
 
 input:focus, textarea:focus, select:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(215, 255, 47, 0.4);
-  border-color: #D7FF2F;
+  box-shadow: 0 0 0 3px rgba(206, 220, 0, 0.45); /* Lima #CEDC00 */
+  border-color: #CEDC00;
+}
+
+/* Tipografía de marca: títulos en Articulat CF (fallback Inter hasta licenciar),
+   cifras/datos en BC Barell 1973 vía la clase .num / font-numeric (Brandbook §3) */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+.num, .font-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Glass Utilities */
@@ -57,11 +152,11 @@ input:focus, textarea:focus, select:focus {
 }
 
 .glass-panel-dark {
-  background: rgba(15, 15, 15, 0.6);
+  background: rgba(7, 43, 49, 0.82); /* Petróleo #072B31 — superficie oscura de marca */
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 40px rgba(7, 43, 49, 0.28);
 }
 
 .glass-card {

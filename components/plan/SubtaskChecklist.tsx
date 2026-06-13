@@ -52,7 +52,7 @@ export default function SubtaskChecklist({ subtareas, tareaId, readOnly, onChang
           <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, backgroundColor: pct === 100 ? '#10B981' : '#D7FF2F' }}
+              style={{ width: `${pct}%`, backgroundColor: pct === 100 ? '#10B981' : 'var(--color-acento)' }}
             />
           </div>
           <span className="text-[10px] font-bold text-gray-400">{pct}%</span>

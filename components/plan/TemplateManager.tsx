@@ -55,7 +55,7 @@ export default function TemplateManager({ proyectoId, currentUser, fases, activi
         return {
           nombre: fase.nombre,
           orden: fase.orden,
-          color: fase.color || '#000000',
+          color: fase.color || 'var(--color-principal)',
           actividades: faseActs.map(act => ({
             nombre: act.nombre,
             orden: act.orden,
@@ -93,7 +93,7 @@ export default function TemplateManager({ proyectoId, currentUser, fases, activi
         return {
           nombre: fase.nombre,
           orden: fase.orden,
-          color: fase.color || '#000000',
+          color: fase.color || 'var(--color-principal)',
           actividades: faseActs.map(act => {
             const actTareas = (tareas || [])
               .filter((t: any) => t.actividad_id === act.id)
