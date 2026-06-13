@@ -38,7 +38,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   // Get project name for the header
   const { data: proyecto } = await supabase
     .from('proyectos')
-    .select('nombre_proyecto')
+    .select('nombre_proyecto, estado')
     .eq('id', id)
     .single()
 
@@ -61,6 +61,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
         proyectoId={id}
         currentUser={profile}
         readOnly={readOnly}
+        proyectoEstado={proyecto?.estado}
       />
     </div>
   )

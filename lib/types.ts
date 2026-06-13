@@ -325,7 +325,7 @@ export interface PlanPlantillaEstructura {
 
 // ── Comment & Notification Types ──────────────────────────────
 
-export type CommentTargetType = 'fase' | 'actividad' | 'tarea' | 'subtarea' | 'hito'
+export type CommentTargetType = 'fase' | 'actividad' | 'tarea' | 'subtarea' | 'hito' | 'evidencia'
 
 export interface PlanComentario {
   id: string
@@ -335,6 +335,7 @@ export interface PlanComentario {
   tarea_id: string | null
   subtarea_id: string | null
   hito_id: string | null
+  evidencia_id: string | null
   parent_id: string | null
   autor_id: string
   contenido: string
@@ -346,7 +347,7 @@ export interface PlanComentario {
   respuestas?: PlanComentario[]
 }
 
-export type TipoNotificacion = 'comentario' | 'respuesta' | 'resuelto' | 'sistema'
+export type TipoNotificacion = 'comentario' | 'respuesta' | 'resuelto' | 'sistema' | 'evidencia'
 
 export interface Notificacion {
   id: string
@@ -360,3 +361,24 @@ export interface Notificacion {
   leido: boolean
   created_at: string
 }
+
+// ── Evidence Types ───────────────────────────────────────────
+
+export type TipoEvidencia = 'foto' | 'documento' | 'nota'
+
+export interface InstalacionEvidencia {
+  id: string
+  proyecto_id: string
+  fase_id: string | null
+  actividad_id: string | null
+  tarea_id: string | null
+  tipo: TipoEvidencia
+  titulo: string
+  descripcion: string | null
+  url: string | null
+  autor_id: string
+  created_at: string
+  updated_at: string
+  autor?: Profile
+}
+

@@ -21,7 +21,7 @@ export default async function AnalistaPlanPage({ params }: { params: Promise<{ i
 
   const { data: proyecto } = await supabase
     .from('proyectos')
-    .select('nombre_proyecto')
+    .select('nombre_proyecto, estado')
     .eq('id', id)
     .single()
 
@@ -42,6 +42,7 @@ export default async function AnalistaPlanPage({ params }: { params: Promise<{ i
         proyectoId={id}
         currentUser={profile}
         readOnly={true}
+        proyectoEstado={proyecto.estado}
       />
     </div>
   )

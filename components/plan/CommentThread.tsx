@@ -43,6 +43,7 @@ const TARGET_COLUMN: Record<CommentTargetType, string> = {
   tarea: 'tarea_id',
   subtarea: 'subtarea_id',
   hito: 'hito_id',
+  evidencia: 'evidencia_id',
 }
 
 // ── Props ─────────────────────────────────────────────────────
@@ -206,7 +207,9 @@ export default function CommentThread({ proyectoId, targetType, targetId, curren
       financiero: '/financiero', cliente_final: '/cliente',
     }
     const prefix = rolePrefixMap[currentUser.rol] || '/epc'
-    const enlace = `${prefix}/proyectos/${proyectoId}/plan`
+    const enlace = targetType === 'evidencia'
+      ? `${prefix}/proyectos/${proyectoId}/instalaciones`
+      : `${prefix}/proyectos/${proyectoId}/plan`
     const autorName = currentUser.nombre || 'Usuario'
 
     // Notify participants — but we do this from the client by fetching relevant user IDs

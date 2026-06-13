@@ -279,7 +279,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       ...prevHistorial,
       [estado]: new Date().toISOString(),
     }
-    const { data, error } = await supabase.from('proyectos').update({ estado, historial_estados }).eq('id', proyecto.id).select().single()
+    const updatePayload: Record<string, any> = { estado, historial_estados }
+    if (estado === 'en_construccion') {
+      updatePayload.plan_bloqueado = true
+    }
+    const { data, error } = await supabase.from('proyectos').update(updatePayload).eq('id', proyecto.id).select().single()
     if (error) {
       setErrorEstado('Error al cambiar de estado: ' + error.message)
     } else if (data) {
@@ -1468,6 +1472,26 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           </Link>
         </div>
       </Seccion>
+
+      {/* Monitor de Instalación — only visible after project approval */}
+      {['aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
+        <Seccion title="Monitor de Instalación">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">
+                Seguimiento en tiempo real de la instalación con evidencia fotográfica, avance por fase y actividad.
+              </p>
+            </div>
+            <Link
+              href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : isAnalista ? '/analista' : isFinder ? '/finder' : '/financiero'}/proyectos/${proyecto.id}/instalaciones`}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-green-600 hover:bg-green-700 text-white whitespace-nowrap"
+            >
+              <Wrench size={16} />
+              {isEpcista ? 'Gestionar Instalación' : 'Ver Instalación'}
+            </Link>
+          </div>
+        </Seccion>
+      )}
 
       {/* Cronograma Gantt (legacy) */}
       <Seccion title="Cronograma de Construcción (Legacy)">

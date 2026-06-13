@@ -22,7 +22,7 @@ export default async function FinancieroPlanPage({ params }: { params: Promise<{
   // Verify the financiero is linked to this project
   const { data: proyecto } = await supabase
     .from('proyectos')
-    .select('nombre_proyecto')
+    .select('nombre_proyecto, estado')
     .eq('id', id)
     .eq('financiero_id', session.user.id)
     .single()
@@ -44,6 +44,7 @@ export default async function FinancieroPlanPage({ params }: { params: Promise<{
         proyectoId={id}
         currentUser={profile}
         readOnly={true}
+        proyectoEstado={proyecto.estado}
       />
     </div>
   )
