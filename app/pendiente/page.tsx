@@ -42,7 +42,7 @@ export default function PendientePage() {
         </div>
         <div className="border p-8 text-center glass-card">
           <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center"
-            style={{ backgroundColor: '#D7FF2F' }}>
+            style={{ backgroundColor: 'var(--color-acento)' }}>
             <span className="text-2xl">⏳</span>
           </div>
           <h1 className="text-xl font-bold mb-2">Solicitud enviada</h1>

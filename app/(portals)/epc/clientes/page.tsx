@@ -105,7 +105,7 @@ export default function ClientesPage() {
                       {/* Top Action / Header */}
                       <div className="flex items-start justify-between w-full">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-principal font-bold text-sm shrink-0 shadow-sm" style={{ backgroundColor: '#D7FF2F' }}>
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-principal font-bold text-sm shrink-0 shadow-sm" style={{ backgroundColor: 'var(--color-acento)' }}>
                             {c.razon_social.substring(0, 2).toUpperCase()}
                           </div>
                           <div>

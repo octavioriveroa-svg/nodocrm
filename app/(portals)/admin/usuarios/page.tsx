@@ -27,9 +27,9 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  epc: { bg: '#E8E8E8', color: '#444' },
-  nodo_analista: { bg: '#D7FF2F', color: '#000' },
-  nodo_admin: { bg: '#000', color: '#fff' },
+  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' },
+  nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
+  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' },
   cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
   financiero: { bg: '#DCFCE7', color: '#15803D' },
   suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
@@ -146,9 +146,9 @@ export default function UsuariosReadOnlyPage() {
               onClick={() => setFiltroRol(r)}
               className="px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap"
               style={{
-                borderColor: filtroRol === r ? '#000' : '#CFCFCF',
-                backgroundColor: filtroRol === r ? '#000' : '#fff',
-                color: filtroRol === r ? '#D7FF2F' : '#444',
+                borderColor: filtroRol === r ? 'var(--color-principal)' : 'var(--color-linea)',
+                backgroundColor: filtroRol === r ? 'var(--color-principal)' : '#fff',
+                color: filtroRol === r ? 'var(--color-acento)' : 'var(--color-texto-suave)',
               }}
             >
               {r === 'todos' ? 'Todos' : ROL_LABELS[r] ?? r}
@@ -163,7 +163,7 @@ export default function UsuariosReadOnlyPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: '#000', color: '#fff' }}>
+              <tr style={{ backgroundColor: 'var(--color-principal)', color: '#fff' }}>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Nombre</th>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Empresa</th>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Correo</th>

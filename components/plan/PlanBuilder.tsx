@@ -313,7 +313,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
               width: `${overallPct}%`,
               background: overallPct === 100
                 ? '#10B981'
-                : 'linear-gradient(90deg, #D7FF2F, #000)',
+                : 'linear-gradient(90deg, #CEDC00, #072B31)',
             }}
           />
         </div>

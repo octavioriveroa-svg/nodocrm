@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import StepIndicator from '@/components/ui/StepIndicator'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, X, Eye, Pencil, Trash2, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
@@ -116,30 +117,6 @@ function n2(v: number | null, dec = 2) {
   return fmtNum(v, dec)
 }
 
-// ── StepIndicator ─────────────────────────────────────────────
-function StepIndicator({ current }: { current: number }) {
-  const labels = ['Información básica', 'Sitios y productos', 'Financiamiento']
-  return (
-    <div className="flex items-center gap-3 mb-8">
-      {labels.map((label, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-            style={{
-              backgroundColor: i < current ? '#000' : i === current ? '#D7FF2F' : '#CFCFCF',
-              color: i < current ? '#D7FF2F' : '#000',
-            }}>
-            {i < current ? '✓' : i + 1}
-          </div>
-          <span className="text-xs font-medium hidden md:block"
-            style={{ color: i === current ? '#000' : '#999' }}>
-            {label}
-          </span>
-          {i < 2 && <div className="h-px w-5 flex-shrink-0" style={{ backgroundColor: i < current ? '#000' : '#CFCFCF' }} />}
-        </div>
-      ))}
-    </div>
-  )
-}
 
 // ── Tarjeta de producto (display) ────────────────────────────
 function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
@@ -156,7 +133,7 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
             <X size={13} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: 'var(--color-texto-suave)' }}>
           <span><span className="text-muted">Módulos: </span>{p.fv.num_modulos} × {p.fv.potencia_modulos_w} W · {p.fv.marca_modulos}</span>
           <span><span className="text-muted">kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
           <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
@@ -186,7 +163,7 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
             <X size={13} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: '#444' }}>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: 'var(--color-texto-suave)' }}>
           <span><span className="text-muted">Potencia: </span>{p.bess.potencia_kw} kW</span>
           <span><span className="text-muted">Capacidad: </span>{p.bess.capacidad_kwh} kWh</span>
           <span><span className="text-muted">Marca: </span>{p.bess.marca}</span>
@@ -788,7 +765,7 @@ export default function NuevoProyectoPage() {
         <p className="text-sm mt-1 text-muted">Completa los tres pasos para enviar tu solicitud</p>
       </div>
 
-      <StepIndicator current={step} />
+      <StepIndicator steps={['Información básica', 'Sitios y productos', 'Financiamiento']} current={step} />
 
       <div className="rounded-2xl border border-borde p-8 shadow-sm bg-white">
 
@@ -842,19 +819,19 @@ const Icon = opt.icon
                       onClick={() => setF('tipo_instalacion', opt.value)}
                       className="flex items-start gap-4 rounded-xl border p-4 text-left w-full transition-all duration-200"
                       style={{
-                        borderColor: selected ? '#000' : '#E5E5E5',
-                        backgroundColor: selected ? '#000' : '#fff',
+                        borderColor: selected ? 'var(--color-principal)' : '#E5E5E5',
+                        backgroundColor: selected ? 'var(--color-principal)' : '#fff',
                         boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)'
                       }}>
                       <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
-                        style={{ borderColor: selected ? '#D7FF2F' : '#CFCFCF' }}>
-                        {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#D7FF2F' }} />}
+                        style={{ borderColor: selected ? 'var(--color-acento)' : 'var(--color-linea)' }}>
+                        {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-acento)' }} />}
                       </div>
                       <div>
-                        <div className="font-semibold text-sm" style={{ color: selected ? '#D7FF2F' : '#000' }}>
+                        <div className="font-semibold text-sm" style={{ color: selected ? 'var(--color-acento)' : 'var(--color-principal)' }}>
                           {opt.title}
                         </div>
-                        <div className="text-xs mt-1.5" style={{ color: selected ? '#aaa' : '#666' }}>
+                        <div className="text-xs mt-1.5" style={{ color: selected ? '#aaa' : 'var(--color-texto-suave)' }}>
                           {opt.desc}
                         </div>
                       </div>
@@ -883,9 +860,9 @@ const Icon = opt.icon
                   }}
                   className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
                   style={{
-                    backgroundColor: activeConfigId === c.tempId ? '#000' : '#fff',
-                    color: activeConfigId === c.tempId ? '#D7FF2F' : '#666',
-                    borderColor: activeConfigId === c.tempId ? '#000' : '#E5E5E5',
+                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
+                    color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
+                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
                   }}
                 >
                   <span>{c.nombre || `Configuración ${idx + 1}`}</span>
@@ -984,7 +961,7 @@ const Icon = opt.icon
                     <div key={s.id}>
                       {/* Fila sitio */}
                       <div className="flex items-center gap-3 border rounded-xl p-3 shadow-sm transition-all" style={{
-                        borderColor: selected ? '#000' : '#E5E5E5',
+                        borderColor: selected ? 'var(--color-principal)' : '#E5E5E5',
                         backgroundColor: selected ? '#fafafa' : '#fff',
                       }}>
                         <input type="checkbox" id={`s-${s.id}`} checked={selected}
@@ -1005,18 +982,18 @@ const Icon = opt.icon
                           }}
                             className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: viendoSitioId === s.id ? '#000' : '#E5E5E5',
-                              backgroundColor: viendoSitioId === s.id ? '#000' : '#fff',
-                              color: viendoSitioId === s.id ? '#D7FF2F' : '#444',
+                              borderColor: viendoSitioId === s.id ? 'var(--color-principal)' : '#E5E5E5',
+                              backgroundColor: viendoSitioId === s.id ? 'var(--color-principal)' : '#fff',
+                              color: viendoSitioId === s.id ? 'var(--color-acento)' : 'var(--color-texto-suave)',
                             }}>
                             <Eye size={13} />
                           </button>
                           <button type="button" onClick={() => abrirEditarSitio(s)}
                             className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: editandoSitioId === s.id ? '#000' : '#E5E5E5',
+                              borderColor: editandoSitioId === s.id ? 'var(--color-principal)' : '#E5E5E5',
                               backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff',
-                              color: '#444',
+                              color: 'var(--color-texto-suave)',
                             }}>
                             <Pencil size={13} />
                           </button>
@@ -1043,7 +1020,7 @@ const Icon = opt.icon
 
                       {/* Panel Ver */}
                       {viendoSitioId === s.id && (
-                        <div className="border border-t-0 px-4 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
+                        <div className="border border-t-0 px-4 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                             {s.nombre_recibo && <div><span className="text-muted">Nombre en recibo: </span><span className="font-medium">{s.nombre_recibo}</span></div>}
                             {(s.ciudad || s.ubicacion_estado) && <div><span className="text-muted">Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
@@ -1052,7 +1029,7 @@ const Icon = opt.icon
                             {s.recibo_url && (
                               <div className="col-span-2">
                                 <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center gap-1 underline font-medium" style={{ color: '#000' }}>
+                                  className="flex items-center gap-1 underline font-medium" style={{ color: 'var(--color-principal)' }}>
                                   <FileText size={11} /> Ver recibo CFE
                                 </a>
                               </div>
@@ -1063,7 +1040,7 @@ const Icon = opt.icon
 
                       {/* Panel Editar sitio */}
                       {editandoSitioId === s.id && (
-                        <div className="border border-t-0 px-4 py-4" style={{ borderColor: '#000' }}>
+                        <div className="border border-t-0 px-4 py-4" style={{ borderColor: 'var(--color-principal)' }}>
                           <p className="text-xs font-bold mb-3">Editar sitio</p>
                           <div className="flex flex-col gap-3">
                             <input type="text" value={editSitioForm.nombre}
@@ -1122,7 +1099,7 @@ const Icon = opt.icon
 
                       {/* Productos — solo cuando el sitio está seleccionado */}
                       {selected && (
-                        <div className="border border-t-0 px-3 py-3" style={{ borderColor: '#000', backgroundColor: '#fafafa' }}>
+                        <div className="border border-t-0 px-3 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
                           <p className="text-xs font-bold uppercase tracking-wide mb-2 text-muted">
                             Productos del sitio
                           </p>
@@ -1139,7 +1116,7 @@ const Icon = opt.icon
 
                           {/* Formulario agregar producto */}
                           {isAdding ? (
-                            <div className="border p-4" style={{ borderColor: '#000', backgroundColor: '#fff' }}>
+                            <div className="border p-4" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fff' }}>
                               {/* Selector de tipo */}
                               {!productTipo ? (
                                 <div>
@@ -1345,7 +1322,7 @@ const Icon = opt.icon
 
               {/* Agregar nuevo sitio inline */}
               {mostrarNuevoSitio ? (
-                <div className="border p-4" style={{ borderColor: '#000' }}>
+                <div className="border p-4" style={{ borderColor: 'var(--color-principal)' }}>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-bold">Nuevo sitio</span>
                     <button type="button" onClick={() => { setMostrarNuevoSitio(false); setNuevoSitio(emptyNuevoSitio); setReciboUrlNuevo(null) }}>
@@ -1422,7 +1399,7 @@ const Icon = opt.icon
             <h2 className="font-bold text-lg">Financiamiento</h2>
 
             {anyHighDemanda && (
-              <div className="border p-4" style={{ borderColor: '#D7FF2F', backgroundColor: '#fffff0' }}>
+              <div className="border p-4" style={{ borderColor: 'var(--color-acento)', backgroundColor: '#fffff0' }}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.incluye_mem}
                     onChange={e => setF('incluye_mem', e.target.checked)}
@@ -1448,9 +1425,9 @@ const Icon = opt.icon
                   onClick={() => setIsRecomendacionNodo(true)}
                   className="border rounded-xl p-4 text-left transition-all"
                   style={{
-                    borderColor: isRecomendacionNodo ? '#000' : '#E5E5E5',
-                    backgroundColor: isRecomendacionNodo ? '#000' : '#fff',
-                    color: isRecomendacionNodo ? '#D7FF2F' : '#000',
+                    borderColor: isRecomendacionNodo ? 'var(--color-principal)' : '#E5E5E5',
+                    backgroundColor: isRecomendacionNodo ? 'var(--color-principal)' : '#fff',
+                    color: isRecomendacionNodo ? 'var(--color-acento)' : 'var(--color-principal)',
                   }}
                 >
                   <p className="font-bold text-sm">Nodo Recomienda</p>
@@ -1461,9 +1438,9 @@ const Icon = opt.icon
                   onClick={() => setIsRecomendacionNodo(false)}
                   className="border rounded-xl p-4 text-left transition-all"
                   style={{
-                    borderColor: !isRecomendacionNodo ? '#000' : '#E5E5E5',
-                    backgroundColor: !isRecomendacionNodo ? '#000' : '#fff',
-                    color: !isRecomendacionNodo ? '#D7FF2F' : '#000',
+                    borderColor: !isRecomendacionNodo ? 'var(--color-principal)' : '#E5E5E5',
+                    backgroundColor: !isRecomendacionNodo ? 'var(--color-principal)' : '#fff',
+                    color: !isRecomendacionNodo ? 'var(--color-acento)' : 'var(--color-principal)',
                   }}
                 >
                   <p className="font-bold text-sm">Ingresar opciones manualmente</p>
@@ -1657,7 +1634,7 @@ const Icon = opt.icon
           ) : (
             <button type="button" onClick={handleSubmit} disabled={loading}
               className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50 hover:bg-[#1a1a1a]"
-              style={{ backgroundColor: '#000', color: '#D7FF2F' }}>
+              style={{ backgroundColor: 'var(--color-principal)', color: 'var(--color-acento)' }}>
               {loading ? 'Enviando...' : 'Enviar proyecto'}
             </button>
           )}

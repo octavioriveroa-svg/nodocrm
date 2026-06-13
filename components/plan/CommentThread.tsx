@@ -12,7 +12,7 @@ import {
 
 // ── Role badge colors ─────────────────────────────────────────
 const ROLE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  epc:            { bg: '#D7FF2F', text: '#000', label: 'EPC' },
+  epc:            { bg: 'var(--color-acento)', text: 'var(--color-principal)', label: 'EPC' },
   nodo_admin:     { bg: '#1a1a2e', text: '#fff', label: 'Admin' },
   nodo_analista:  { bg: '#4F46E5', text: '#fff', label: 'Analista' },
   financiero:     { bg: '#059669', text: '#fff', label: 'Financiero' },

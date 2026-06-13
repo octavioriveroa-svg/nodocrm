@@ -39,7 +39,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       type="button"
       onClick={() => onChange(!value)}
       className="relative w-10 h-6 flex-shrink-0 transition-colors"
-      style={{ backgroundColor: value ? '#000' : '#CFCFCF', borderRadius: '9999px' }}
+      style={{ backgroundColor: value ? 'var(--color-principal)' : 'var(--color-linea)', borderRadius: '9999px' }}
     >
       <span
         className="absolute top-1 w-4 h-4 bg-white transition-transform"

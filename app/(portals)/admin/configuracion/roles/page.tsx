@@ -24,8 +24,8 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  epc: { bg: '#E8E8E8', color: '#444' }, nodo_analista: { bg: '#D7FF2F', color: '#000' },
-  nodo_admin: { bg: '#000', color: '#fff' }, cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
+  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' }, nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
+  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' }, cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
   financiero: { bg: '#DCFCE7', color: '#15803D' }, suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
   pendiente: { bg: '#FFF3CD', color: '#856404' }, finder: { bg: '#FDE68A', color: '#92400E' },
 }

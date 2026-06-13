@@ -200,8 +200,8 @@ export default function GanttView({ fases, actividades, hitosFinancieros, readOn
     <div className="gantt-container border border-gray-200 rounded-xl overflow-hidden shadow-sm">
       <style>{`
         .gantt-container {
-          --wx-gantt-bar-fill: #000;
-          --wx-gantt-bar-color: #D7FF2F;
+          --wx-gantt-bar-fill: #072B31;
+          --wx-gantt-bar-color: #CEDC00;
           --wx-gantt-milestone-color: #10B981;
           --wx-gantt-link-color: #9CA3AF;
           height: 500px;

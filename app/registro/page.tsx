@@ -138,7 +138,7 @@ export default function RegistroPage() {
 
         <p className="text-center text-sm mt-6 text-muted">
           ¿Ya tienes cuenta?{' '}
-          <Link href="/login" className="font-semibold underline" style={{ color: '#000' }}>
+          <Link href="/login" className="font-semibold underline" style={{ color: 'var(--color-principal)' }}>
             Inicia sesión
           </Link>
         </p>

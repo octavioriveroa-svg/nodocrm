@@ -18,9 +18,9 @@ const ROL_LABELS: Record<string, string> = {
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
   cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
   financiero: { bg: '#DCFCE7', color: '#15803D' },
-  epc: { bg: '#E8E8E8', color: '#444' },
-  nodo_analista: { bg: '#D7FF2F', color: '#000' },
-  nodo_admin: { bg: '#000', color: '#fff' },
+  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' },
+  nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
+  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' },
   suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
 }
 
@@ -201,7 +201,7 @@ export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers,
                   className="px-2.5 py-1 text-[10px] font-bold rounded-md"
                   style={{
                     backgroundColor: ROL_COLORS[u.rol]?.bg ?? '#E8E8E8',
-                    color: ROL_COLORS[u.rol]?.color ?? '#444',
+                    color: ROL_COLORS[u.rol]?.color ?? 'var(--color-texto-suave)',
                   }}
                 >
                   {ROL_LABELS[u.rol] ?? u.rol}
