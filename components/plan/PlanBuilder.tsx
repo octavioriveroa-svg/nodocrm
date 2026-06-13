@@ -9,7 +9,7 @@ import PhaseCard from './PhaseCard'
 import FinancialMilestones from './FinancialMilestones'
 import TemplateManager from './TemplateManager'
 import dynamic from 'next/dynamic'
-import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2, MessageCircle } from 'lucide-react'
+import { Plus, LayoutList, BarChart3, DollarSign, Save, Loader2, MessageCircle, AlertTriangle } from 'lucide-react'
 
 // Dynamic import — SVAR Gantt uses browser APIs, not SSR-safe
 const GanttView = dynamic(() => import('./GanttView'), { ssr: false, loading: () => (
@@ -25,12 +25,14 @@ interface Props {
   proyectoId: string
   currentUser: Profile
   readOnly?: boolean
+  proyectoEstado?: string
 }
 
 type ViewMode = 'tree' | 'gantt' | 'financial'
 
-export default function PlanBuilder({ proyectoId, currentUser, readOnly = false }: Props) {
+export default function PlanBuilder({ proyectoId, currentUser, readOnly = false, proyectoEstado }: Props) {
   const supabase = createClient()
+  const isLocked = readOnly || ['en_construccion', 'operativo', 'completado'].includes(proyectoEstado || '')
   const [loading, setLoading] = useState(true)
   const [fases, setFases] = useState<PlanFase[]>([])
   const [actividades, setActividades] = useState<PlanActividad[]>([])
@@ -250,6 +252,13 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
 
   return (
     <div className="max-w-4xl mx-auto">
+      {isLocked && !readOnly && (
+        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-sm text-amber-800">
+          <AlertTriangle size={16} />
+          El plan está bloqueado porque el proyecto se encuentra en fase de construcción. 
+          Use el Monitor de Instalación para registrar avances.
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -263,7 +272,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
                 </span>
               )}
             </p>
-            {!readOnly && (
+            {!isLocked && (
               <TemplateManager
                 proyectoId={proyectoId}
                 currentUser={currentUser}
@@ -329,7 +338,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
               <p className="text-xs text-gray-400 mb-4 text-center max-w-xs">
                 Comienza creando fases para organizar las actividades de ingeniería, procurement y construcción.
               </p>
-              {!readOnly && (
+              {!isLocked && (
                 <button
                   onClick={() => setAddingPhase(true)}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-bold bg-principal text-acento rounded-lg hover:bg-gray-900 transition-colors"
@@ -347,7 +356,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
               actividades={actividades.filter(a => a.fase_id === fase.id)}
               allActividades={actividades}
               hitosFinancieros={hitosFinancieros}
-              readOnly={readOnly}
+              readOnly={isLocked}
               currentUser={currentUser}
               proyectoId={proyectoId}
               commentCounts={commentCounts}
@@ -382,7 +391,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
           )}
 
           {/* Add phase */}
-          {!readOnly && sortedFases.length > 0 && (
+          {!isLocked && sortedFases.length > 0 && (
             addingPhase ? (
               <div className="flex items-center gap-2 mt-2">
                 <input
@@ -415,7 +424,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
           fases={fases}
           actividades={actividades}
           hitosFinancieros={hitosFinancieros}
-          readOnly={readOnly}
+          readOnly={isLocked}
           onTaskDragged={handleTaskDragged}
         />
       )}
@@ -427,7 +436,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false 
           fases={fases}
           proyectoId={proyectoId}
           capexEstimado={null}
-          readOnly={readOnly}
+          readOnly={isLocked}
           isFinanciero={currentUser.rol === 'financiero'}
           currentUser={currentUser}
           commentCounts={commentCounts}
