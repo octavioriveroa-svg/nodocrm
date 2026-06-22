@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Folder, Users, LogOut, Settings, LayoutDashboard, Building2, Menu, X } from 'lucide-react'
+import { Folder, Users, LogOut, Settings, LayoutDashboard, Building2, Menu, X, Wrench } from 'lucide-react'
 import Logo from './Logo'
 import type { Rol } from '@/lib/types'
 
@@ -51,6 +51,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     ]},
     { label: null, items: [
       { href: '/epc/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/epc/instalaciones', label: 'Instalaciones', icon: Wrench },
       { href: '/epc/clientes', label: 'Clientes', icon: Users },
     ]},
   ]
@@ -60,6 +61,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
       { href: '/analista', label: 'Proyectos', icon: Folder },
     ]},
     { label: 'Operaciones', items: [
+      { href: '/analista/instalaciones', label: 'Instalaciones', icon: Wrench },
       { href: '/analista/clientes', label: 'Clientes', icon: Building2 },
     ]},
     { label: 'Equipo', items: [
@@ -73,6 +75,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     ]},
     { label: 'Operaciones', items: [
       { href: '/admin/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/admin/instalaciones', label: 'Instalaciones', icon: Wrench },
       { href: '/admin/clientes', label: 'Clientes', icon: Building2 },
     ]},
     { label: 'Equipo', items: [
@@ -83,12 +86,14 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   const navCliente: NavSection[] = [
     { label: null, items: [
       { href: '/cliente', label: 'Mis Proyectos', icon: Folder },
+      { href: '/cliente/instalaciones', label: 'Instalaciones', icon: Wrench },
     ]},
   ]
 
   const navFinanciero: NavSection[] = [
     { label: null, items: [
       { href: '/financiero', label: 'Portafolio', icon: LayoutDashboard },
+      { href: '/financiero/instalaciones', label: 'Instalaciones', icon: Wrench },
     ]},
   ]
 
@@ -104,6 +109,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     ]},
     { label: 'Operaciones', items: [
       { href: '/finder/proyectos', label: 'Proyectos', icon: Folder },
+      { href: '/finder/instalaciones', label: 'Instalaciones', icon: Wrench },
       { href: '/finder/clientes', label: 'Clientes', icon: Building2 },
     ]},
   ]
