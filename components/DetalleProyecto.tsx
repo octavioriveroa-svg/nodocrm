@@ -691,7 +691,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                       <label className="block text-xs font-medium mb-1">EPC Asignado</label>
                       <select
                         value={form.epcista_id || ''}
-                        onChange={e => setForm(f => ({...f, epcista_id: e.target.value || ''}))}
+                        onChange={e => setForm(f => ({...f, epcista_id: e.target.value || proyecto.epcista_id}))}
                         className="w-full border rounded p-2 text-sm bg-white"
                       >
                         <option value="">Sin asignar</option>

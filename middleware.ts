@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error } = await supabase.auth.getUser()
 
   const url = request.nextUrl
   const path = url.pathname
@@ -59,16 +59,15 @@ export async function middleware(request: NextRequest) {
                           path.startsWith('/financiero') || path.startsWith('/mem') ||
                           path.startsWith('/finder')
 
-  // Si no hay sesión y tratan de entrar a un portal privado, redirigir a login
-  if (isProtectedPath && !session) {
+  // Si no hay usuario validado y tratan de entrar a un portal privado, redirigir a login
+  if (isProtectedPath && (!user || error)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si hay sesión y están en login/registro/home, redirigirlos a su portal
-  if (session && (path === '/login' || path === '/registro' || path === '/')) {
-    // Obtener rol del perfil para saber a qué portal mandarlos
-    const { data: profile } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single()
-    const rol = profile?.rol || session.user.user_metadata?.rol
+  // Si hay usuario validado, obtener rol para ruteo correcto
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
+    const rol = profile?.rol || user.user_metadata?.rol
     
     let targetPath = ''
     switch(rol) {
@@ -82,8 +81,16 @@ export async function middleware(request: NextRequest) {
       case 'pendiente': targetPath = 'pendiente'; break;
     }
 
-    if (targetPath && !path.startsWith(`/${targetPath}`)) {
+    // Prevención de acceso cruzado entre portales
+    if (isProtectedPath && targetPath && !path.startsWith(`/${targetPath}`)) {
       return NextResponse.redirect(new URL(`/${targetPath}`, request.url))
+    }
+
+    // Redirección si están en rutas públicas de auth o root
+    if (path === '/login' || path === '/registro' || path === '/') {
+      if (targetPath) {
+        return NextResponse.redirect(new URL(`/${targetPath}`, request.url))
+      }
     }
   }
 
