@@ -198,6 +198,20 @@ export default function InstalacionMonitor({
       const targetEv = evidencias.find(x => x.id === evId)
       if (!targetEv) return
 
+      // Delete from storage if it has an url
+      if (targetEv.url) {
+        // extract the path after the bucket name
+        // typically url is: .../storage/v1/object/public/evidencias-instalacion/proyectoId/faseId/file...
+        const urlParts = targetEv.url.split('/public/')
+        if (urlParts.length === 2) {
+          const pathParts = urlParts[1].split('/')
+          const bucketName = pathParts[0]
+          const filePath = pathParts.slice(1).join('/')
+          
+          await supabase.storage.from(bucketName).remove([filePath])
+        }
+      }
+
       // Delete database row
       const { error: dbError } = await supabase
         .from('instalacion_evidencias')

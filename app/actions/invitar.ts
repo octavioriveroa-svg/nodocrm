@@ -93,10 +93,11 @@ export async function invitarUsuario(data: {
   // 7. Link the user to a specific project (optional, legacy support)
   if (data.proyecto_id) {
     const column = data.rol === 'cliente_final' ? 'cliente_id' : 'financiero_id'
+    const value = data.rol === 'cliente_final' && data.cliente_crm_id ? data.cliente_crm_id : userId
     
     const { error: projectError } = await adminAuthClient
       .from('proyectos')
-      .update({ [column]: userId })
+      .update({ [column]: value })
       .eq('id', data.proyecto_id)
     
     if (projectError) {
