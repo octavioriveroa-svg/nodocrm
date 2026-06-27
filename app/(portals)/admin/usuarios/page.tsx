@@ -21,6 +21,7 @@ const ROL_LABELS: Record<string, string> = {
   financiero: 'Financiero',
   suministrador: 'Suministrador',
   pendiente: 'Pendiente',
+  finder: 'Finder Comercial',
   epcista: 'EPC',
   analista: 'Analista Nodo',
   admin: 'Admin Nodo',
@@ -34,6 +35,7 @@ const ROL_COLORS: Record<string, { bg: string; color: string }> = {
   financiero: { bg: '#DCFCE7', color: '#15803D' },
   suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
   pendiente: { bg: '#FFF3CD', color: '#856404' },
+  finder: { bg: '#FDE68A', color: '#92400E' },
 }
 
 const FILTER_ROLES = ['todos', 'epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'pendiente']

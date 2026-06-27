@@ -258,7 +258,17 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 <div>
                   <label className="block text-sm font-medium mb-1">Rol en la plataforma</label>
                   <input type="text"
-                    value={initialProfile.rol === 'nodo_analista' ? 'Analista' : initialProfile.rol === 'nodo_admin' ? 'Administrador' : 'EPCista'}
+                    value={
+                      initialProfile.rol === 'nodo_analista' ? 'Analista Nodo' :
+                      initialProfile.rol === 'nodo_admin' ? 'Administrador' :
+                      initialProfile.rol === 'cliente_final' ? 'Cliente Final' :
+                      initialProfile.rol === 'financiero' ? 'Financiero' :
+                      initialProfile.rol === 'suministrador' ? 'Suministrador' :
+                      initialProfile.rol === 'finder' ? 'Finder Comercial' :
+                      initialProfile.rol === 'pendiente' ? 'Pendiente' :
+                      initialProfile.rol === 'epc' ? 'EPC' :
+                      initialProfile.rol
+                    }
                     disabled className={inpDisabled} />
                 </div>
                 {isNodoUser && (
