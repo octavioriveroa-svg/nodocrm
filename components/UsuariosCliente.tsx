@@ -13,6 +13,7 @@ const ROL_LABELS: Record<string, string> = {
   nodo_analista: 'Analista Nodo',
   nodo_admin: 'Admin Nodo',
   suministrador: 'Suministrador',
+  finder: 'Finder Comercial',
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
@@ -22,6 +23,7 @@ const ROL_COLORS: Record<string, { bg: string; color: string }> = {
   nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
   nodo_admin: { bg: 'var(--color-principal)', color: '#fff' },
   suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
+  finder: { bg: '#FDE68A', color: '#92400E' },
 }
 
 interface LinkedUser {
