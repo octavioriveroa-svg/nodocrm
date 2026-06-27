@@ -2,6 +2,7 @@
 
 import type { DashboardData } from '@/lib/dashboard-data'
 import { useState, useMemo } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { TrendingUp, TrendingDown, Minus, Folder, DollarSign, Zap, Target, Clock, Activity, Users, BarChart3, AlertTriangle, Map, PieChart } from 'lucide-react'
 import { TimePeriodButtons, filterProjects, computePipeline, computeFinancial, type TimePeriod } from './TimePeriodSelector'
 
@@ -27,7 +28,7 @@ const FINANCING_LABELS: Record<string, string> = {
 }
 
 // ─── Section wrapper ───
-function Section({ title, icon: Icon, children, id }: { title: string; icon: any; children: any; id?: string }) {
+function Section({ title, icon: Icon, children, id }: { title: string; icon: ComponentType<{ size?: number }>; children: ReactNode; id?: string }) {
   return (
     <div className="mb-8" id={id}>
       <h2 className="text-sm font-bold uppercase tracking-wider text-principal mb-4 flex items-center gap-2"><Icon size={16} />{title}</h2>
@@ -38,8 +39,8 @@ function Section({ title, icon: Icon, children, id }: { title: string; icon: any
 
 export default function DashboardAnalytics({ data }: { data: DashboardData }) {
   const [staleThreshold, setStaleThreshold] = useState(30)
-  const [pipelinePeriod, setPipelinePeriod] = useState<TimePeriod>('all_time')
-  const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('all_time')
+  const [pipelinePeriod, setPipelinePeriod] = useState<TimePeriod>('all')
+  const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('all')
   const { technical, activity, epcLeaderboard, stalePipeline, techMix, financingMix, geoCAPEX } = data
   const filteredStale = stalePipeline.filter(s => s.daysInStage >= staleThreshold)
   
