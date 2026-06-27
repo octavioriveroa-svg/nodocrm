@@ -2,10 +2,11 @@
 
 import type { DashboardData } from '@/lib/dashboard-data'
 import { useState, useMemo } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { TrendingUp, TrendingDown, Minus, Folder, DollarSign, Zap, Target, Clock, Activity, Users, BarChart3, AlertTriangle, Map, PieChart } from 'lucide-react'
 import { TimePeriodButtons, filterProjects, computePipeline, computeFinancial, type TimePeriod } from './TimePeriodSelector'
 
-import { fmtNum, fmtCurrency, fmtCompact, fmtPct } from '@/lib/format'
+import { fmtNum, fmtCurrency, fmtCompact, fmtPct, fmtCurrencyCompact } from '@/lib/format'
 
 function Trend({ current, previous, suffix = '' }: { current: number; previous: number; suffix?: string }) {
   if (previous === 0 && current === 0) return <span className="text-xs text-gray-400">—</span>
@@ -23,17 +24,14 @@ const STAGE_COLORS: Record<string, string> = {
 }
 
 const FINANCING_LABELS: Record<string, string> = {
-  credito: 'Crédito', arrendamiento: 'Arrendamiento', ensaas: 'ENSaaS', mem: 'MEM', no_sabe: 'No definido',
+  credito: 'Crédito', arrendamiento: 'Arrendamiento', ensaas: 'EnSaaS', mem: 'MEM', no_sabe: 'No sabe / Nodo recomienda'
 }
 
 // ─── Section wrapper ───
-function Section({ title, icon: Icon, children, id }: { title: string; icon: React.ElementType; children: React.ReactNode; id: string }) {
+function Section({ title, icon: Icon, children, id }: { title: string; icon: ComponentType<{ size?: number }>; children: ReactNode; id?: string }) {
   return (
-    <div id={id} className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-principal"><Icon size={14} className="text-acento" /></div>
-        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">{title}</h2>
-      </div>
+    <div className="mb-8" id={id}>
+      <h2 className="text-sm font-bold uppercase tracking-wider text-principal mb-4 flex items-center gap-2"><Icon size={16} />{title}</h2>
       {children}
     </div>
   )
@@ -42,9 +40,13 @@ function Section({ title, icon: Icon, children, id }: { title: string; icon: Rea
 export default function DashboardAnalytics({ data }: { data: DashboardData }) {
   const [staleThreshold, setStaleThreshold] = useState(30)
   const [pipelinePeriod, setPipelinePeriod] = useState<TimePeriod>('all')
-  const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('last_year')
-  const { kpis, technical, activity, epcLeaderboard, stalePipeline, financingMix, techMix, geoCAPEX } = data
+  const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('all')
+  const { technical, activity, epcLeaderboard, stalePipeline, techMix, financingMix, geoCAPEX } = data
   const filteredStale = stalePipeline.filter(s => s.daysInStage >= staleThreshold)
+  
+  const kpis = useMemo(() => {
+    return data.kpis
+  }, [data.kpis])
 
   const filteredPipeline = useMemo(() => {
     const fp = filterProjects(data.rawProjects, pipelinePeriod)
@@ -59,25 +61,28 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
   return (
     <div>
       {/* ═══ KPI BAR ═══ */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         {[
-          { label: 'Proyectos', value: kpis.totalProjects, icon: Folder, color: 'bg-acento/20 text-principal' },
-          { label: 'Pipeline activo', value: fmtCurrency(kpis.activePipelineCapex, 'MXN'), icon: DollarSign, color: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Capacidad instalada', value: `${fmtCompact(kpis.installedCapacityKwp)} kWp`, icon: Zap, color: 'bg-amber-50 text-amber-600' },
-          { label: 'Tasa de cierre', value: fmtPct(kpis.winRate, 0), icon: Target, color: 'bg-blue-50 text-blue-600' },
-          { label: 'Días hasta cierre', value: kpis.avgDaysToClose ?? '—', icon: Clock, color: 'bg-purple-50 text-purple-600' },
-          { label: 'Días hasta instalar', value: kpis.avgDaysToInstall ?? '—', icon: Activity, color: 'bg-teal-50 text-teal-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="glass-card p-5 group hover:shadow-md transition-all">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="num text-2xl font-black tracking-tight">{value}</div>
-                <div className="text-xs mt-1.5 text-gray-500">{label}</div>
+          { label: 'Proyectos', value: String(kpis.totalProjects), fullValue: String(kpis.totalProjects), icon: Folder, color: 'bg-acento/20 text-principal' },
+          { label: 'Pipeline activo', value: fmtCurrencyCompact(kpis.activePipelineCapex, 'MXN'), fullValue: fmtCurrency(kpis.activePipelineCapex, 'MXN'), icon: DollarSign, color: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Capacidad instalada', value: `${fmtCompact(kpis.installedCapacityKwp)} kWp`, fullValue: `${fmtNum(kpis.installedCapacityKwp, 1)} kWp`, icon: Zap, color: 'bg-amber-50 text-amber-600' },
+          { label: 'Tasa de cierre', value: fmtPct(kpis.winRate, 0), fullValue: fmtPct(kpis.winRate, 2), icon: Target, color: 'bg-blue-50 text-blue-600' },
+          { label: 'Días hasta cierre', value: String(kpis.avgDaysToClose ?? '—'), fullValue: String(kpis.avgDaysToClose ?? '—'), icon: Clock, color: 'bg-purple-50 text-purple-600' },
+          { label: 'Días hasta instalar', value: String(kpis.avgDaysToInstall ?? '—'), fullValue: String(kpis.avgDaysToInstall ?? '—'), icon: Activity, color: 'bg-teal-50 text-teal-600' },
+        ].map(({ label, value, fullValue, icon: Icon, color }) => {
+          const fontSizeClass = value.length > 13 ? 'text-lg' : value.length > 10 ? 'text-xl' : 'text-2xl';
+          return (
+            <div key={label} className="glass-card p-5 group hover:shadow-md transition-all" title={fullValue}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className={`num font-black tracking-tight ${fontSizeClass} truncate`}>{value}</div>
+                  <div className="text-xs mt-1.5 text-gray-500">{label}</div>
+                </div>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}><Icon size={16} /></div>
               </div>
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}><Icon size={16} /></div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ═══ PIPELINE ═══ */}
@@ -163,24 +168,34 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
           <span className="text-xs text-gray-500">Periodo:</span>
           <TimePeriodButtons value={financialPeriod} onChange={setFinancialPeriod} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
-            { label: 'CAPEX total', value: fmtCurrency(filteredFinancial.totalCapex, 'MXN') },
-            { label: 'CAPEX FV', value: fmtCurrency(filteredFinancial.fvCapex, 'MXN') },
-            { label: 'CAPEX BESS', value: fmtCurrency(filteredFinancial.bessCapex, 'MXN') },
-            { label: 'CAPEX prom/proyecto', value: fmtCurrency(filteredFinancial.avgCapexPerProject, 'MXN') },
-          ].map(s => (
-            <div key={s.label} className="glass-card p-5">
-              <div className="num text-xl font-black">{s.value}</div>
-              <div className="text-xs text-gray-500 mt-1">{s.label}</div>
-            </div>
-          ))}
+            { label: 'CAPEX total', value: fmtCurrencyCompact(filteredFinancial.totalCapex, 'MXN'), fullValue: fmtCurrency(filteredFinancial.totalCapex, 'MXN') },
+            { label: 'CAPEX FV', value: fmtCurrencyCompact(filteredFinancial.fvCapex, 'MXN'), fullValue: fmtCurrency(filteredFinancial.fvCapex, 'MXN') },
+            { label: 'CAPEX BESS', value: fmtCurrencyCompact(filteredFinancial.bessCapex, 'MXN'), fullValue: fmtCurrency(filteredFinancial.bessCapex, 'MXN') },
+            { label: 'CAPEX prom/proyecto', value: fmtCurrencyCompact(filteredFinancial.avgCapexPerProject, 'MXN'), fullValue: fmtCurrency(filteredFinancial.avgCapexPerProject, 'MXN') },
+          ].map(s => {
+            const fontSizeClass = s.value.length > 13 ? 'text-sm' : s.value.length > 10 ? 'text-base' : 'text-xl';
+            return (
+              <div key={s.label} className="glass-card p-5" title={s.fullValue}>
+                <div className={`num font-black ${fontSizeClass} truncate`}>{s.value}</div>
+                <div className="text-xs text-gray-500 mt-1">{s.label}</div>
+              </div>
+            );
+          })}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="glass-card p-5">
-            <div className="num text-xl font-black">{fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN')}</div>
-            <div className="text-xs text-gray-500 mt-1">Ahorro mensual estimado</div>
-          </div>
+          {(() => {
+            const savingsVal = fmtCurrencyCompact(filteredFinancial.totalSavingsMonthly, 'MXN');
+            const savingsFull = fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN');
+            const savingsFontSize = savingsVal.length > 13 ? 'text-sm' : savingsVal.length > 10 ? 'text-base' : 'text-xl';
+            return (
+              <div className="glass-card p-5" title={savingsFull}>
+                <div className={`num font-black ${savingsFontSize} truncate`}>{savingsVal}</div>
+                <div className="text-xs text-gray-500 mt-1">Ahorro mensual estimado</div>
+              </div>
+            );
+          })()}
           <div className="glass-card p-5">
             <div className="num text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmtNum(filteredFinancial.avgPaybackMonths, 1)} meses` : '—'}</div>
             <div className="text-xs text-gray-500 mt-1">Payback promedio</div>
