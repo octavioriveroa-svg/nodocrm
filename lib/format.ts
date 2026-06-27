@@ -31,6 +31,20 @@ export function fmtCurrency(n: number | null | undefined, currency: string = 'MX
   }
 }
 
+/** Compact currency: $1.2M, $340k, or normal if small */
+export function fmtCurrencyCompact(n: number | null | undefined, currency: string = 'MXN'): string {
+  if (n === null || n === undefined || isNaN(Number(n))) return '—';
+  const val = Number(n);
+  const symbol = currency === 'USD' ? 'USD ' : '$';
+  if (Math.abs(val) >= 1_000_000) {
+    return `${symbol}${(val / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} M`;
+  }
+  if (Math.abs(val) >= 1_000) {
+    return `${symbol}${(val / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} k`;
+  }
+  return fmtCurrency(val, currency);
+}
+
 /** Compact: 1.2M, 340k, 123 (for dashboard KPIs) */
 export function fmtCompact(n: number | null | undefined): string {
   if (n === null || n === undefined || isNaN(Number(n))) return '—';
