@@ -176,6 +176,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     { data: archivos },
     { data: comentarios },
     { data: opcionesFinanciamiento },
+    { data: configuracionesTecnicas },
   ] = await Promise.all([
     supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, historial_estados, capex_estimado, moneda, ubicacion_estado, modalidad_financiamiento, epcista_id, created_at, updated_at').order('created_at', { ascending: false }),
     supabase.from('proyecto_sitio_productos').select('proyecto_id, tipo, datos'),
@@ -186,6 +187,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     supabase.from('archivos').select('id, created_at'),
     supabase.from('comentarios').select('id, created_at'),
     supabase.from('opciones_financiamiento').select('proyecto_id, ahorro_estimado_mensual, moneda, seleccionada'),
+    supabase.from('configuraciones_tecnicas').select('proyecto_id, ahorro_estimado_mensual, moneda, seleccionada'),
   ])
 
   const prs = (proyectos ?? []) as Record<string, unknown>[]
@@ -310,7 +312,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
   })
 
-    // ─── Financial ───
+  // ─── Financial ───
   let fvCapex = 0, bessCapex = 0, totalSavingsMonthly = 0
   const projectCapex: Record<string, number> = {}
   const projectSavings: Record<string, number> = {}
@@ -323,13 +325,29 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     else if (prod.tipo === 'bess') bessCapex += capex
     projectCapex[pid] = (projectCapex[pid] || 0) + capex
   }
+  
+  const configs = (configuracionesTecnicas ?? []) as Record<string, unknown>[]
+  
+  // Aggregate savings per project, prioritizing config over financing option
+  const rawProjSavings: Record<string, number> = {}
+  for (const c of configs) {
+    if (c.seleccionada && c.ahorro_estimado_mensual) {
+      rawProjSavings[c.proyecto_id as string] = Number(c.ahorro_estimado_mensual) || 0
+    }
+  }
+  
   for (const opt of opcionesFinanciamiento ?? []) {
     if (opt.seleccionada) {
-      const pid = opt.proyecto_id
-      const savings = Number(opt.ahorro_estimado_mensual) || 0
-      projectSavings[pid] = (projectSavings[pid] || 0) + savings
-      totalSavingsMonthly += savings
+      const pid = opt.proyecto_id as string
+      if (rawProjSavings[pid] === undefined && opt.ahorro_estimado_mensual) {
+        rawProjSavings[pid] = Number(opt.ahorro_estimado_mensual) || 0
+      }
     }
+  }
+
+  for (const pid of Object.keys(rawProjSavings)) {
+    projectSavings[pid] = rawProjSavings[pid]
+    totalSavingsMonthly += rawProjSavings[pid]
   }
   const totalCapex = fvCapex + bessCapex
   const avgCapexPerProject = totalProjects > 0 ? totalCapex / totalProjects : 0

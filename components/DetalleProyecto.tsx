@@ -1200,6 +1200,16 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     </div>
                   </div>
                 </div>
+                {(activeConfig as any).ahorro_estimado_mensual != null && (activeConfig as any).ahorro_estimado_mensual > 0 && (
+                  <div className='bg-white p-4 rounded-lg border border-borde shadow-sm flex justify-between items-center mt-3'>
+                    <div>
+                      <div className='text-xs uppercase font-bold text-gray-400'>Ahorro bruto mensual</div>
+                      <div className='text-xl font-black text-green-600 mt-1'>
+                        {fmtCurrency((activeConfig as any).ahorro_estimado_mensual, (activeConfig as any).ahorro_moneda || 'MXN')}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1241,6 +1251,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     {items.map(p => {
                       const d = p.datos as Record<string, unknown>
                       if (p.tipo === 'fv') {
+                        const hasHybridBess = items.some(other => other.tipo === 'bess' && (other.datos as any).inversores_hibridos === true)
                         const nm = parseNum(d.num_modulos as string) || 0
                         const pw = parseNum(d.potencia_modulos_w as string) || 0
                         const ni = parseNum(d.num_inversores as string) || 0
@@ -1258,9 +1269,17 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                               <Campo label="Módulos" value={`${d.num_modulos} × ${d.potencia_modulos_w} W`} />
                               <Campo label="Marca módulos" value={d.marca_modulos as string} />
                               <Campo label="kWp sistema" value={kwpSistema !== null ? fmtUnit(kwpSistema, 'kWp', 1) : undefined} />
-                              <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
-                              <Campo label="Marca inversores" value={d.marca_inversores as string} />
-                              <Campo label="kWp inversores" value={kwpInv !== null ? fmtUnit(kwpInv, 'kW', 1) : undefined} />
+                              
+                              {hasHybridBess && ni === 0 ? (
+                                <Campo label="Inversores" value="Cubiertos por BESS híbrido" />
+                              ) : (
+                                <>
+                                  <Campo label="Inversores" value={`${d.num_inversores} × ${d.potencia_inversores_kw} kW`} />
+                                  <Campo label="Marca inversores" value={d.marca_inversores as string} />
+                                  <Campo label="kWp inversores" value={kwpInv !== null ? fmtUnit(kwpInv, 'kW', 1) : undefined} />
+                                </>
+                              )}
+
                               <Campo label="Generación anual" value={parseNum(d.generacion_anual_kwh as string) ? fmtUnit(parseNum(d.generacion_anual_kwh as string), 'kWh/año') : undefined} />
                               <Campo label="CAPEX" value={fmtCurrency(capex, (d.capex_moneda as string) || 'USD')} />
                               <Campo label="Precio por Watt" value={precioWatt !== null ? `$${fmtNum(precioWatt, 4)}/W` : undefined} />
@@ -1276,6 +1295,9 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                           <div key={p.id} className="border border-white/40 rounded-xl p-5 bg-[#f0f8ff] shadow-sm">
                             <div className="flex items-center gap-2 font-bold text-sm mb-4 text-[#1a5a8f]">
                               <Battery size={16} /> BESS
+                              {(d as any).inversores_hibridos === true && (
+                                <span className='text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-2'>Híbrido</span>
+                              )}
                             </div>
                             <div className="grid grid-cols-3 gap-y-4 gap-x-2">
                               <Campo label="Potencia" value={`${d.potencia_kw} kW`} />

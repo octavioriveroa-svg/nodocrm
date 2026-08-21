@@ -370,7 +370,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                       </select>
                     </div>
                                         <div>
-                      <label className="block text-xs font-medium mb-1">Ahorro estimado mensual</label>
+                      <label className="block text-xs font-medium mb-1">Ahorro neto mensual (post-financiamiento)</label>
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <input
