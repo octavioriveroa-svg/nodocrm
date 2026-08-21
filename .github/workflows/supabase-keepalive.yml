@@ -1,0 +1,23 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Run every 5 days at 06:00 UTC to prevent Supabase Free Tier auto-pause
+    # (Free tier pauses after 7 days of inactivity)
+    - cron: '0 6 */5 * *'
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/?limit=0")
+          echo "Supabase responded with HTTP $STATUS"
+          if [ "$STATUS" -ge 500 ]; then
+            echo "::error::Supabase returned $STATUS — project may be unhealthy"
+            exit 1
+          fi
