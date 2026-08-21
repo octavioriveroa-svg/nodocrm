@@ -36,6 +36,7 @@ interface BESSForm {
   uso: string
   capex: string
   capex_moneda: Moneda
+  inversores_hibridos: boolean
 }
 
 interface Producto {
@@ -62,6 +63,8 @@ interface CreationConfig {
   descripcion: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
+  ahorro_estimado_mensual: string
+  ahorro_moneda: Moneda
 }
 
 interface CreationFinancingOption {
@@ -84,7 +87,7 @@ const emptyFv: FVForm = {
   num_inversores: '', potencia_inversores_kw: '', marca_inversores: '',
   generacion_anual_kwh: '', capex: '', capex_moneda: 'USD',
 }
-const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '', capex_moneda: 'USD' }
+const emptyBess: BESSForm = { potencia_kw: '', capacidad_kwh: '', marca: '', uso: '', capex: '', capex_moneda: 'USD', inversores_hibridos: false }
 const emptyNuevoSitio = { nombre: '', nombre_recibo: '', ciudad: '', ubicacion_estado: '', rpu: '', demanda_contratada_kw: '' }
 const initialForm: FormData = {
   nombre_proyecto: '', cliente_id: '', tipo_instalacion: '',
@@ -118,10 +121,10 @@ function n2(v: number | null, dec = 2) {
 }
 
 
-// ── Tarjeta de producto (display) ────────────────────────────
-function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
+function ProductoCard({ p, onRemove, hasHybridBess }: { p: Producto; onRemove: () => void; hasHybridBess?: boolean }) {
   if (p.tipo === 'fv' && p.fv) {
     const { kwpSistema, kwpInversores, precioWatt } = calcFV(p.fv)
+    const isCoveredByHybrid = hasHybridBess && (!p.fv.num_inversores || parseNum(p.fv.num_inversores) === 0)
     return (
       <div className="border p-3 text-xs border-borde rounded-xl bg-white/60">
         <div className="flex items-start justify-between gap-2">
@@ -136,8 +139,16 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
         <div className="grid grid-cols-2 gap-x-4 gap-y-1" style={{ color: 'var(--color-texto-suave)' }}>
           <span><span className="text-muted">Módulos: </span>{p.fv.num_modulos} × {p.fv.potencia_modulos_w} W · {p.fv.marca_modulos}</span>
           <span><span className="text-muted">kWp sistema: </span>{n2(kwpSistema, 1)} kWp</span>
-          <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
-          <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
+          {isCoveredByHybrid ? (
+            <span className="col-span-2 text-blue-600 font-medium">
+              <span className="text-muted">Inversores: </span>Cubiertos por BESS híbrido
+            </span>
+          ) : (
+            <>
+              <span><span className="text-muted">Inversores: </span>{p.fv.num_inversores} × {p.fv.potencia_inversores_kw} kW · {p.fv.marca_inversores}</span>
+              <span><span className="text-muted">kWp inversores: </span>{n2(kwpInversores, 1)} kW</span>
+            </>
+          )}
           <span><span className="text-muted">Generación: </span>{fmtNum(parseNum(p.fv.generacion_anual_kwh))} kWh/año</span>
           <span><span className="text-muted">CAPEX: </span>{fmtCurrency(parseNum(p.fv.capex), p.fv.capex_moneda || 'USD')}</span>
           <span className="col-span-2"><span className="text-muted">Precio/Wp: </span>${n2(precioWatt, 4)}/W</span>
@@ -158,6 +169,11 @@ function ProductoCard({ p, onRemove }: { p: Producto; onRemove: () => void }) {
           <div className="flex items-center gap-1.5 font-bold text-sm mb-2">
             <Battery size={13} className="text-muted" />
             BESS
+            {p.bess.inversores_hibridos && (
+              <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-1">
+                Híbrido
+              </span>
+            )}
           </div>
           <button type="button" onClick={onRemove} className="p-0.5 flex-shrink-0 text-muted">
             <X size={13} />
@@ -212,7 +228,9 @@ export default function NuevoProyectoPage() {
       nombre: 'Configuración A',
       descripcion: '',
       sitiosSeleccionados: [],
-      productosMap: {}
+      productosMap: {},
+      ahorro_estimado_mensual: '',
+      ahorro_moneda: 'MXN',
     }
   ])
   const [activeConfigId, setActiveConfigId] = useState<string>('default')
@@ -293,7 +311,7 @@ export default function NuevoProyectoPage() {
   async function cargarSitios(clienteId: string) {
     if (!clienteId) {
       setSitiosCliente([])
-      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
+      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_mensual: '', ahorro_moneda: 'MXN' as Moneda }])
       setActiveConfigId('default')
       setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
       setIsRecomendacionNodo(false)
@@ -301,7 +319,7 @@ export default function NuevoProyectoPage() {
     }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {} }])
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_mensual: '', ahorro_moneda: 'MXN' as Moneda }])
     setActiveConfigId('default')
     setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
@@ -337,8 +355,13 @@ export default function NuevoProyectoPage() {
   function validarFvForm(): string {
     if (!fvForm.num_modulos || !fvForm.potencia_modulos_w) return 'Ingresa número y potencia de módulos.'
     if (!fvForm.marca_modulos.trim()) return 'Ingresa la marca de los módulos.'
-    if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) return 'Ingresa número y potencia de inversores.'
-    if (!fvForm.marca_inversores.trim()) return 'Ingresa la marca de los inversores.'
+    // Skip inverter validation if a hybrid BESS exists on the same site
+    const siteProducts = addingToSitioId ? (productosMap[addingToSitioId] ?? []) : []
+    const hasHybridBess = siteProducts.some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos)
+    if (!hasHybridBess) {
+      if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) return 'Ingresa número y potencia de inversores.'
+      if (!fvForm.marca_inversores.trim()) return 'Ingresa la marca de los inversores.'
+    }
     if (!fvForm.generacion_anual_kwh) return 'Ingresa la generación anual estimada.'
     if (!fvForm.capex) return 'Ingresa el CAPEX del sistema FV.'
     return ''
@@ -536,18 +559,40 @@ export default function NuevoProyectoPage() {
     return ''
   }
 
+  const isNodoBusca = form.tipo_instalacion === 'nodo_busca'
+
+  function validarPaso1NodoBusca(): string {
+    const allSitios = configs.flatMap(c => c.sitiosSeleccionados)
+    if (allSitios.length === 0) return 'Selecciona al menos un sitio.'
+    return ''
+  }
+
   function handleNext() {
     setError('')
-    const err = step === 0 ? validarPaso0() : step === 1 ? validarPaso1() : ''
-    if (err) { setError(err); return }
-    setStep(s => s + 1)
+    if (step === 0) {
+      const err = validarPaso0()
+      if (err) { setError(err); return }
+      setStep(s => s + 1)
+    } else if (step === 1) {
+      if (isNodoBusca) {
+        const err = validarPaso1NodoBusca()
+        if (err) { setError(err); return }
+        handleSubmit()
+      } else {
+        const err = validarPaso1()
+        if (err) { setError(err); return }
+        setStep(s => s + 1)
+      }
+    }
   }
 
   // ── Submit ───────────────────────────────────────────────────
   async function handleSubmit() {
     setError('')
-    const err = validarPaso2()
-    if (err) { setError(err); return }
+    if (!isNodoBusca) {
+      const err = validarPaso2()
+      if (err) { setError(err); return }
+    }
     setLoading(true)
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -562,18 +607,23 @@ export default function NuevoProyectoPage() {
       if (prods.some(p => p.tipo === 'fv')) hasFV = true
       if (prods.some(p => p.tipo === 'bess')) hasBESS = true
     }
-    const tipo = hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS'
+    const tipo = isNodoBusca ? 'FV' : (hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS')
 
-    const primerSitioId = configs[0].sitiosSeleccionados[0]
+    const primerSitioId = configs[0]?.sitiosSeleccionados[0]
     const ubicacion_estado = sitiosCliente.find(s => s.id === primerSitioId)?.ubicacion_estado ?? ''
 
-    const firstConfigProducts = Object.values(configs[0].productosMap).flat()
+    const firstConfigProducts = Object.values(configs[0]?.productosMap ?? {}).flat()
     const firstConfigCapex = firstConfigProducts.reduce((sum, p) => {
       const pCapex = p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)
       return sum + pCapex
     }, 0)
 
-    const vehiclesArray = isRecomendacionNodo 
+    // Derive currency from products
+    const allFirstProds = Object.values(configs[0]?.productosMap ?? {}).flat()
+    const firstProdCurrencies = allFirstProds.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+    const projectMoneda: Moneda = (firstProdCurrencies.length > 0 ? firstProdCurrencies[0] : 'USD') as Moneda
+
+    const vehiclesArray = (isRecomendacionNodo || isNodoBusca)
       ? ['no_sabe'] 
       : Array.from(new Set(financingOptions.map(o => o.vehiculo_inversion)))
 
@@ -589,8 +639,8 @@ export default function NuevoProyectoPage() {
       cliente_final_nombre: cliente?.contacto_nombre ?? '',
       cliente_final_empresa: cliente?.razon_social ?? '',
       cliente_final_contacto: cliente?.contacto_email ?? cliente?.contacto_telefono ?? '',
-      capex_estimado: firstConfigCapex,
-      moneda: form.moneda,
+      capex_estimado: isNodoBusca ? null : firstConfigCapex,
+      moneda: projectMoneda,
       ubicacion_estado,
       modalidad_financiamiento: vehiclesArray as ModalidadFinanciamiento[],
       notas_adicionales: form.notas_adicionales || null,
@@ -610,6 +660,59 @@ export default function NuevoProyectoPage() {
       if (sitiosErr) { setError('Error al vincular sitios: ' + sitiosErr.message); setLoading(false); return }
     }
 
+    if (isNodoBusca) {
+      // Create single default config and financing option for Nodo busca
+      const { data: insertedConfigs, error: configsErr } = await supabase
+        .from('configuraciones_tecnicas')
+        .insert([{
+          proyecto_id: proyecto.id,
+          nombre: 'Pendiente definición',
+          descripcion: 'Nodo definirá la solución técnica óptima',
+          inversion_total: null,
+          moneda: 'USD',
+          ahorro_estimado_mensual: null,
+          ahorro_moneda: 'MXN',
+          seleccionada: true,
+        }])
+        .select('id, nombre')
+
+      if (configsErr) {
+        setError('Error al guardar configuración: ' + configsErr.message)
+        setLoading(false)
+        return
+      }
+
+      const { data: insertedOptions, error: optionsErr } = await supabase
+        .from('opciones_financiamiento')
+        .insert([{
+          proyecto_id: proyecto.id,
+          nombre: 'Recomendación de Nodo',
+          vehiculo_inversion: 'no_sabe',
+          ahorro_estimado_mensual: null,
+          moneda: 'MXN',
+          plazo_meses: null,
+          notas: null,
+          seleccionada: true
+        }])
+        .select('id, nombre, vehiculo_inversion')
+
+      if (optionsErr) {
+        setError('Error al guardar opciones de financiamiento: ' + optionsErr.message)
+        setLoading(false)
+        return
+      }
+
+      if (insertedConfigs?.[0]?.id && insertedOptions?.[0]?.id) {
+        await supabase.from('config_financiamiento').insert([{
+          configuracion_id: insertedConfigs[0].id,
+          opcion_financiamiento_id: insertedOptions[0].id
+        }])
+      }
+
+      router.push(`/epc/proyectos/${proyecto.id}`)
+      return
+    }
+
     const configsToInsert = configs.map((c, idx) => {
       const activeConfigProducts = Object.values(c.productosMap).flat()
       const inversion_total = activeConfigProducts.reduce((sum, p) => {
@@ -617,12 +720,17 @@ export default function NuevoProyectoPage() {
         return sum + pCapex
       }, 0)
 
+      const configCurrencies = activeConfigProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+      const configMoneda = configCurrencies.length > 0 ? configCurrencies[0] : 'USD'
+
       return {
         proyecto_id: proyecto.id,
         nombre: c.nombre,
         descripcion: c.descripcion || null,
         inversion_total,
-        moneda: form.moneda,
+        moneda: configMoneda,
+        ahorro_estimado_mensual: c.ahorro_estimado_mensual ? parseNum(c.ahorro_estimado_mensual) : null,
+        ahorro_moneda: c.ahorro_moneda || 'MXN',
         seleccionada: idx === 0,
       }
     })
@@ -638,7 +746,7 @@ export default function NuevoProyectoPage() {
       return
     }
 
-        const optionsToInsert = isRecomendacionNodo 
+    const optionsToInsert = isRecomendacionNodo 
       ? [{
           proyecto_id: proyecto.id,
           nombre: 'Recomendación de Nodo',
@@ -765,7 +873,7 @@ export default function NuevoProyectoPage() {
         <p className="text-sm mt-1 text-muted">Completa los tres pasos para enviar tu solicitud</p>
       </div>
 
-      <StepIndicator steps={['Información básica', 'Sitios y productos', 'Financiamiento']} current={step} />
+      <StepIndicator steps={isNodoBusca ? ['Información básica', 'Sitios'] : ['Información básica', 'Sitios y productos', 'Financiamiento']} current={step} />
 
       <div className="rounded-2xl border border-borde p-8 shadow-sm bg-white">
 
@@ -846,102 +954,141 @@ const Icon = opt.icon
         {/* ══ PASO 1 — Sitios y productos ══════════════════════ */}
         {step === 1 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Sitios y productos</h2>
+            <h2 className="font-bold text-lg">{isNodoBusca ? 'Sitios del proyecto' : 'Sitios y productos'}</h2>
 
             {/* Configurations Tab Bar */}
-            <div className="flex flex-wrap gap-2 pb-2 border-b border-borde">
-              {configs.map((c, idx) => (
+            {!isNodoBusca && (
+              <div className="flex flex-wrap gap-2 pb-2 border-b border-borde">
+                {configs.map((c, idx) => (
+                  <button
+                    key={c.tempId}
+                    type="button"
+                    onClick={() => {
+                      setActiveConfigId(c.tempId)
+                      setAddingToSitioId(null)
+                    }}
+                    className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
+                    style={{
+                      backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
+                      color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
+                      borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
+                    }}
+                  >
+                    <span>{c.nombre || `Configuración ${idx + 1}`}</span>
+                    {configs.length > 1 && (
+                      <X
+                        size={14}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfigs(prev => {
+                            const next = prev.filter(item => item.tempId !== c.tempId)
+                            if (activeConfigId === c.tempId) {
+                              setActiveConfigId(next[0].tempId)
+                            }
+                            return next
+                          })
+                        }}
+                        className="hover:text-red-500 transition-colors"
+                      />
+                    )}
+                  </button>
+                ))}
                 <button
-                  key={c.tempId}
                   type="button"
                   onClick={() => {
-                    setActiveConfigId(c.tempId)
-                    setAddingToSitioId(null)
+                    const newId = `config-${Date.now()}`
+                    setConfigs(prev => [
+                      ...prev,
+                      {
+                        tempId: newId,
+                        nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
+                        descripcion: '',
+                        sitiosSeleccionados: [],
+                        productosMap: {},
+                        ahorro_estimado_mensual: '',
+                        ahorro_moneda: 'MXN',
+                      }
+                    ])
+                    setActiveConfigId(newId)
                   }}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
-                  style={{
-                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
-                    color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
-                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
-                  }}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border border-dashed border-borde bg-white hover:border-black transition-all flex items-center gap-1"
                 >
-                  <span>{c.nombre || `Configuración ${idx + 1}`}</span>
-                  {configs.length > 1 && (
-                    <X
-                      size={14}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConfigs(prev => {
-                          const next = prev.filter(item => item.tempId !== c.tempId)
-                          if (activeConfigId === c.tempId) {
-                            setActiveConfigId(next[0].tempId)
-                          }
-                          return next
-                        })
-                      }}
-                      className="hover:text-red-500 transition-colors"
-                    />
-                  )}
+                  <Plus size={14} /> Nueva alternativa
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const newId = `config-${Date.now()}`
-                  setConfigs(prev => [
-                    ...prev,
-                    {
-                      tempId: newId,
-                      nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
-                      descripcion: '',
-                      sitiosSeleccionados: [],
-                      productosMap: {}
-                    }
-                  ])
-                  setActiveConfigId(newId)
-                }}
-                className="px-4 py-2 text-sm font-semibold rounded-lg border border-dashed border-borde bg-white hover:border-black transition-all flex items-center gap-1"
-              >
-                <Plus size={14} /> Nueva alternativa
-              </button>
-            </div>
+              </div>
+            )}
 
             {/* Active Configuration Details Form */}
-            <div className="bg-fondo/35 p-4 rounded-xl border border-borde flex flex-col gap-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted">Detalles de esta alternativa</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1">Nombre *</label>
-                  <input
-                    type="text"
-                    value={activeConfig.nombre}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, nombre: e.target.value } : c))
-                    }}
-                    className={inp}
-                    placeholder="Ej: Opción A - Solo FV"
-                  />
+            {!isNodoBusca && (
+              <div className="bg-fondo/35 p-4 rounded-xl border border-borde flex flex-col gap-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted">Detalles de esta alternativa</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Nombre *</label>
+                    <input
+                      type="text"
+                      value={activeConfig.nombre}
+                      onChange={e => {
+                        setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, nombre: e.target.value } : c))
+                      }}
+                      className={inp}
+                      placeholder="Ej: Opción A - Solo FV"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      value={activeConfig.descripcion}
+                      onChange={e => {
+                        setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, descripcion: e.target.value } : c))
+                      }}
+                      className={inp}
+                      placeholder="Ej: Opción con 150 kWp and sin baterías"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Descripción</label>
-                  <input
-                    type="text"
-                    value={activeConfig.descripcion}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, descripcion: e.target.value } : c))
-                    }}
-                    className={inp}
-                    placeholder="Ej: Opción con 150 kWp and sin baterías"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-borde">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Ahorro bruto estimado mensual</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={activeConfig.ahorro_estimado_mensual}
+                          onChange={e => {
+                            setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : c))
+                          }}
+                          className={inp}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <select
+                          value={activeConfig.ahorro_moneda || 'MXN'}
+                          onChange={e => {
+                            setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value as Moneda } : c))
+                          }}
+                          className={inp}
+                        >
+                          <option value="MXN">MXN</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="text-xs text-muted flex justify-between items-center py-2.5">
+                      <span>Inversión total estimada:</span>
+                      <span className="font-bold text-sm text-principal">
+                        ${activeConfigCapex.toLocaleString('es-MX')} {activeConfigProducts[0]?.tipo === 'fv' ? (activeConfigProducts[0].fv?.capex_moneda || 'USD') : (activeConfigProducts[0]?.bess?.capex_moneda || 'USD')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
-                <span>Inversión total estimada (CAPEX acumulado):</span>
-                <span className="font-bold text-sm text-principal">
-                  ${activeConfigCapex.toLocaleString('es-MX')} {form.moneda}
-                </span>
-              </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
@@ -955,6 +1102,7 @@ const Icon = opt.icon
                 {sitiosCliente.map(s => {
                   const selected = sitiosSeleccionados.includes(s.id)
                   const productos = productosMap[s.id] ?? []
+                  const hasHybridBessOnSite = productos.some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos)
                   const isAdding = addingToSitioId === s.id
 
                   return (
@@ -1097,8 +1245,8 @@ const Icon = opt.icon
                         </div>
                       )}
 
-                      {/* Productos — solo cuando el sitio está seleccionado */}
-                      {selected && (
+                      {/* Productos — solo cuando el sitio está seleccionado y NO es nodo_busca */}
+                      {selected && !isNodoBusca && (
                         <div className="border border-t-0 px-3 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
                           <p className="text-xs font-bold uppercase tracking-wide mb-2 text-muted">
                             Productos del sitio
@@ -1109,6 +1257,7 @@ const Icon = opt.icon
                             <div className="flex flex-col gap-2 mb-3">
                               {productos.map(p => (
                                   <ProductoCard key={p.tempId} p={p}
+                                    hasHybridBess={hasHybridBessOnSite}
                                     onRemove={() => removeProduct(s.id, p.tempId)} />
                               ))}
                             </div>
@@ -1180,21 +1329,26 @@ const Icon = opt.icon
 
                                     {/* Inversores */}
                                     <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Inversores</p>
+                                    {hasHybridBessOnSite && (
+                                      <div className="text-xs text-blue-600 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                        Los inversores del BESS híbrido en este sitio cubren la conversión FV. Los campos de inversores son opcionales.
+                                      </div>
+                                    )}
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                       <div>
-                                        <label className="block text-xs font-medium mb-1">No. Inversores *</label>
+                                        <label className="block text-xs font-medium mb-1">No. Inversores {!hasHybridBessOnSite && '*'}</label>
                                         <input type="text" value={fvForm.num_inversores}
                                           onChange={e => setFvForm(f => ({ ...f, num_inversores: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
+                                        <label className="block text-xs font-medium mb-1">Potencia (kW) {!hasHybridBessOnSite && '*'}</label>
                                         <input type="text" value={fvForm.potencia_inversores_kw}
                                           onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: formatNumberInput(e.target.value) }))}
                                           className={inp} style={borde} placeholder="0" />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium mb-1">Marca *</label>
+                                        <label className="block text-xs font-medium mb-1">Marca {!hasHybridBessOnSite && '*'}</label>
                                         <input type="text" value={fvForm.marca_inversores}
                                           onChange={e => setFvForm(f => ({ ...f, marca_inversores: e.target.value }))}
                                           className={inp} style={borde} placeholder="Huawei, SMA…" />
@@ -1277,11 +1431,37 @@ const Icon = opt.icon
                                         <option value="load_shifting_ups">Load Shifting + UPS</option>
                                       </select>
                                     </div>
+                                    <div className="bg-fondo/35 p-3 rounded-lg border border-borde">
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={bessForm.inversores_hibridos}
+                                          onChange={e => setBessForm(f => ({ ...f, inversores_hibridos: e.target.checked }))}
+                                          className="w-4 h-4 rounded text-principal"
+                                        />
+                                        <div>
+                                          <span className="text-xs font-semibold block">Inversores híbridos (también manejan FV)</span>
+                                          <span className="text-[11px] text-muted">Permite que el BESS se encargue de la conversión de paneles solares</span>
+                                        </div>
+                                      </label>
+                                    </div>
                                     <div>
                                       <label className="block text-xs font-medium mb-1">CAPEX *</label>
-                                      <input type="text" value={bessForm.capex}
-                                        onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
-                                        className={inp} style={borde} placeholder="0" />
+                                      <div className="flex gap-2">
+                                        <div className="flex-1">
+                                          <input type="text" value={bessForm.capex}
+                                            onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
+                                            className={inp} style={borde} placeholder="0" />
+                                        </div>
+                                        <div className="w-24">
+                                          <select value={bessForm.capex_moneda || 'USD'}
+                                            onChange={e => setBessForm(f => ({ ...f, capex_moneda: e.target.value as Moneda }))}
+                                            className={inp} style={borde}>
+                                            <option value="USD">USD</option>
+                                            <option value="MXN">MXN</option>
+                                          </select>
+                                        </div>
+                                      </div>
                                     </div>
                                     {/* Precio/kWh calculado */}
                                     <CalcField label="Precio por kWh" value={bessCalc.precioKwh} unit="$/kWh" />
@@ -1522,8 +1702,8 @@ const Icon = opt.icon
                           <option value="mem">Mercado Eléctrico Mayorista</option>
                         </select>
                       </div>
-                                            <div>
-                        <label className="block text-xs font-medium mb-1">Ahorro mensual estimado</label>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Ahorro neto mensual (post-financiamiento)</label>
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <input
@@ -1621,24 +1801,24 @@ const Icon = opt.icon
 
         {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
 
-        <div className="flex justify-between mt-10">
-          <button type="button" onClick={() => { setError(''); setStep(s => s - 1) }}
-            disabled={step === 0} className="px-5 py-2.5 text-sm font-medium border border-borde rounded-lg hover:bg-gray-50 transition-all disabled:opacity-30">
-            Anterior
-          </button>
-          {step < 2 ? (
-            <button type="button" onClick={handleNext}
-              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] bg-acento text-principal rounded-xl">
-              Siguiente
+          <div className="flex justify-between mt-10">
+            <button type="button" onClick={() => { setError(''); setStep(s => s - 1) }}
+              disabled={step === 0} className="px-5 py-2.5 text-sm font-medium border border-borde rounded-lg hover:bg-gray-50 transition-all disabled:opacity-30">
+              Anterior
             </button>
-          ) : (
-            <button type="button" onClick={handleSubmit} disabled={loading}
-              className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50 hover:bg-[#1a1a1a]"
-              style={{ backgroundColor: 'var(--color-principal)', color: 'var(--color-acento)' }}>
-              {loading ? 'Enviando...' : 'Enviar proyecto'}
-            </button>
-          )}
-        </div>
+            {(isNodoBusca ? step < 1 : step < 2) ? (
+              <button type="button" onClick={handleNext}
+                className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] bg-acento text-principal rounded-xl">
+                Siguiente
+              </button>
+            ) : (
+              <button type="button" onClick={isNodoBusca ? handleNext : handleSubmit} disabled={loading}
+                className="px-6 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50 hover:bg-[#1a1a1a]"
+                style={{ backgroundColor: 'var(--color-principal)', color: 'var(--color-acento)' }}>
+                {loading ? 'Enviando...' : 'Enviar proyecto'}
+              </button>
+            )}
+          </div>
       </div>
     </div>
   )

@@ -69,6 +69,8 @@ export interface ConfiguracionTecnica {
   descripcion: string | null
   inversion_total: number | null
   moneda: string
+  ahorro_estimado_mensual: number | null
+  ahorro_moneda: string
   seleccionada: boolean
   created_at: string
   updated_at: string

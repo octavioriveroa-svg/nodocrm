@@ -26,6 +26,7 @@ interface BESSForm {
   uso: string
   capex: string
   capex_moneda: string
+  inversores_hibridos: boolean
 }
 
 interface Producto {
@@ -43,6 +44,8 @@ interface CreationConfig {
   descripcion: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
+  ahorro_estimado_mensual: string
+  ahorro_moneda: string
 }
 
 interface Props {
@@ -82,6 +85,7 @@ const emptyBess: BESSForm = {
   uso: 'load_shifting',
   capex: '',
   capex_moneda: 'USD',
+  inversores_hibridos: false,
 }
 
 export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, configuraciones, productos, sitios, onSave }: Props) {
@@ -143,6 +147,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
               uso: String(d.uso ?? 'load_shifting'),
               capex: formatNumberInput(String(d.capex ?? '')),
               capex_moneda: String(d.capex_moneda ?? 'USD'),
+              inversores_hibridos: d.inversores_hibridos ?? false,
             } : undefined
           })
         }
@@ -153,7 +158,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           nombre: c.nombre,
           descripcion: c.descripcion || '',
           sitiosSeleccionados,
-          productosMap
+          productosMap,
+          ahorro_estimado_mensual: (c as any).ahorro_estimado_mensual !== null && (c as any).ahorro_estimado_mensual !== undefined ? formatNumberInput(String((c as any).ahorro_estimado_mensual)) : '',
+          ahorro_moneda: (c as any).ahorro_moneda || 'MXN'
         }
       })
 
@@ -163,7 +170,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           nombre: 'Configuración A',
           descripcion: '',
           sitiosSeleccionados: [],
-          productosMap: {}
+          productosMap: {},
+          ahorro_estimado_mensual: '',
+          ahorro_moneda: 'MXN'
         })
       }
 
@@ -306,10 +315,16 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const configProducts = Object.values(c.productosMap).flat()
         const inversion_total = configProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
+        const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+        const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
+
         const { error: err } = await supabase.from('configuraciones_tecnicas').update({
           nombre: c.nombre,
           descripcion: c.descripcion || null,
-          inversion_total
+          inversion_total,
+          moneda: configMoneda,
+          ahorro_estimado_mensual: parseNum(c.ahorro_estimado_mensual) || null,
+          ahorro_moneda: c.ahorro_moneda || 'MXN'
         }).eq('id', c.id!)
         if (err) throw err
       }
@@ -319,13 +334,18 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const configProducts = Object.values(c.productosMap).flat()
         const inversion_total = configProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
+        const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+        const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
+
         return {
           proyecto_id: proyecto.id,
           nombre: c.nombre,
           descripcion: c.descripcion || null,
           inversion_total,
-          moneda: proyecto.moneda || 'MXN',
-          seleccionada: false
+          moneda: configMoneda,
+          seleccionada: false,
+          ahorro_estimado_mensual: parseNum(c.ahorro_estimado_mensual) || null,
+          ahorro_moneda: c.ahorro_moneda || 'MXN'
         }
       })
 
@@ -519,7 +539,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                         nombre: `Alternativa ${String.fromCharCode(65 + prev.length)}`,
                         descripcion: '',
                         sitiosSeleccionados: [],
-                        productosMap: {}
+                        productosMap: {},
+                        ahorro_estimado_mensual: '',
+                        ahorro_moneda: 'MXN'
                       }
                     ])
                     setActiveConfigId(newId)
@@ -564,6 +586,24 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                   <span className="font-bold text-sm text-principal">
                     {fmtCurrency(activeConfigCapex, proyecto.moneda)}
                   </span>
+                </div>
+                <div className='mt-2 pt-2 border-t border-borde'>
+                  <label className='block text-xs font-medium mb-1'>Ahorro bruto estimado mensual</label>
+                  <div className='flex gap-2'>
+                    <div className='flex-1'>
+                      <input type='text' value={activeConfig.ahorro_estimado_mensual}
+                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : c))}
+                        className={inp} placeholder='0' />
+                    </div>
+                    <div className='w-24'>
+                      <select value={activeConfig.ahorro_moneda}
+                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value } : c))}
+                        className={inp}>
+                        <option value='MXN'>MXN</option>
+                        <option value='USD'>USD</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -740,6 +780,12 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                           <option value="load_shifting_ups">Load Shifting + UPS</option>
                                         </select>
                                       </div>
+                                      <label className='flex items-center gap-2 cursor-pointer mt-1'>
+                                        <input type='checkbox' checked={bessForm.inversores_hibridos}
+                                          onChange={e => setBessForm(f => ({ ...f, inversores_hibridos: e.target.checked }))}
+                                          className='w-4 h-4' />
+                                        <span className='text-[10px] font-medium'>Inversores híbridos (también manejan FV)</span>
+                                      </label>
                                                                             <div>
                                         <label className="block text-[10px] font-medium mb-0.5">CAPEX *</label>
                                         <div className="flex gap-1">
