@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "scratch/**",
   ]),
   // Marca de marca: prohíbe colores hex crudos en el código. Usa tokens
   // (clases bg-acento/text-principal… o var(--color-*)); define colores nuevos
