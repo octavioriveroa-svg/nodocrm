@@ -155,16 +155,22 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const canChangeEstado = isAnalista || isAdmin
   const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : isFinder ? '/finder' : '/epc'
 
-  // Fetch responsable nodo profile
+  // Fetch responsable nodo profile & finder profile
   const [responsableProfile, setResponsableProfile] = useState<{nombre: string; empresa: string; calendario_url: string | null} | null>(null)
+  const [finderProfile, setFinderProfile] = useState<{nombre: string; empresa: string} | null>(null)
   const [nodoUsers, setNodoUsers] = useState<{id: string; nombre: string; empresa: string}[]>([])
   const [allClientes, setAllClientes] = useState<{id: string; razon_social: string}[]>([])
   const [allEpcistas, setAllEpcistas] = useState<{id: string; nombre: string; empresa: string}[]>([])
+  const [allFinders, setAllFinders] = useState<{id: string; nombre: string; empresa: string}[]>([])
 
   useEffect(() => {
     if (initial.responsable_nodo_id) {
       supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).single()
         .then(({ data }) => { if (data) setResponsableProfile(data as {nombre: string; empresa: string; calendario_url: string | null}) })
+    }
+    if (initial.finder_id) {
+      supabase.from('profiles').select('nombre, empresa').eq('id', initial.finder_id).single()
+        .then(({ data }) => { if (data) setFinderProfile(data as {nombre: string; empresa: string}) })
     }
     // Load nodo users for responsable selector (admin/analista only)
     if (isAdmin || isAnalista) {
@@ -180,6 +186,10 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       // Admins/Analysts can see all EPCistas
       supabase.from('profiles').select('id, nombre, empresa').eq('rol', 'epc').order('nombre')
         .then(({ data }) => { if (data) setAllEpcistas(data as {id: string; nombre: string; empresa: string}[]) })
+
+      // Admins/Analysts can see all Finders
+      supabase.from('profiles').select('id, nombre, empresa').eq('rol', 'finder').order('nombre')
+        .then(({ data }) => { if (data) setAllFinders(data as {id: string; nombre: string; empresa: string}[]) })
     } else if (isFinder) {
       // Finders can only see their own clients
       supabase.from('clientes').select('id, razon_social').eq('finder_id', currentUser.id).order('razon_social')
@@ -189,7 +199,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       supabase.from('profiles').select('id, nombre, empresa').eq('rol', 'epc').order('nombre')
         .then(({ data }) => { if (data) setAllEpcistas(data as {id: string; nombre: string; empresa: string}[]) })
     }
-  }, [isAdmin, isAnalista, isFinder, currentUser.id, initial.responsable_nodo_id])
+  }, [isAdmin, isAnalista, isFinder, currentUser.id, initial.responsable_nodo_id, initial.finder_id])
   async function handleSelectConfig(configId: string) {
     if (configId === 'legacy') return
     setSeleccionandoConfig(true)
@@ -324,6 +334,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     if (isAdmin || isAnalista) {
       updatePayload.responsable_nodo_id = form.responsable_nodo_id || null
       updatePayload.cliente_id = form.cliente_id || null
+      updatePayload.finder_id = form.finder_id || null
     }
 
     if (isAdmin || isAnalista || isFinder) {
@@ -363,6 +374,13 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         if (rp) setResponsableProfile(rp as {nombre: string; empresa: string; calendario_url: string | null})
       } else {
         setResponsableProfile(null)
+      }
+      // Refresh finder profile display
+      if ((data as Proyecto).finder_id) {
+        const { data: fp } = await supabase.from('profiles').select('nombre, empresa').eq('id', (data as Proyecto).finder_id!).single()
+        if (fp) setFinderProfile(fp as {nombre: string; empresa: string})
+      } else {
+        setFinderProfile(null)
       }
     }
     if (shouldExit) {
@@ -655,7 +673,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             {(isAdmin || isAnalista || isFinder) && (
               <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 3: Asignaciones</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {(isAdmin || isAnalista) && (
                     <>
                       <div>
@@ -681,6 +699,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                           <option value="">Sin asignar</option>
                           {allClientes.map(c => (
                             <option key={c.id} value={c.id}>{c.razon_social}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Finder / Originador</label>
+                        <select
+                          value={form.finder_id || ''}
+                          onChange={e => setForm(f => ({...f, finder_id: e.target.value || null}))}
+                          className="w-full border rounded p-2 text-sm bg-white"
+                        >
+                          <option value="">Sin asignar</option>
+                          {allFinders.map(f => (
+                            <option key={f.id} value={f.id}>{f.nombre} — {f.empresa}</option>
                           ))}
                         </select>
                       </div>
@@ -924,6 +955,20 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                 <p className="text-sm text-gray-400">Sin responsable asignado.</p>
               )}
             </div>
+          )}
+        </Seccion>
+      )}
+
+      {/* Finder / Originador */}
+      {!editando && (
+        <Seccion title="Finder / Originador">
+          {finderProfile ? (
+            <div>
+              <p className="text-sm font-semibold">{finderProfile.nombre}</p>
+              <p className="text-xs text-gray-500">{finderProfile.empresa}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">Sin finder asignado.</p>
           )}
         </Seccion>
       )}

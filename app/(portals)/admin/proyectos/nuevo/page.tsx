@@ -210,11 +210,13 @@ export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false)
   const [sitioError, setSitioError] = useState('')
 
-  // Admin: EPC + Responsable selectors
+  // Admin: EPC + Responsable + Finder selectors
   const [epcList, setEpcList] = useState<Profile[]>([])
   const [nodoUsers, setNodoUsers] = useState<Profile[]>([])
+  const [finderList, setFinderList] = useState<Profile[]>([])
   const [selectedEpcId, setSelectedEpcId] = useState('')
   const [selectedResponsableId, setSelectedResponsableId] = useState('')
+  const [selectedFinderId, setSelectedFinderId] = useState('')
 
   // Manual client toggle
   const [clienteManual, setClienteManual] = useState(false)
@@ -300,13 +302,15 @@ export default function NuevoProyectoPage() {
   const [guardandoEditSitio, setGuardandoEditSitio] = useState(false)
   const fileRefEdit = useRef<HTMLInputElement>(null)
 
-  // Load EPC users and Nodo users for admin assignment
+  // Load EPC users, Nodo users, and Finders for admin assignment
   useEffect(() => {
     async function loadAdminData() {
       const { data: epcs } = await supabase.from('profiles').select('*').eq('rol', 'epc').order('nombre')
       setEpcList((epcs ?? []) as Profile[])
       const { data: nodos } = await supabase.from('profiles').select('*').in('rol', ['nodo_admin', 'nodo_analista']).order('nombre')
       setNodoUsers((nodos ?? []) as Profile[])
+      const { data: finders } = await supabase.from('profiles').select('*').eq('rol', 'finder').order('nombre')
+      setFinderList((finders ?? []) as Profile[])
     }
     loadAdminData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -678,6 +682,7 @@ export default function NuevoProyectoPage() {
     const payload: Record<string, unknown> = {
       epcista_id: selectedEpcId,
       responsable_nodo_id: selectedResponsableId || null,
+      finder_id: selectedFinderId || null,
       cliente_id: clienteManual ? null : (form.cliente_id || null),
       tipo,
       nombre_proyecto: form.nombre_proyecto,
@@ -897,7 +902,7 @@ export default function NuevoProyectoPage() {
                 className={inp} style={borde} placeholder="Ej: Proyecto Energía Norte" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">EPCista *</label>
                 <select value={selectedEpcId} onChange={e => handleSelectEpc(e.target.value)}
@@ -912,6 +917,14 @@ export default function NuevoProyectoPage() {
                   className={inp} style={borde}>
                   <option value="">Sin asignar</option>
                   {nodoUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} ({u.rol === 'nodo_admin' ? 'Admin' : 'Analista'})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Finder / Originador</label>
+                <select value={selectedFinderId} onChange={e => setSelectedFinderId(e.target.value)}
+                  className={inp} style={borde}>
+                  <option value="">Sin asignar (opcional)</option>
+                  {finderList.map(u => <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>)}
                 </select>
               </div>
             </div>
