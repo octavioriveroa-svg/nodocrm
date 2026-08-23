@@ -17,6 +17,7 @@ export interface DashboardData {
   technical: TechnicalData
   activity: ActivityData
   epcLeaderboard: EpcLeader[]
+  finderLeaderboard: FinderLeader[]
   stalePipeline: StaleProject[]
   financingMix: Record<string, number>
   techMix: Record<string, number>
@@ -92,6 +93,15 @@ export interface ActivityData {
 }
 
 export interface EpcLeader {
+  id: string
+  nombre: string
+  empresa: string
+  totalProjects: number
+  totalCapex: number
+  closedProjects: number
+}
+
+export interface FinderLeader {
   id: string
   nombre: string
   empresa: string
@@ -424,6 +434,23 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
   }).sort((a, b) => b.totalProjects - a.totalProjects).slice(0, 10)
 
+  // ─── Finder Leaderboard ───
+  const finderProfs = profs.filter(p => p.rol === 'finder')
+  const finderLeaderboard: FinderLeader[] = finderProfs.map(f => {
+    const finderId = f.id as string
+    const finderProjects = prs.filter(p => p.finder_id === finderId)
+    const totalFinderCapex = finderProjects.reduce((s, p) => s + (Number(p.capex_estimado) || 0), 0)
+    const closed = finderProjects.filter(p => TERMINAL_STAGES.includes(p.estado as string)).length
+    return {
+      id: finderId,
+      nombre: f.nombre as string,
+      empresa: f.empresa as string,
+      totalProjects: finderProjects.length,
+      totalCapex: totalFinderCapex,
+      closedProjects: closed,
+    }
+  }).sort((a, b) => b.totalProjects - a.totalProjects).slice(0, 10)
+
   // ─── Stale Pipeline ───
   const now = Date.now()
   const stalePipeline: StaleProject[] = []
@@ -515,6 +542,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     technical: { totalSolarKwh, totalGridKwh, totalBatteryDischargeKwh, operativeProjects, constructionProjects },
     activity,
     epcLeaderboard,
+    finderLeaderboard,
     stalePipeline,
     financingMix,
     techMix,

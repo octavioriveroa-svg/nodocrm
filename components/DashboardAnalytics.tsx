@@ -3,7 +3,7 @@
 import type { DashboardData } from '@/lib/dashboard-data'
 import { useState, useMemo } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { TrendingUp, TrendingDown, Minus, Folder, DollarSign, Zap, Target, Clock, Activity, Users, BarChart3, AlertTriangle, Map, PieChart } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Folder, DollarSign, Zap, Target, Clock, Activity, Users, BarChart3, AlertTriangle, Map, PieChart, Compass } from 'lucide-react'
 import { TimePeriodButtons, filterProjects, computePipeline, computeFinancial, type TimePeriod } from './TimePeriodSelector'
 
 import { fmtNum, fmtCurrency, fmtCompact, fmtPct, fmtCurrencyCompact } from '@/lib/format'
@@ -41,7 +41,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
   const [staleThreshold, setStaleThreshold] = useState(30)
   const [pipelinePeriod, setPipelinePeriod] = useState<TimePeriod>('all')
   const [financialPeriod, setFinancialPeriod] = useState<TimePeriod>('all')
-  const { technical, activity, epcLeaderboard, stalePipeline, techMix, financingMix, geoCAPEX } = data
+  const { technical, activity, epcLeaderboard, finderLeaderboard, stalePipeline, techMix, financingMix, geoCAPEX } = data
   const filteredStale = stalePipeline.filter(s => s.daysInStage >= staleThreshold)
   
   const kpis = useMemo(() => {
@@ -275,6 +275,31 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
                   <td className="px-5 py-3 text-right font-bold">{ep.totalProjects}</td>
                   <td className="px-5 py-3 text-right">{fmtCurrency(ep.totalCapex, 'MXN')}</td>
                   <td className="px-5 py-3 text-right"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">{ep.closedProjects}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Finder Leaderboard */}
+        {finderLeaderboard && finderLeaderboard.length > 0 && (
+          <div className="glass-card overflow-hidden mt-6">
+            <div className="px-5 py-3 border-b border-borde"><h3 className="text-sm font-bold flex items-center gap-2"><Compass size={14} /> Top Finders</h3></div>
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-50 border-b border-borde text-xs text-gray-400 uppercase">
+                <th className="text-left px-5 py-2.5 font-semibold">Finder</th>
+                <th className="text-left px-5 py-2.5 font-semibold">Empresa</th>
+                <th className="text-right px-5 py-2.5 font-semibold">Proyectos</th>
+                <th className="text-right px-5 py-2.5 font-semibold">CAPEX</th>
+                <th className="text-right px-5 py-2.5 font-semibold">Cerrados</th>
+              </tr></thead>
+              <tbody>{finderLeaderboard.map((f, i) => (
+                <tr key={f.id} className={`border-t border-borde/50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                  <td className="px-5 py-3 font-medium">{f.nombre}</td>
+                  <td className="px-5 py-3 text-gray-500">{f.empresa}</td>
+                  <td className="px-5 py-3 text-right font-bold">{f.totalProjects}</td>
+                  <td className="px-5 py-3 text-right">{fmtCurrency(f.totalCapex, 'MXN')}</td>
+                  <td className="px-5 py-3 text-right"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">{f.closedProjects}</span></td>
                 </tr>
               ))}</tbody>
             </table>

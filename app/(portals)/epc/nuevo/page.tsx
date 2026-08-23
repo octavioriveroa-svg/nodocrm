@@ -5,7 +5,7 @@ import StepIndicator from '@/components/ui/StepIndicator'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, X, Eye, Pencil, Trash2, Upload, FileText, Zap, Battery, Wrench, HelpCircle } from 'lucide-react'
-import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio } from '@/lib/types'
+import type { Moneda, ModalidadFinanciamiento, Cliente, Sitio, Profile } from '@/lib/types'
 import { parseNum, formatNumberInput, fmtNum, fmtCurrency } from '@/lib/format'
 
 const ESTADOS_MX = [
@@ -216,10 +216,12 @@ export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false)
   const [sitioError, setSitioError] = useState('')
 
-  // Clientes y sitios
+  // Clientes, sitios y finders
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [clientesCargados, setClientesCargados] = useState(false)
   const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
+  const [finderList, setFinderList] = useState<Profile[]>([])
+  const [selectedFinderId, setSelectedFinderId] = useState('')
 
   // Alternative Technical Configurations
   const [configs, setConfigs] = useState<CreationConfig[]>([
@@ -297,14 +299,16 @@ export default function NuevoProyectoPage() {
   const fileRefEdit = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    async function loadClientes() {
+    async function loadData() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { setClientesCargados(true); return }
       const { data } = await supabase.from('clientes').select('*').eq('epcista_id', session.user.id).order('razon_social')
       setClientes((data ?? []) as Cliente[])
       setClientesCargados(true)
+      const { data: finders } = await supabase.from('profiles').select('*').eq('rol', 'finder').order('nombre')
+      setFinderList((finders ?? []) as Profile[])
     }
-    loadClientes()
+    loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -629,6 +633,7 @@ export default function NuevoProyectoPage() {
 
     const payload = {
       epcista_id: session.user.id,
+      finder_id: selectedFinderId || null,
       cliente_id: form.cliente_id,
       tipo,
       nombre_proyecto: form.nombre_proyecto,
@@ -889,15 +894,25 @@ export default function NuevoProyectoPage() {
                 className={inp} style={borde} placeholder="Ej: Proyecto Energía Norte" />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Cliente *</label>
-              {clientesCargados && (
-                <select value={form.cliente_id} onChange={e => seleccionarCliente(e.target.value)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Cliente *</label>
+                {clientesCargados && (
+                  <select value={form.cliente_id} onChange={e => seleccionarCliente(e.target.value)}
+                    className={inp} style={borde}>
+                    <option value="">Selecciona un cliente</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Finder / Originador</label>
+                <select value={selectedFinderId} onChange={e => setSelectedFinderId(e.target.value)}
                   className={inp} style={borde}>
-                  <option value="">Selecciona un cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
+                  <option value="">Sin asignar (opcional)</option>
+                  {finderList.map(u => <option key={u.id} value={u.id}>{u.nombre} — {u.empresa}</option>)}
                 </select>
-              )}
+              </div>
             </div>
 
             <hr className="border-borde rounded-xl" />
