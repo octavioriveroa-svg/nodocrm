@@ -103,9 +103,10 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
         const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
         setPdfUrl(publicUrl)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Catch upload error:', err)
-      setUploadError(err?.message || 'Error inesperado al subir el recibo.')
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setUploadError(msg)
     } finally {
       setSubiendoPdf(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -143,9 +144,10 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
       }
       setMostrando(false)
       setEditandoId(null)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving site:', err)
-      setSaveError(err?.message || 'Error al guardar el sitio.')
+      const msg = err instanceof Error ? err.message : 'Error al guardar el sitio.'
+      setSaveError(msg)
     } finally {
       setLoading(false)
     }
@@ -157,7 +159,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
       if (delErr) throw delErr
       setSitios(prev => prev.filter(s => s.id !== id))
       setConfirmDelete(null)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting site:', err)
     }
   }

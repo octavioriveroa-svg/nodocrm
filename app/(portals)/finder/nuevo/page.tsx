@@ -436,9 +436,10 @@ export default function FinderNuevoProyectoPage() {
         const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
         setReciboUrlNuevo(publicUrl)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Catch upload error:', err)
-      setSitioError(err?.message || 'Error inesperado al subir el recibo.')
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setSitioError(msg)
     } finally {
       setSubiendoPdfNuevo(false)
       if (fileRefNuevo.current) fileRefNuevo.current.value = ''
@@ -467,9 +468,10 @@ export default function FinderNuevoProyectoPage() {
         const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
         setEditSitioReciboUrl(publicUrl)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Catch upload error:', err)
-      setSitioError(err?.message || 'Error inesperado al subir el recibo.')
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setSitioError(msg)
     } finally {
       setSubiendoPdfEdit(false)
       if (fileRefEdit.current) fileRefEdit.current.value = ''

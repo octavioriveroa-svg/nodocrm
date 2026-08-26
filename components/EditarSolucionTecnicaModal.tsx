@@ -468,9 +468,10 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       }).eq('id', proyecto.id)
 
       onSave()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving technical solution:', err)
-      setError(err?.message || (typeof err === 'string' ? err : 'Error al guardar los cambios.'))
+      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al guardar los cambios.'
+      setError(msg)
     } finally {
       setLoading(false)
     }
