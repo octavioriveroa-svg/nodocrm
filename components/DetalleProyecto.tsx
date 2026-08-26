@@ -1245,16 +1245,20 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                     </div>
                   </div>
                 </div>
-                {(activeConfig as any).ahorro_estimado_mensual != null && (activeConfig as any).ahorro_estimado_mensual > 0 && (
-                  <div className='bg-white p-4 rounded-lg border border-borde shadow-sm flex justify-between items-center mt-3'>
-                    <div>
-                      <div className='text-xs uppercase font-bold text-gray-400'>Ahorro bruto mensual</div>
-                      <div className='text-xl font-black text-green-600 mt-1'>
-                        {fmtCurrency((activeConfig as any).ahorro_estimado_mensual, (activeConfig as any).ahorro_moneda || 'MXN')}
+                {(() => {
+                  const ahorroBrutoAnual = (activeConfig as any).ahorro_estimado_anual ?? ((activeConfig as any).ahorro_estimado_mensual != null ? (activeConfig as any).ahorro_estimado_mensual * 12 : null)
+                  if (ahorroBrutoAnual == null || ahorroBrutoAnual <= 0) return null
+                  return (
+                    <div className='bg-white p-4 rounded-lg border border-borde shadow-sm flex justify-between items-center mt-3'>
+                      <div>
+                        <div className='text-xs uppercase font-bold text-gray-400'>Ahorro bruto anual</div>
+                        <div className='text-xl font-black text-green-600 mt-1'>
+                          {fmtCurrency(ahorroBrutoAnual, (activeConfig as any).ahorro_moneda || 'MXN')}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             </div>
 
@@ -1422,9 +1426,12 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                             <span className="font-bold text-principal">{MODALIDAD_LABELS[o.vehiculo_inversion as ModalidadFinanciamiento] || o.vehiculo_inversion}</span>
                           </div>
                           <div>
-                            <span className="text-muted block">Ahorro mensual:</span>
+                            <span className="text-muted block">Ahorro anual:</span>
                             <span className="font-bold text-green-600">
-                              {o.ahorro_estimado_mensual !== null ? fmtCurrency(o.ahorro_estimado_mensual, o.moneda || 'MXN') : '—'}
+                              {(() => {
+                                const ahorroNetoAnual = o.ahorro_estimado_anual ?? (o.ahorro_estimado_mensual !== null ? o.ahorro_estimado_mensual * 12 : null)
+                                return ahorroNetoAnual !== null ? fmtCurrency(ahorroNetoAnual, o.moneda || 'MXN') : '—'
+                              })()}
                             </span>
                           </div>
                           {o.plazo_meses && (

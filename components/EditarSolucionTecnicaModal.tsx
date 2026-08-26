@@ -44,7 +44,7 @@ interface CreationConfig {
   descripcion: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: string
 }
 
@@ -152,6 +152,8 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           })
         }
 
+        const rawAhorroAnual = (c as any).ahorro_estimado_anual ?? ((c as any).ahorro_estimado_mensual != null ? (c as any).ahorro_estimado_mensual * 12 : null)
+
         return {
           id: c.id,
           tempId: c.id,
@@ -159,7 +161,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           descripcion: c.descripcion || '',
           sitiosSeleccionados,
           productosMap,
-          ahorro_estimado_mensual: (c as any).ahorro_estimado_mensual !== null && (c as any).ahorro_estimado_mensual !== undefined ? formatNumberInput(String((c as any).ahorro_estimado_mensual)) : '',
+          ahorro_estimado_anual: rawAhorroAnual !== null && rawAhorroAnual !== undefined ? formatNumberInput(String(rawAhorroAnual)) : '',
           ahorro_moneda: (c as any).ahorro_moneda || 'MXN'
         }
       })
@@ -171,7 +173,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           descripcion: '',
           sitiosSeleccionados: [],
           productosMap: {},
-          ahorro_estimado_mensual: '',
+          ahorro_estimado_anual: '',
           ahorro_moneda: 'MXN'
         })
       }
@@ -318,12 +320,16 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
         const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
 
+        const ahorroAnual = parseNum(c.ahorro_estimado_anual) || null
+        const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+
         const { error: err } = await supabase.from('configuraciones_tecnicas').update({
           nombre: c.nombre,
           descripcion: c.descripcion || null,
           inversion_total,
           moneda: configMoneda,
-          ahorro_estimado_mensual: parseNum(c.ahorro_estimado_mensual) || null,
+          ahorro_estimado_anual: ahorroAnual,
+          ahorro_estimado_mensual: ahorroMensual,
           ahorro_moneda: c.ahorro_moneda || 'MXN'
         }).eq('id', c.id!)
         if (err) throw err
@@ -337,6 +343,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
         const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
 
+        const ahorroAnual = parseNum(c.ahorro_estimado_anual) || null
+        const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+
         return {
           proyecto_id: proyecto.id,
           nombre: c.nombre,
@@ -344,7 +353,8 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           inversion_total,
           moneda: configMoneda,
           seleccionada: false,
-          ahorro_estimado_mensual: parseNum(c.ahorro_estimado_mensual) || null,
+          ahorro_estimado_anual: ahorroAnual,
+          ahorro_estimado_mensual: ahorroMensual,
           ahorro_moneda: c.ahorro_moneda || 'MXN'
         }
       })
@@ -416,17 +426,30 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         if (err) throw err
       }
 
-      // Upsert current products
-      const upsertPayload = activeProductsList.map(p => ({
-        id: p.id || undefined,
-        proyecto_id: p.proyecto_id,
-        sitio_id: p.sitio_id,
-        configuracion_id: p.configuracion_id,
-        tipo: p.tipo,
-        datos: p.datos
-      }))
-      if (upsertPayload.length > 0) {
-        const { error: err } = await supabase.from('proyecto_sitio_productos').upsert(upsertPayload)
+      // Separate existing products from new products to avoid batch upsert primary key conflicts
+      const prodsToUpdate = activeProductsList.filter(p => p.id && !p.id.startsWith('prod-'))
+      const prodsToInsert = activeProductsList.filter(p => !p.id || p.id.startsWith('prod-'))
+
+      for (const p of prodsToUpdate) {
+        const { error: err } = await supabase.from('proyecto_sitio_productos').update({
+          sitio_id: p.sitio_id,
+          configuracion_id: p.configuracion_id,
+          tipo: p.tipo,
+          datos: p.datos
+        }).eq('id', p.id)
+        if (err) throw err
+      }
+
+      if (prodsToInsert.length > 0) {
+        const { error: err } = await supabase.from('proyecto_sitio_productos').insert(
+          prodsToInsert.map(p => ({
+            proyecto_id: p.proyecto_id,
+            sitio_id: p.sitio_id,
+            configuracion_id: p.configuracion_id,
+            tipo: p.tipo,
+            datos: p.datos
+          }))
+        )
         if (err) throw err
       }
 
@@ -445,9 +468,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       }).eq('id', proyecto.id)
 
       onSave()
-    } catch (err) {
-      console.error(err)
-      setError(err instanceof Error ? err.message : 'Error al guardar los cambios.')
+    } catch (err: any) {
+      console.error('Error saving technical solution:', err)
+      setError(err?.message || (typeof err === 'string' ? err : 'Error al guardar los cambios.'))
     } finally {
       setLoading(false)
     }
@@ -540,7 +563,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                         descripcion: '',
                         sitiosSeleccionados: [],
                         productosMap: {},
-                        ahorro_estimado_mensual: '',
+                        ahorro_estimado_anual: '',
                         ahorro_moneda: 'MXN'
                       }
                     ])
@@ -588,11 +611,11 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                   </span>
                 </div>
                 <div className='mt-2 pt-2 border-t border-borde'>
-                  <label className='block text-xs font-medium mb-1'>Ahorro bruto estimado mensual</label>
+                  <label className='block text-xs font-medium mb-1'>Ahorro bruto estimado anual</label>
                   <div className='flex gap-2'>
                     <div className='flex-1'>
-                      <input type='text' value={activeConfig.ahorro_estimado_mensual}
-                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : c))}
+                      <input type='text' value={activeConfig.ahorro_estimado_anual}
+                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_anual: formatNumberInput(e.target.value) } : c))}
                         className={inp} placeholder='0' />
                     </div>
                     <div className='w-24'>

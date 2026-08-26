@@ -63,7 +63,7 @@ interface CreationConfig {
   tempId: string
   nombre: string
   descripcion: string
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: Moneda
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
@@ -73,7 +73,7 @@ interface CreationFinancingOption {
   tempId: string
   nombre: string
   vehiculo_inversion: string
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: Moneda
   plazo_meses: string
   notas: string
@@ -226,7 +226,9 @@ export default function FinderNuevoProyectoPage() {
       nombre: 'Configuración A',
       descripcion: '',
       sitiosSeleccionados: [],
-      ahorro_estimado_mensual: "", ahorro_moneda: "MXN", productosMap: {}
+      ahorro_estimado_anual: '',
+      ahorro_moneda: 'MXN',
+      productosMap: {}
     }
   ])
   const [activeConfigId, setActiveConfigId] = useState<string>('default')
@@ -236,7 +238,7 @@ export default function FinderNuevoProyectoPage() {
       tempId: 'fin-default',
       nombre: 'Financiamiento 1',
       vehiculo_inversion: 'credito',
-      ahorro_estimado_mensual: '',
+      ahorro_estimado_anual: '',
       ahorro_moneda: 'MXN',
       plazo_meses: '',
       notas: '',
@@ -321,20 +323,20 @@ export default function FinderNuevoProyectoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-    async function cargarSitios(clienteId: string) {
+  async function cargarSitios(clienteId: string) {
     if (!clienteId) {
       setSitiosCliente([])
-      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_mensual: "", ahorro_moneda: "MXN", productosMap: {} }])
+      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
       setActiveConfigId('default')
-      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
       setIsRecomendacionNodo(false)
       return
     }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_mensual: "", ahorro_moneda: "MXN", productosMap: {} }])
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
     setActiveConfigId('default')
-    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
   }
 
@@ -366,22 +368,20 @@ export default function FinderNuevoProyectoPage() {
 
   function validarFvForm(): string {
     if (!fvForm.num_modulos || !fvForm.potencia_modulos_w) return 'Ingresa número y potencia de módulos.'
-    if (!fvForm.marca_modulos.trim()) return 'Ingresa la marca de los módulos.'
-    
-    const hybridBessExists = addingToSitioId && (productosMap[addingToSitioId] ?? []).some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos === true);
-    if (!hybridBessExists) {
-      if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) return 'Ingresa número y potencia de inversores.'
-      if (!fvForm.marca_inversores.trim()) return 'Ingresa la marca de los inversores.'
+    if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) {
+      const siteProducts = productosMap[addingToSitioId || ''] ?? []
+      const hasHybridBessOnSite = siteProducts.some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos)
+      if (!hasHybridBessOnSite) {
+        return 'Ingresa número y potencia de inversores.'
+      }
     }
-    
     if (!fvForm.generacion_anual_kwh) return 'Ingresa la generación anual estimada.'
     if (!fvForm.capex) return 'Ingresa el CAPEX del sistema FV.'
     return ''
   }
 
   function validarBessForm(): string {
-    if (!bessForm.potencia_kw) return 'Ingresa la potencia del BESS.'
-    if (!bessForm.capacidad_kwh) return 'Ingresa la capacidad del BESS.'
+    if (!bessForm.potencia_kw || !bessForm.capacidad_kwh) return 'Ingresa potencia y capacidad del BESS.'
     if (!bessForm.marca.trim()) return 'Ingresa la marca del BESS.'
     if (!bessForm.uso) return 'Selecciona el uso del BESS.'
     if (!bessForm.capex) return 'Ingresa el CAPEX del BESS.'
@@ -416,34 +416,64 @@ export default function FinderNuevoProyectoPage() {
   // ── Sitios inline ────────────────────────────────────────────
   async function subirPdfNuevo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !form.cliente_id) return
+    if (!file) return
     setSubiendoPdfNuevo(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setSubiendoPdfNuevo(false); return }
-    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
-    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
-    if (!uploadErr) {
-      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
-      setReciboUrlNuevo(publicUrl)
+    setSitioError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { setSitioError('Sesión expirada. Recarga la página.'); setSubiendoPdfNuevo(false); return }
+      const effectiveClientId = form.cliente_id || 'temp-client'
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/${effectiveClientId}/${Date.now()}_${cleanFileName}`
+      const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+      if (uploadErr) {
+        console.error('Upload error:', uploadErr)
+        setSitioError(`Error al subir recibo: ${uploadErr.message}`)
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+        setReciboUrlNuevo(publicUrl)
+      }
+    } catch (err: any) {
+      console.error('Catch upload error:', err)
+      setSitioError(err?.message || 'Error inesperado al subir el recibo.')
+    } finally {
+      setSubiendoPdfNuevo(false)
+      if (fileRefNuevo.current) fileRefNuevo.current.value = ''
     }
-    setSubiendoPdfNuevo(false)
-    if (fileRefNuevo.current) fileRefNuevo.current.value = ''
   }
 
   async function subirPdfEdit(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !form.cliente_id) return
+    if (!file) return
     setSubiendoPdfEdit(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setSubiendoPdfEdit(false); return }
-    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
-    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
-    if (!uploadErr) {
-      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
-      setEditSitioReciboUrl(publicUrl)
+    setSitioError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { setSubiendoPdfEdit(false); return }
+      const effectiveClientId = form.cliente_id || 'temp-client'
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/${effectiveClientId}/${Date.now()}_${cleanFileName}`
+      const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+      if (uploadErr) {
+        console.error('Upload error:', uploadErr)
+        setSitioError(`Error al subir recibo: ${uploadErr.message}`)
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+        setEditSitioReciboUrl(publicUrl)
+      }
+    } catch (err: any) {
+      console.error('Catch upload error:', err)
+      setSitioError(err?.message || 'Error inesperado al subir el recibo.')
+    } finally {
+      setSubiendoPdfEdit(false)
+      if (fileRefEdit.current) fileRefEdit.current.value = ''
     }
-    setSubiendoPdfEdit(false)
-    if (fileRefEdit.current) fileRefEdit.current.value = ''
   }
 
   async function guardarNuevoSitio() {
@@ -662,12 +692,18 @@ export default function FinderNuevoProyectoPage() {
         return sum + pCapex
       }, 0)
 
+      const ahorroAnual = c.ahorro_estimado_anual ? parseNum(c.ahorro_estimado_anual) : null
+      const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+
       return {
         proyecto_id: proyecto.id,
         nombre: c.nombre,
         descripcion: c.descripcion || null,
         inversion_total,
         moneda: finalMoneda,
+        ahorro_estimado_anual: ahorroAnual,
+        ahorro_estimado_mensual: ahorroMensual,
+        ahorro_moneda: c.ahorro_moneda || 'MXN',
         seleccionada: idx === 0,
       }
     })
@@ -683,27 +719,33 @@ export default function FinderNuevoProyectoPage() {
       return
     }
 
-        const optionsToInsert = (isRecomendacionNodo || isNodoBuscaSubmit)
+    const optionsToInsert = (isRecomendacionNodo || isNodoBuscaSubmit)
       ? [{
           proyecto_id: proyecto.id,
           nombre: 'Recomendación de Nodo',
           vehiculo_inversion: 'no_sabe',
+          ahorro_estimado_anual: null,
           ahorro_estimado_mensual: null,
           moneda: 'MXN',
           plazo_meses: null,
           notas: null,
           seleccionada: true
         }]
-      : financingOptions.map((o, idx) => ({
-          proyecto_id: proyecto.id,
-          nombre: o.nombre,
-          vehiculo_inversion: o.vehiculo_inversion,
-          ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
-          moneda: o.ahorro_moneda || 'MXN',
-          plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
-          notas: o.notas || null,
-          seleccionada: idx === 0
-        }))
+      : financingOptions.map((o, idx) => {
+          const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
+          const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+          return {
+            proyecto_id: proyecto.id,
+            nombre: o.nombre,
+            vehiculo_inversion: o.vehiculo_inversion,
+            ahorro_estimado_anual: ahorroAnual,
+            ahorro_estimado_mensual: ahorroMensual,
+            moneda: o.ahorro_moneda || 'MXN',
+            plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
+            notas: o.notas || null,
+            seleccionada: idx === 0
+          }
+        })
 
     const { data: insertedOptions, error: optionsErr } = await supabase
       .from('opciones_financiamiento')
@@ -964,7 +1006,9 @@ export default function FinderNuevoProyectoPage() {
                       nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
                       descripcion: '',
                       sitiosSeleccionados: [],
-                      ahorro_estimado_mensual: "", ahorro_moneda: "MXN", productosMap: {}
+                      ahorro_estimado_anual: '',
+                      ahorro_moneda: 'MXN',
+                      productosMap: {}
                     }
                   ])
                   setActiveConfigId(newId)
@@ -1010,10 +1054,10 @@ export default function FinderNuevoProyectoPage() {
                 </span>
               </div>
               <div className='text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde'>
-                <span>Ahorro bruto estimado mensual:</span>
+                <span>Ahorro bruto estimado anual:</span>
                 <div className='flex gap-2 items-center'>
-                  <input type='text' value={activeConfig.ahorro_estimado_mensual} onChange={e => {
-                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : c))
+                  <input type='text' value={activeConfig.ahorro_estimado_anual} onChange={e => {
+                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_anual: formatNumberInput(e.target.value) } : c))
                   }} className={inp} style={{ width: '140px' }} placeholder='0' />
                   <select value={activeConfig.ahorro_moneda} onChange={e => {
                     setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value as Moneda } : c))
@@ -1523,7 +1567,7 @@ export default function FinderNuevoProyectoPage() {
                           tempId: newId,
                           nombre: `Financiamiento ${prev.length + 1}`,
                           vehiculo_inversion: 'credito',
-                          ahorro_estimado_mensual: '',
+                          ahorro_estimado_anual: '',
                           ahorro_moneda: 'MXN',
                           plazo_meses: '',
                           notas: '',
@@ -1583,14 +1627,14 @@ export default function FinderNuevoProyectoPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Ahorro neto mensual (post-financiamiento)</label>
+                        <label className="block text-xs font-medium mb-1">Ahorro neto anual (post-financiamiento)</label>
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <input
                               type="text"
-                              value={opt.ahorro_estimado_mensual}
+                              value={opt.ahorro_estimado_anual}
                               onChange={e => {
-                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : o))
+                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_anual: formatNumberInput(e.target.value) } : o))
                               }}
                               className={inp}
                               placeholder="0"

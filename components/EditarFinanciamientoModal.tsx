@@ -12,7 +12,7 @@ interface CreationFinancingOption {
   tempId: string
   nombre: string
   vehiculo_inversion: string
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: Moneda
   plazo_meses: string
   notas: string
@@ -55,14 +55,15 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
       if (hasNoSabe) {
         setOptions([])
       } else {
-                const mapped: CreationFinancingOption[] = list.map(o => {
+        const mapped: CreationFinancingOption[] = list.map(o => {
           const linkedConfigIds = links.filter(l => l.opcion_financiamiento_id === o.id).map(l => l.configuracion_id)
+          const rawAhorroAnual = o.ahorro_estimado_anual ?? (o.ahorro_estimado_mensual != null ? o.ahorro_estimado_mensual * 12 : null)
           return {
             id: o.id,
             tempId: o.id,
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
-            ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null ? formatNumberInput(String(o.ahorro_estimado_mensual)) : '',
+            ahorro_estimado_anual: rawAhorroAnual !== null ? formatNumberInput(String(rawAhorroAnual)) : '',
             ahorro_moneda: (o.moneda as Moneda) || 'MXN',
             plazo_meses: o.plazo_meses !== null ? String(o.plazo_meses) : '',
             notas: o.notas || '',
@@ -70,12 +71,12 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           }
         })
 
-                if (mapped.length === 0) {
+        if (mapped.length === 0) {
           mapped.push({
             tempId: 'default',
             nombre: 'Financiamiento 1',
             vehiculo_inversion: 'credito',
-            ahorro_estimado_mensual: '',
+            ahorro_estimado_anual: '',
             ahorro_moneda: 'MXN',
             plazo_meses: '',
             notas: '',
@@ -89,7 +90,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
 
   if (!isOpen) return null
 
-    function handleAddOption() {
+  function handleAddOption() {
     const newId = `fin-${Date.now()}`
     setOptions(prev => [
       ...prev,
@@ -97,10 +98,9 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
         tempId: newId,
         nombre: `Financiamiento ${prev.length + 1}`,
         vehiculo_inversion: 'credito',
-        ahorro_estimado_mensual: '',
+        ahorro_estimado_anual: '',
         ahorro_moneda: 'MXN',
         plazo_meses: '',
-        notes: '',
         notas: '',
         linkedConfigIds: configuraciones.map(c => c.id)
       }
@@ -195,10 +195,14 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
 
                 // B. Update existing ones
         for (const o of existingOpts) {
+          const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
+          const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+
           const { error: updErr } = await supabase.from('opciones_financiamiento').update({
             nombre: o.nombre,
             vehiculo_inversion: o.vehiculo_inversion,
-            ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
+            ahorro_estimado_anual: ahorroAnual,
+            ahorro_estimado_mensual: ahorroMensual,
             moneda: o.ahorro_moneda || 'MXN',
             plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
             notas: o.notas || null
@@ -209,16 +213,21 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
         // C. Insert new ones
         let insertedOpts: any[] = []
         if (newOpts.length > 0) {
-          const payload = newOpts.map((o, idx) => ({
-            proyecto_id: proyecto.id,
-            nombre: o.nombre,
-            vehiculo_inversion: o.vehiculo_inversion,
-            ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
-            moneda: o.ahorro_moneda || 'MXN',
-            plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
-            notas: o.notas || null,
-            seleccionada: false // will preserve or let them select later
-          }))
+          const payload = newOpts.map((o, idx) => {
+            const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
+            const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+            return {
+              proyecto_id: proyecto.id,
+              nombre: o.nombre,
+              vehiculo_inversion: o.vehiculo_inversion,
+              ahorro_estimado_anual: ahorroAnual,
+              ahorro_estimado_mensual: ahorroMensual,
+              moneda: o.ahorro_moneda || 'MXN',
+              plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
+              notas: o.notas || null,
+              seleccionada: false // will preserve or let them select later
+            }
+          })
           const { data, error: insErr } = await supabase.from('opciones_financiamiento').insert(payload).select('*')
           if (insErr) throw insErr
           insertedOpts = data || []
@@ -370,13 +379,13 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                       </select>
                     </div>
                                         <div>
-                      <label className="block text-xs font-medium mb-1">Ahorro neto mensual (post-financiamiento)</label>
+                      <label className="block text-xs font-medium mb-1">Ahorro neto anual (post-financiamiento)</label>
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <input
                             type="text"
-                            value={opt.ahorro_estimado_mensual}
-                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_estimado_mensual: formatNumberInput(e.target.value) })}
+                            value={opt.ahorro_estimado_anual}
+                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_estimado_anual: formatNumberInput(e.target.value) })}
                             className={inp}
                             placeholder="0"
                           />

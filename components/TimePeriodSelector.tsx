@@ -107,8 +107,8 @@ export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: R
   const ids = new Set(prs.map(p => p.id))
   const filtered = prods.filter(p => ids.has(p.proyecto_id))
   const filteredOpts = opts.filter(o => ids.has(o.proyecto_id))
-  let fv = 0, bess = 0, savings = 0
-  const pCapex: Record<string, number> = {}, pSav: Record<string, number> = {}
+  let fv = 0, bess = 0, savingsAnnual = 0
+  const pCapex: Record<string, number> = {}, pSavAnnual: Record<string, number> = {}
 
   for (const prod of filtered) {
     const d = prod.datos; if (!d) continue
@@ -118,19 +118,28 @@ export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: R
   }
   for (const opt of filteredOpts) {
     if (opt.seleccionada) {
-      const s = Number(opt.ahorro_estimado_mensual) || 0
-      pSav[opt.proyecto_id] = (pSav[opt.proyecto_id]||0) + s
-      savings += s
+      const s = opt.ahorro_estimado_anual ? Number(opt.ahorro_estimado_anual) : (opt.ahorro_estimado_mensual ? Number(opt.ahorro_estimado_mensual) * 12 : 0)
+      if (s > 0) {
+        pSavAnnual[opt.proyecto_id] = (pSavAnnual[opt.proyecto_id]||0) + s
+        savingsAnnual += s
+      }
     }
   }
   const total = fv + bess
   const paybacks: number[] = []
-  for (const pid of Object.keys(pCapex)) { if (pCapex[pid] > 0 && pSav[pid] > 0) paybacks.push(pCapex[pid] / pSav[pid]) }
+  for (const pid of Object.keys(pCapex)) { if (pCapex[pid] > 0 && pSavAnnual[pid] > 0) paybacks.push(pCapex[pid] / pSavAnnual[pid]) }
+
+  const avgPaybackYears = paybacks.length > 0 ? Math.round((paybacks.reduce((a,b)=>a+b,0)/paybacks.length)*10)/10 : null
+  const avgPaybackMonths = avgPaybackYears ? Math.round(avgPaybackYears * 12) : null
 
   return {
-    totalCapex: total, fvCapex: fv, bessCapex: bess,
+    totalCapex: total,
+    fvCapex: fv,
+    bessCapex: bess,
     avgCapexPerProject: prs.length > 0 ? total / prs.length : 0,
-    totalSavingsMonthly: savings,
-    avgPaybackMonths: paybacks.length > 0 ? Math.round(paybacks.reduce((a,b)=>a+b,0)/paybacks.length) : null,
+    totalSavingsAnnual: savingsAnnual,
+    totalSavingsMonthly: savingsAnnual / 12,
+    avgPaybackYears,
+    avgPaybackMonths,
   }
 }

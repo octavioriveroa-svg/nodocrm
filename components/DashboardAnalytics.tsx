@@ -186,22 +186,36 @@ export default function DashboardAnalytics({ data }: { data: DashboardData }) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(() => {
-            const savingsVal = fmtCurrencyCompact(filteredFinancial.totalSavingsMonthly, 'MXN');
-            const savingsFull = fmtCurrency(filteredFinancial.totalSavingsMonthly, 'MXN');
+            const savingsAnnual = filteredFinancial.totalSavingsAnnual || (filteredFinancial.totalSavingsMonthly ? filteredFinancial.totalSavingsMonthly * 12 : 0);
+            const savingsVal = fmtCurrencyCompact(savingsAnnual, 'MXN');
+            const savingsFull = fmtCurrency(savingsAnnual, 'MXN');
             const savingsFontSize = savingsVal.length > 13 ? 'text-sm' : savingsVal.length > 10 ? 'text-base' : 'text-xl';
             return (
               <div className="glass-card p-5" title={savingsFull}>
                 <div className={`num font-black ${savingsFontSize} truncate`}>{savingsVal}</div>
-                <div className="text-xs text-gray-500 mt-1">Ahorro mensual estimado</div>
+                <div className="text-xs text-gray-500 mt-1">Ahorro anual estimado</div>
               </div>
             );
           })()}
           <div className="glass-card p-5">
-            <div className="num text-xl font-black">{filteredFinancial.avgPaybackMonths ? `${fmtNum(filteredFinancial.avgPaybackMonths, 1)} meses` : '—'}</div>
+            <div className="num text-xl font-black">
+              {filteredFinancial.avgPaybackYears
+                ? `${fmtNum(filteredFinancial.avgPaybackYears, 1)} años`
+                : filteredFinancial.avgPaybackMonths
+                ? `${fmtNum(filteredFinancial.avgPaybackMonths / 12, 1)} años`
+                : '—'}
+            </div>
             <div className="text-xs text-gray-500 mt-1">Payback promedio</div>
           </div>
           <div className="glass-card p-5">
-            <div className="num text-xl font-black">{filteredFinancial.totalSavingsMonthly > 0 && filteredFinancial.totalCapex > 0 ? fmtPct(((filteredFinancial.totalSavingsMonthly * 12 * 25) / filteredFinancial.totalCapex * 100), 0) : '—'}</div>
+            <div className="num text-xl font-black">
+              {(() => {
+                const savingsAnnual = filteredFinancial.totalSavingsAnnual || (filteredFinancial.totalSavingsMonthly ? filteredFinancial.totalSavingsMonthly * 12 : 0);
+                return savingsAnnual > 0 && filteredFinancial.totalCapex > 0
+                  ? fmtPct(((savingsAnnual * 25) / filteredFinancial.totalCapex * 100), 0)
+                  : '—';
+              })()}
+            </div>
             <div className="text-xs text-gray-500 mt-1">ROI proyectado (25 años)</div>
           </div>
         </div>

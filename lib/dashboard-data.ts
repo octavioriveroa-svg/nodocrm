@@ -4,28 +4,10 @@ import { parseNum } from '@/lib/format'
 // ─── Types ───────────────────────────────────────────
 export interface RawFinancingOption {
   proyecto_id: string
-  ahorro_estimado_mensual: number | null
+  ahorro_estimado_anual?: number | null
+  ahorro_estimado_mensual?: number | null
   moneda: string
   seleccionada: boolean
-}
-
-export interface DashboardData {
-  kpis: KPIs
-  pipeline: PipelineData
-  velocity: VelocityData
-  financial: FinancialData
-  technical: TechnicalData
-  activity: ActivityData
-  epcLeaderboard: EpcLeader[]
-  finderLeaderboard: FinderLeader[]
-  stalePipeline: StaleProject[]
-  financingMix: Record<string, number>
-  techMix: Record<string, number>
-  geoCAPEX: Record<string, number>
-  recentProjects: RecentProject[]
-  rawProjects: RawProject[]
-  rawProducts: RawProduct[]
-  rawFinancingOptions?: RawFinancingOption[]
 }
 
 export interface RawProject {
@@ -66,9 +48,30 @@ export interface FinancialData {
   fvCapex: number
   bessCapex: number
   avgCapexPerProject: number
+  totalSavingsAnnual: number
   totalSavingsMonthly: number
+  avgPaybackYears: number | null
   avgPaybackMonths: number | null
   projectCount: number
+}
+
+export interface DashboardData {
+  kpis: KPIs
+  pipeline: PipelineData
+  velocity: VelocityData
+  financial: FinancialData
+  technical: TechnicalData
+  activity: ActivityData
+  epcLeaderboard: EpcLeader[]
+  finderLeaderboard: FinderLeader[]
+  stalePipeline: StaleProject[]
+  financingMix: Record<string, number>
+  techMix: Record<string, number>
+  geoCAPEX: Record<string, number>
+  recentProjects: RecentProject[]
+  rawProjects: RawProject[]
+  rawProducts: RawProduct[]
+  rawFinancingOptions?: RawFinancingOption[]
 }
 
 export interface TechnicalData {
@@ -196,8 +199,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     supabase.from('hitos_construccion').select('id, proyecto_id, estado, fecha_estimada_fin, fecha_real_fin'),
     supabase.from('archivos').select('id, created_at'),
     supabase.from('comentarios').select('id, created_at'),
-    supabase.from('opciones_financiamiento').select('proyecto_id, ahorro_estimado_mensual, moneda, seleccionada'),
-    supabase.from('configuraciones_tecnicas').select('proyecto_id, ahorro_estimado_mensual, moneda, seleccionada'),
+    supabase.from('opciones_financiamiento').select('proyecto_id, ahorro_estimado_anual, ahorro_estimado_mensual, moneda, seleccionada'),
+    supabase.from('configuraciones_tecnicas').select('proyecto_id, ahorro_estimado_anual, ahorro_estimado_mensual, moneda, seleccionada'),
   ])
 
   const prs = (proyectos ?? []) as Record<string, unknown>[]
@@ -339,37 +342,47 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const configs = (configuracionesTecnicas ?? []) as Record<string, unknown>[]
   
   // Aggregate savings per project, prioritizing config over financing option
-  const rawProjSavings: Record<string, number> = {}
+  const rawProjSavingsAnual: Record<string, number> = {}
   for (const c of configs) {
-    if (c.seleccionada && c.ahorro_estimado_mensual) {
-      rawProjSavings[c.proyecto_id as string] = Number(c.ahorro_estimado_mensual) || 0
+    if (c.seleccionada) {
+      const anual = c.ahorro_estimado_anual ? Number(c.ahorro_estimado_anual) : (c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) * 12 : 0)
+      if (anual > 0) {
+        rawProjSavingsAnual[c.proyecto_id as string] = anual
+      }
     }
   }
   
   for (const opt of opcionesFinanciamiento ?? []) {
     if (opt.seleccionada) {
       const pid = opt.proyecto_id as string
-      if (rawProjSavings[pid] === undefined && opt.ahorro_estimado_mensual) {
-        rawProjSavings[pid] = Number(opt.ahorro_estimado_mensual) || 0
+      if (rawProjSavingsAnual[pid] === undefined) {
+        const anual = opt.ahorro_estimado_anual ? Number(opt.ahorro_estimado_anual) : (opt.ahorro_estimado_mensual ? Number(opt.ahorro_estimado_mensual) * 12 : 0)
+        if (anual > 0) {
+          rawProjSavingsAnual[pid] = anual
+        }
       }
     }
   }
 
-  for (const pid of Object.keys(rawProjSavings)) {
-    projectSavings[pid] = rawProjSavings[pid]
-    totalSavingsMonthly += rawProjSavings[pid]
+  let totalSavingsAnnual = 0
+  for (const pid of Object.keys(rawProjSavingsAnual)) {
+    projectSavings[pid] = rawProjSavingsAnual[pid]
+    totalSavingsAnnual += rawProjSavingsAnual[pid]
   }
+  totalSavingsMonthly = totalSavingsAnnual / 12
+
   const totalCapex = fvCapex + bessCapex
   const avgCapexPerProject = totalProjects > 0 ? totalCapex / totalProjects : 0
 
-  // Avg payback
+  // Avg payback in years
   const paybacks: number[] = []
   for (const pid of Object.keys(projectCapex)) {
     if (projectCapex[pid] > 0 && projectSavings[pid] > 0) {
       paybacks.push(projectCapex[pid] / projectSavings[pid])
     }
   }
-  const avgPaybackMonths = paybacks.length > 0 ? Math.round(paybacks.reduce((a, b) => a + b, 0) / paybacks.length) : null
+  const avgPaybackYears = paybacks.length > 0 ? Math.round((paybacks.reduce((a, b) => a + b, 0) / paybacks.length) * 10) / 10 : null
+  const avgPaybackMonths = avgPaybackYears ? Math.round(avgPaybackYears * 12) : null
 
   // ─── Technical ───
   let totalSolarKwh = 0, totalGridKwh = 0, totalBatteryDischargeKwh = 0
@@ -529,7 +542,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   const rawFinancingOptions: RawFinancingOption[] = (opcionesFinanciamiento ?? []).map(o => ({
     proyecto_id: o.proyecto_id as string,
-    ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null ? Number(o.ahorro_estimado_mensual) : null,
+    ahorro_estimado_anual: o.ahorro_estimado_anual !== null && o.ahorro_estimado_anual !== undefined ? Number(o.ahorro_estimado_anual) : null,
+    ahorro_estimado_mensual: o.ahorro_estimado_mensual !== null && o.ahorro_estimado_mensual !== undefined ? Number(o.ahorro_estimado_mensual) : null,
     moneda: o.moneda as string || 'MXN',
     seleccionada: !!o.seleccionada
   }))
@@ -538,7 +552,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     kpis: { totalProjects, activePipelineCapex, installedCapacityKwp: installedKwp, winRate, avgDaysToClose, avgDaysToInstall },
     pipeline: { byStage, funnelPercents },
     velocity: { stages: velocityStages },
-    financial: { totalCapex, fvCapex, bessCapex, avgCapexPerProject, totalSavingsMonthly, avgPaybackMonths, projectCount: totalProjects },
+    financial: { totalCapex, fvCapex, bessCapex, avgCapexPerProject, totalSavingsAnnual, totalSavingsMonthly, avgPaybackYears, avgPaybackMonths, projectCount: totalProjects },
     technical: { totalSolarKwh, totalGridKwh, totalBatteryDischargeKwh, operativeProjects, constructionProjects },
     activity,
     epcLeaderboard,
