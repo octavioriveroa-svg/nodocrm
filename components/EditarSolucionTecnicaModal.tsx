@@ -470,7 +470,10 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       onSave()
     } catch (err: unknown) {
       console.error('Error saving technical solution:', err)
-      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al guardar los cambios.'
+      const postgrestMsg = (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') 
+        ? (err as { message: string }).message 
+        : null
+      const msg = postgrestMsg || (err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al guardar los cambios.')
       setError(msg)
     } finally {
       setLoading(false)
