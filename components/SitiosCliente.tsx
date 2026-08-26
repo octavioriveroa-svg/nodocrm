@@ -41,6 +41,8 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
   const [form, setForm] = useState(emptyForm)
   const [subiendoPdf, setSubiendoPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -49,6 +51,8 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
     setEditandoId(null)
     setForm(emptyForm)
     setPdfUrl(null)
+    setUploadError(null)
+    setSaveError(null)
     setViendoId(null)
     setMostrando(true)
   }
@@ -66,6 +70,8 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
       notas: s.notas ?? '',
     })
     setPdfUrl(s.recibo_url ?? null)
+    setUploadError(null)
+    setSaveError(null)
     setViendoId(null)
     setMostrando(true)
   }
@@ -78,135 +84,181 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
   async function subirPdf(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    setUploadError(null)
     setSubiendoPdf(true)
-    const path = `${epcistaId}/${clienteId}/${Date.now()}_${file.name}`
-    const { error } = await supabase.storage.from('recibos-cfe').upload(path, file)
-    if (!error) {
-      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
-      setPdfUrl(publicUrl)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const effectiveOwnerId = epcistaId || session?.user?.id || 'general'
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${effectiveOwnerId}/${clienteId}/${Date.now()}_${cleanFileName}`
+
+      const { error: upErr } = await supabase.storage.from('recibos-cfe').upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+      if (upErr) {
+        console.error('Storage upload error:', upErr)
+        setUploadError(`Error al subir archivo: ${upErr.message}`)
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+        setPdfUrl(publicUrl)
+      }
+    } catch (err: unknown) {
+      console.error('Catch upload error:', err)
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setUploadError(msg)
+    } finally {
+      setSubiendoPdf(false)
+      if (fileRef.current) fileRef.current.value = ''
     }
-    setSubiendoPdf(false)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function guardar() {
     if (!form.nombre.trim()) return
+    setSaveError(null)
     setLoading(true)
-    const payload = {
-      cliente_id: clienteId,
-      epcista_id: epcistaId,
-      nombre: form.nombre,
-      nombre_recibo: form.nombre_recibo || null,
-      ciudad: form.ciudad || null,
-      ubicacion_estado: form.ubicacion_estado || null,
-      rpu: form.rpu || null,
-      demanda_contratada_kw: form.demanda_contratada_kw ? Number(form.demanda_contratada_kw) : null,
-      recibo_url: pdfUrl,
-      notas: form.notas || null,
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const effectiveEpcistaId = epcistaId || session?.user?.id
+
+      const payload = {
+        cliente_id: clienteId,
+        epcista_id: effectiveEpcistaId,
+        nombre: form.nombre.trim(),
+        nombre_recibo: form.nombre_recibo.trim() || null,
+        ciudad: form.ciudad.trim() || null,
+        ubicacion_estado: form.ubicacion_estado || null,
+        rpu: form.rpu.trim() || null,
+        demanda_contratada_kw: form.demanda_contratada_kw ? Number(form.demanda_contratada_kw) : null,
+        recibo_url: pdfUrl,
+        notas: form.notas.trim() || null,
+      }
+      if (editandoId) {
+        const { data, error: updErr } = await supabase.from('sitios').update(payload).eq('id', editandoId).select().single()
+        if (updErr) throw updErr
+        if (data) setSitios(prev => prev.map(s => s.id === editandoId ? data as Sitio : s))
+      } else {
+        const { data, error: insErr } = await supabase.from('sitios').insert(payload).select().single()
+        if (insErr) throw insErr
+        if (data) setSitios(prev => [...prev, data as Sitio])
+      }
+      setMostrando(false)
+      setEditandoId(null)
+    } catch (err: unknown) {
+      console.error('Error saving site:', err)
+      const msg = err instanceof Error ? err.message : 'Error al guardar el sitio.'
+      setSaveError(msg)
+    } finally {
+      setLoading(false)
     }
-    if (editandoId) {
-      const { data } = await supabase.from('sitios').update(payload).eq('id', editandoId).select().single()
-      if (data) setSitios(prev => prev.map(s => s.id === editandoId ? data as Sitio : s))
-    } else {
-      const { data } = await supabase.from('sitios').insert(payload).select().single()
-      if (data) setSitios(prev => [...prev, data as Sitio])
-    }
-    setMostrando(false)
-    setEditandoId(null)
-    setLoading(false)
   }
 
   async function eliminar(id: string) {
-    await supabase.from('sitios').delete().eq('id', id)
-    setSitios(prev => prev.filter(s => s.id !== id))
-    setConfirmDelete(null)
+    try {
+      const { error: delErr } = await supabase.from('sitios').delete().eq('id', id)
+      if (delErr) throw delErr
+      setSitios(prev => prev.filter(s => s.id !== id))
+      setConfirmDelete(null)
+    } catch (err: unknown) {
+      console.error('Error deleting site:', err)
+    }
   }
 
   const inputClass = "w-full border border-borde rounded-lg px-4 py-2.5 text-sm bg-white focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all"
 
-  function FormSitio() {
-    return (
-      <div className="glass-card p-6 shadow-sm">
-        <h4 className="font-bold text-sm mb-5">{editandoId ? 'Editar sitio' : 'Nuevo sitio'}</h4>
-        <div className="flex flex-col gap-4">
+  const renderFormSitio = () => (
+    <div className="glass-card p-6 shadow-sm">
+      <h4 className="font-bold text-sm mb-5">{editandoId ? 'Editar sitio' : 'Nuevo sitio'}</h4>
+      
+      {saveError && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold">
+          {saveError}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <div>
+          <label className="block text-xs font-medium mb-1">Nombre del sitio *</label>
+          <input type="text" value={form.nombre}
+            onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+            className={inputClass} placeholder="Ej: Planta Monterrey" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1">Nombre como aparece en el recibo</label>
+          <input type="text" value={form.nombre_recibo}
+            onChange={e => setForm(f => ({ ...f, nombre_recibo: e.target.value }))}
+            className={inputClass} placeholder="Nombre en el recibo CFE" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium mb-1">Nombre del sitio *</label>
-            <input type="text" value={form.nombre}
-              onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-              className={inputClass} placeholder="Ej: Planta Monterrey" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Nombre como aparece en el recibo</label>
-            <input type="text" value={form.nombre_recibo}
-              onChange={e => setForm(f => ({ ...f, nombre_recibo: e.target.value }))}
-              className={inputClass} placeholder="Nombre en el recibo CFE" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">Ciudad</label>
-              <input type="text" value={form.ciudad}
-                onChange={e => setForm(f => ({ ...f, ciudad: e.target.value }))}
-                className={inputClass} placeholder="Monterrey" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Estado</label>
-              <select value={form.ubicacion_estado}
-                onChange={e => setForm(f => ({ ...f, ubicacion_estado: e.target.value }))}
-                className={inputClass}>
-                <option value="">Selecciona</option>
-                {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-[110px_1fr] gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">RPU</label>
-              <input type="text" value={form.rpu}
-                onChange={e => setForm(f => ({ ...f, rpu: e.target.value }))}
-                className={inputClass} placeholder="RPU" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
-              <input type="number" min="0" value={form.demanda_contratada_kw}
-                onChange={e => setForm(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
-                className={inputClass} placeholder="0" />
-            </div>
+            <label className="block text-xs font-medium mb-1">Ciudad</label>
+            <input type="text" value={form.ciudad}
+              onChange={e => setForm(f => ({ ...f, ciudad: e.target.value }))}
+              className={inputClass} placeholder="Monterrey" />
           </div>
           <div>
-            <label className="block text-xs font-medium mb-1">Último recibo CFE (PDF)</label>
+            <label className="block text-xs font-medium mb-1">Estado</label>
+            <select value={form.ubicacion_estado}
+              onChange={e => setForm(f => ({ ...f, ubicacion_estado: e.target.value }))}
+              className={inputClass}>
+              <option value="">Selecciona</option>
+              {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-[110px_1fr] gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1">RPU</label>
+            <input type="text" value={form.rpu}
+              onChange={e => setForm(f => ({ ...f, rpu: e.target.value }))}
+              className={inputClass} placeholder="RPU" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
+            <input type="number" min="0" value={form.demanda_contratada_kw}
+              onChange={e => setForm(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
+              className={inputClass} placeholder="0" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1">Último recibo CFE (PDF)</label>
+          <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
               <input ref={fileRef} type="file" accept=".pdf" onChange={subirPdf} className="hidden" id="recibo-pdf" />
               <label htmlFor="recibo-pdf"
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-borde text-sm font-medium cursor-pointer hover:bg-gray-50 transition-all bg-white">
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border border-borde text-sm font-medium cursor-pointer hover:bg-gray-50 transition-all bg-white ${subiendoPdf ? 'opacity-60 pointer-events-none' : ''}`}>
                 <Upload size={14} />
-                {subiendoPdf ? 'Subiendo…' : 'Seleccionar PDF'}
+                {subiendoPdf ? 'Subiendo archivo…' : 'Seleccionar PDF'}
               </label>
               {pdfUrl && (
                 <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-xs underline flex items-center gap-1">
-                  <FileText size={11} /> Ver PDF actual
+                  className="text-xs underline flex items-center gap-1 text-principal font-medium">
+                  <FileText size={12} /> Ver PDF actual <ExternalLink size={10} />
                 </a>
               )}
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Notas</label>
-            <textarea rows={2} value={form.notas}
-              onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-              className={inputClass} placeholder="Observaciones del sitio…" />
+            {uploadError && (
+              <p className="text-xs text-red-600 font-medium">{uploadError}</p>
+            )}
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-borde">
-          <Button variant="outline" size="md" onClick={() => { setMostrando(false); setEditandoId(null) }}>
-            Cancelar
-          </Button>
-          <Button variant="primary" size="md" onClick={guardar} disabled={loading || !form.nombre.trim()}>
-            {loading ? 'Guardando…' : editandoId ? 'Guardar cambios' : 'Agregar sitio'}
-          </Button>
+        <div>
+          <label className="block text-xs font-medium mb-1">Notas</label>
+          <textarea rows={2} value={form.notas}
+            onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+            className={inputClass} placeholder="Observaciones del sitio…" />
         </div>
       </div>
-    )
-  }
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-borde">
+        <Button variant="outline" size="md" onClick={() => { setMostrando(false); setEditandoId(null); setSaveError(null); setUploadError(null) }}>
+          Cancelar
+        </Button>
+        <Button variant="primary" size="md" onClick={guardar} disabled={loading || subiendoPdf || !form.nombre.trim()}>
+          {loading ? 'Guardando…' : subiendoPdf ? 'Subiendo PDF…' : editandoId ? 'Guardar cambios' : 'Agregar sitio'}
+        </Button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="glass-card p-6 mt-6 shadow-sm">
@@ -315,7 +367,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
             {/* Formulario editar inline */}
             {editandoId === s.id && mostrando && (
               <div className="mt-2">
-                <FormSitio />
+                {renderFormSitio()}
               </div>
             )}
           </div>
@@ -323,7 +375,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
       </div>
 
       {/* Formulario nuevo sitio */}
-      {mostrando && !editandoId && <FormSitio />}
+      {mostrando && !editandoId && renderFormSitio()}
     </div>
   )
 }

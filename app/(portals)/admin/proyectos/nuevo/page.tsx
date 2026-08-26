@@ -63,7 +63,7 @@ interface CreationConfig {
   descripcion: string
   sitiosSeleccionados: string[]
   productosMap: Record<string, Producto[]>
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: Moneda
 }
 
@@ -71,7 +71,7 @@ interface CreationFinancingOption {
   tempId: string
   nombre: string
   vehiculo_inversion: string
-  ahorro_estimado_mensual: string
+  ahorro_estimado_anual: string
   ahorro_moneda: Moneda
   plazo_meses: string
   notas: string
@@ -235,7 +235,7 @@ export default function NuevoProyectoPage() {
       descripcion: '',
       sitiosSeleccionados: [],
       productosMap: {},
-      ahorro_estimado_mensual: '',
+      ahorro_estimado_anual: '',
       ahorro_moneda: 'MXN'
     }
   ])
@@ -246,7 +246,7 @@ export default function NuevoProyectoPage() {
       tempId: 'fin-default',
       nombre: 'Financiamiento 1',
       vehiculo_inversion: 'credito',
-      ahorro_estimado_mensual: '',
+      ahorro_estimado_anual: '',
       ahorro_moneda: 'MXN',
       plazo_meses: '',
       notas: '',
@@ -316,15 +316,14 @@ export default function NuevoProyectoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // When admin selects an EPC, load that EPC's clients
   async function handleSelectEpc(epcId: string) {
     setSelectedEpcId(epcId)
     setClienteManual(false)
     setForm(prev => ({ ...prev, cliente_id: '' }))
     setSitiosCliente([])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_mensual: '', ahorro_moneda: 'MXN' }])
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_anual: '', ahorro_moneda: 'MXN' }])
     setActiveConfigId('default')
-    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
     if (!epcId) { setClientes([]); setClientesCargados(true); return }
     const { data } = await supabase.from('clientes').select('*').eq('epcista_id', epcId).order('razon_social')
@@ -335,17 +334,17 @@ export default function NuevoProyectoPage() {
   async function cargarSitios(clienteId: string) {
     if (!clienteId) {
       setSitiosCliente([])
-      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_mensual: '', ahorro_moneda: 'MXN' }])
+      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_anual: '', ahorro_moneda: 'MXN' }])
       setActiveConfigId('default')
-      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+      setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
       setIsRecomendacionNodo(false)
       return
     }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_mensual: '', ahorro_moneda: 'MXN' }])
+    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], productosMap: {}, ahorro_estimado_anual: '', ahorro_moneda: 'MXN' }])
     setActiveConfigId('default')
-    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_mensual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
+    setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
   }
 
@@ -430,34 +429,66 @@ export default function NuevoProyectoPage() {
   // ── Sitios inline ────────────────────────────────────────────
   async function subirPdfNuevo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !form.cliente_id) return
+    if (!file) return
     setSubiendoPdfNuevo(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setSubiendoPdfNuevo(false); return }
-    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
-    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
-    if (!uploadErr) {
-      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
-      setReciboUrlNuevo(publicUrl)
+    setSitioError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { setSitioError('Sesión expirada. Recarga la página.'); setSubiendoPdfNuevo(false); return }
+      const effectiveClientId = form.cliente_id || 'temp-client'
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/${effectiveClientId}/${Date.now()}_${cleanFileName}`
+      const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+      if (uploadErr) {
+        console.error('Upload error:', uploadErr)
+        setSitioError(`Error al subir recibo: ${uploadErr.message}`)
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+        setReciboUrlNuevo(publicUrl)
+      }
+    } catch (err: unknown) {
+      console.error('Catch upload error:', err)
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setSitioError(msg)
+    } finally {
+      setSubiendoPdfNuevo(false)
+      if (fileRefNuevo.current) fileRefNuevo.current.value = ''
     }
-    setSubiendoPdfNuevo(false)
-    if (fileRefNuevo.current) fileRefNuevo.current.value = ''
   }
 
   async function subirPdfEdit(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !form.cliente_id) return
+    if (!file) return
     setSubiendoPdfEdit(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setSubiendoPdfEdit(false); return }
-    const path = `${session.user.id}/${form.cliente_id}/${Date.now()}_${file.name}`
-    const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file)
-    if (!uploadErr) {
-      const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
-      setEditSitioReciboUrl(publicUrl)
+    setSitioError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { setSubiendoPdfEdit(false); return }
+      const effectiveClientId = form.cliente_id || 'temp-client'
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/${effectiveClientId}/${Date.now()}_${cleanFileName}`
+      const { error: uploadErr } = await supabase.storage.from('recibos-cfe').upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+      if (uploadErr) {
+        console.error('Upload error:', uploadErr)
+        setSitioError(`Error al subir recibo: ${uploadErr.message}`)
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('recibos-cfe').getPublicUrl(path)
+        setEditSitioReciboUrl(publicUrl)
+      }
+    } catch (err: unknown) {
+      console.error('Catch upload error:', err)
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el recibo.'
+      setSitioError(msg)
+    } finally {
+      setSubiendoPdfEdit(false)
+      if (fileRefEdit.current) fileRefEdit.current.value = ''
     }
-    setSubiendoPdfEdit(false)
-    if (fileRefEdit.current) fileRefEdit.current.value = ''
   }
 
   async function guardarNuevoSitio() {
@@ -731,13 +762,18 @@ export default function NuevoProyectoPage() {
       const configProductCurrencies = activeConfigProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
       const thisConfigMoneda = configProductCurrencies.length > 0 ? configProductCurrencies[0] : form.moneda
 
+      const ahorroAnual = c.ahorro_estimado_anual ? parseNum(c.ahorro_estimado_anual) : null
+      const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+
       return {
         proyecto_id: proyecto.id,
         nombre: c.nombre,
         descripcion: c.descripcion || null,
         inversion_total,
         moneda: thisConfigMoneda,
-        ahorro_estimado_mensual: c.ahorro_estimado_mensual ? parseNum(c.ahorro_estimado_mensual) : null,
+        ahorro_estimado_anual: ahorroAnual,
+        ahorro_estimado_mensual: ahorroMensual,
+        ahorro_moneda: c.ahorro_moneda || 'MXN',
         seleccionada: idx === 0,
       }
     })
@@ -758,22 +794,28 @@ export default function NuevoProyectoPage() {
           proyecto_id: proyecto.id,
           nombre: 'Recomendación de Nodo',
           vehiculo_inversion: 'no_sabe',
+          ahorro_estimado_anual: null,
           ahorro_estimado_mensual: null,
           moneda: 'MXN',
           plazo_meses: null,
           notas: null,
           seleccionada: true
         }]
-      : financingOptions.map((o, idx) => ({
-          proyecto_id: proyecto.id,
-          nombre: o.nombre,
-          vehiculo_inversion: o.vehiculo_inversion,
-          ahorro_estimado_mensual: o.ahorro_estimado_mensual ? parseNum(o.ahorro_estimado_mensual) : null,
-          moneda: o.ahorro_moneda || 'MXN',
-          plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
-          notas: o.notas || null,
-          seleccionada: idx === 0
-        }))
+      : financingOptions.map((o, idx) => {
+          const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
+          const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
+          return {
+            proyecto_id: proyecto.id,
+            nombre: o.nombre,
+            vehiculo_inversion: o.vehiculo_inversion,
+            ahorro_estimado_anual: ahorroAnual,
+            ahorro_estimado_mensual: ahorroMensual,
+            moneda: o.ahorro_moneda || 'MXN',
+            plazo_meses: o.plazo_meses ? parseNum(o.plazo_meses) : null,
+            notas: o.notas || null,
+            seleccionada: idx === 0
+          }
+        })
 
     const { data: insertedOptions, error: optionsErr } = await supabase
       .from('opciones_financiamiento')
@@ -1092,7 +1134,7 @@ export default function NuevoProyectoPage() {
                       descripcion: '',
                       sitiosSeleccionados: [],
                       productosMap: {},
-                      ahorro_estimado_mensual: '',
+                      ahorro_estimado_anual: '',
                       ahorro_moneda: 'MXN'
                     }
                   ])
@@ -1144,10 +1186,10 @@ export default function NuevoProyectoPage() {
                 </span>
               </div>
               <div className='text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde'>
-                <span>Ahorro bruto estimado mensual:</span>
+                <span>Ahorro bruto estimado anual:</span>
                 <div className='flex gap-2 items-center'>
-                  <input type='text' value={activeConfig.ahorro_estimado_mensual} onChange={e => {
-                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : c))
+                  <input type='text' value={activeConfig.ahorro_estimado_anual} onChange={e => {
+                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_anual: formatNumberInput(e.target.value) } : c))
                   }} className={inp} style={{ width: '140px' }} placeholder='0' />
                   <select value={activeConfig.ahorro_moneda} onChange={e => {
                     setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value as Moneda } : c))
@@ -1701,7 +1743,7 @@ export default function NuevoProyectoPage() {
                           tempId: newId,
                           nombre: `Financiamiento ${prev.length + 1}`,
                           vehiculo_inversion: 'credito',
-                          ahorro_estimado_mensual: '',
+                          ahorro_estimado_anual: '',
                           ahorro_moneda: 'MXN',
                           plazo_meses: '',
                           notas: '',
@@ -1761,14 +1803,14 @@ export default function NuevoProyectoPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Ahorro neto mensual (post-financiamiento)</label>
+                        <label className="block text-xs font-medium mb-1">Ahorro neto anual (post-financiamiento)</label>
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <input
                               type="text"
-                              value={opt.ahorro_estimado_mensual}
+                              value={opt.ahorro_estimado_anual}
                               onChange={e => {
-                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_mensual: formatNumberInput(e.target.value) } : o))
+                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_anual: formatNumberInput(e.target.value) } : o))
                               }}
                               className={inp}
                               placeholder="0"

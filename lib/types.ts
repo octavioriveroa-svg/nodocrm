@@ -69,6 +69,7 @@ export interface ConfiguracionTecnica {
   descripcion: string | null
   inversion_total: number | null
   moneda: string
+  ahorro_estimado_anual?: number | null
   ahorro_estimado_mensual: number | null
   ahorro_moneda: string
   seleccionada: boolean
@@ -81,6 +82,7 @@ export interface OpcionFinanciamiento {
   proyecto_id: string
   nombre: string
   vehiculo_inversion: string
+  ahorro_estimado_anual?: number | null
   ahorro_estimado_mensual: number | null
   moneda: string
   plazo_meses: number | null
