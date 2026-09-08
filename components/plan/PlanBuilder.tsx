@@ -89,17 +89,30 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
   // ── Phase CRUD ──────────────────────────────────────────────
   async function addPhase() {
     if (!newPhaseName.trim()) return
-    const color = PHASE_COLORS[fases.length % PHASE_COLORS.length]
-    const { data } = await supabase.from('plan_fases').insert({
-      proyecto_id: proyectoId,
-      nombre: newPhaseName.trim(),
-      orden: fases.length,
-      color,
-    }).select().single()
-    if (data) {
-      setFases(prev => [...prev, data as PlanFase])
-      setNewPhaseName('')
-      setAddingPhase(false)
+    setSaving(true)
+    try {
+      const color = PHASE_COLORS[fases.length % PHASE_COLORS.length]
+      const { data, error } = await supabase.from('plan_fases').insert({
+        proyecto_id: proyectoId,
+        nombre: newPhaseName.trim(),
+        orden: fases.length,
+        color,
+      }).select().single()
+      if (error) {
+        console.error('Error inserting phase:', error)
+        alert(`Error al crear la fase: ${error.message}`)
+        return
+      }
+      if (data) {
+        setFases(prev => [...prev, data as PlanFase])
+        setNewPhaseName('')
+        setAddingPhase(false)
+      }
+    } catch (err: unknown) {
+      console.error('Error inserting phase:', err)
+      alert('Error inesperado al crear la fase.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -120,17 +133,30 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
 
   async function confirmAddActivity() {
     if (!addingActivity || !newActivityName.trim()) return
-    const faseActividades = actividades.filter(a => a.fase_id === addingActivity)
-    const { data } = await supabase.from('plan_actividades').insert({
-      fase_id: addingActivity,
-      proyecto_id: proyectoId,
-      nombre: newActivityName.trim(),
-      orden: faseActividades.length,
-    }).select().single()
-    if (data) {
-      setActividades(prev => [...prev, data as PlanActividad])
-      setNewActivityName('')
-      setAddingActivity(null)
+    setSaving(true)
+    try {
+      const faseActividades = actividades.filter(a => a.fase_id === addingActivity)
+      const { data, error } = await supabase.from('plan_actividades').insert({
+        fase_id: addingActivity,
+        proyecto_id: proyectoId,
+        nombre: newActivityName.trim(),
+        orden: faseActividades.length,
+      }).select().single()
+      if (error) {
+        console.error('Error inserting activity:', error)
+        alert(`Error al crear la actividad: ${error.message}`)
+        return
+      }
+      if (data) {
+        setActividades(prev => [...prev, data as PlanActividad])
+        setNewActivityName('')
+        setAddingActivity(null)
+      }
+    } catch (err: unknown) {
+      console.error('Error inserting activity:', err)
+      alert('Error inesperado al crear la actividad.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -391,29 +417,42 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
           )}
 
           {/* Add phase */}
-          {!isLocked && sortedFases.length > 0 && (
+          {!isLocked && (
             addingPhase ? (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
                 <input
                   type="text"
                   value={newPhaseName}
                   onChange={e => setNewPhaseName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addPhase(); if (e.key === 'Escape') { setAddingPhase(false); setNewPhaseName('') } }}
-                  placeholder="Nombre de la fase..."
+                  placeholder="Nombre de la fase (ej. Ingeniería de Detalle)..."
                   autoFocus
+                  disabled={saving}
                   className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-acento focus:ring-2 focus:ring-acento/30"
                 />
-                <button onClick={addPhase} className="text-sm font-bold bg-principal text-acento px-4 py-2 rounded-lg">Crear</button>
-                <button onClick={() => { setAddingPhase(false); setNewPhaseName('') }} className="text-sm text-gray-400 px-3 py-2">Cancelar</button>
+                <button
+                  onClick={addPhase}
+                  disabled={saving || !newPhaseName.trim()}
+                  className="text-sm font-bold bg-principal text-acento px-4 py-2 rounded-lg disabled:opacity-50"
+                >
+                  {saving ? 'Creando...' : 'Crear'}
+                </button>
+                <button
+                  onClick={() => { setAddingPhase(false); setNewPhaseName('') }}
+                  disabled={saving}
+                  className="text-sm text-gray-400 px-3 py-2 hover:text-principal"
+                >
+                  Cancelar
+                </button>
               </div>
-            ) : (
+            ) : sortedFases.length > 0 ? (
               <button
                 onClick={() => setAddingPhase(true)}
                 className="flex items-center gap-2 text-sm text-gray-400 hover:text-principal transition-colors w-full justify-center py-3 border border-dashed border-gray-200 rounded-xl mt-2 hover:border-gray-400"
               >
                 <Plus size={14} /> Agregar fase
               </button>
-            )
+            ) : null
           )}
         </div>
       )}

@@ -201,6 +201,51 @@ function CalcField({ label, value, unit }: { label: string; value: number | null
   )
 }
 
+// ── Esquemas de financiamiento predefinidos (Bilingüe) ───────
+const VEHICULOS_FINANCIAMIENTO: {
+  id: ModalidadFinanciamiento
+  nombreEs: string
+  nombreEn: string
+  descEs: string
+  descEn: string
+}[] = [
+  {
+    id: 'credito',
+    nombreEs: 'Crédito Bancario',
+    nombreEn: 'Debt Financing / Bank Loan',
+    descEs: 'Financiamiento mediante crédito tradicional o bancario.',
+    descEn: 'Funding through traditional bank or credit loan.',
+  },
+  {
+    id: 'arrendamiento',
+    nombreEs: 'Arrendamiento Puro / Financiero',
+    nombreEn: 'Lease Financing (Operating / Capital)',
+    descEs: 'Esquema de arrendamiento con opción a compra o deducción fiscal.',
+    descEn: 'Lease structure with purchase option or tax deduction.',
+  },
+  {
+    id: 'ensaas',
+    nombreEs: 'EnSaaS / PPA (Energía como Servicio)',
+    nombreEn: 'EnSaaS / PPA (Energy as a Service)',
+    descEs: 'Venta de energía generada o tarifa por servicio sin desembolso inicial de CAPEX.',
+    descEn: 'Pay-per-kWh or service fee model with zero initial CAPEX outlay.',
+  },
+  {
+    id: 'mem',
+    nombreEs: 'Mercado Eléctrico Mayorista (MEM)',
+    nombreEn: 'Wholesale Electricity Market (MEM)',
+    descEs: 'Participación y suministro calificado en el MEM.',
+    descEn: 'Qualified supplier participation in the wholesale electricity market.',
+  },
+  {
+    id: 'no_sabe',
+    nombreEs: 'Recomendación de Nodo',
+    nombreEn: 'Nodo Recommendation',
+    descEs: 'Nodo analizará el proyecto y recomendará el vehículo óptimo.',
+    descEn: 'Nodo will evaluate the project and recommend the optimal structure.',
+  },
+]
+
 export default function FinderNuevoProyectoPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -215,6 +260,7 @@ export default function FinderNuevoProyectoPage() {
   const [epcistas, setEpcistas] = useState<Profile[]>([])
   const [catalogosCargados, setCatalogosCargados] = useState(false)
   const [sitiosCliente, setSitiosCliente] = useState<Sitio[]>([])
+  const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>([])
 
   // Modal invitar EPC
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -223,7 +269,7 @@ export default function FinderNuevoProyectoPage() {
   const [configs, setConfigs] = useState<CreationConfig[]>([
     {
       tempId: 'default',
-      nombre: 'Configuración A',
+      nombre: 'Alternativa A',
       descripcion: '',
       sitiosSeleccionados: [],
       ahorro_estimado_anual: '',
@@ -235,8 +281,8 @@ export default function FinderNuevoProyectoPage() {
 
   const [financingOptions, setFinancingOptions] = useState<CreationFinancingOption[]>([
     {
-      tempId: 'fin-default',
-      nombre: 'Financiamiento 1',
+      tempId: 'fin-credito',
+      nombre: 'Crédito Bancario / Debt Financing',
       vehiculo_inversion: 'credito',
       ahorro_estimado_anual: '',
       ahorro_moneda: 'MXN',
@@ -246,6 +292,48 @@ export default function FinderNuevoProyectoPage() {
     }
   ])
   const [isRecomendacionNodo, setIsRecomendacionNodo] = useState(false)
+  const [foldedCharacteristics, setFoldedCharacteristics] = useState<Record<string, boolean>>({})
+
+  function toggleVehiculo(vehiculoId: ModalidadFinanciamiento, nombreEs: string, nombreEn: string) {
+    if (vehiculoId === 'no_sabe') {
+      setIsRecomendacionNodo(true)
+      setFinancingOptions([
+        {
+          tempId: 'fin-no_sabe',
+          nombre: 'Recomendación de Nodo / Nodo Recommendation',
+          vehiculo_inversion: 'no_sabe',
+          ahorro_estimado_anual: '',
+          ahorro_moneda: 'MXN',
+          plazo_meses: '',
+          notas: '',
+          linkedConfigIds: configs.map(c => c.tempId)
+        }
+      ])
+      return
+    }
+
+    setIsRecomendacionNodo(false)
+    setFinancingOptions(prev => {
+      const filtered = prev.filter(o => o.vehiculo_inversion !== 'no_sabe')
+      const exists = filtered.some(o => o.vehiculo_inversion === vehiculoId)
+      if (exists) {
+        if (filtered.length === 1) return filtered
+        return filtered.filter(o => o.vehiculo_inversion !== vehiculoId)
+      } else {
+        const newOption: CreationFinancingOption = {
+          tempId: `fin-${vehiculoId}-${Date.now()}`,
+          nombre: `${nombreEs} / ${nombreEn}`,
+          vehiculo_inversion: vehiculoId,
+          ahorro_estimado_anual: '',
+          ahorro_moneda: 'MXN',
+          plazo_meses: '',
+          notas: '',
+          linkedConfigIds: configs.map(c => c.tempId)
+        }
+        return [...filtered, newOption]
+      }
+    })
+  }
 
   const isNodoBusca = form.tipo_instalacion === "nodo_busca"
   const activeConfig = configs.find(c => c.tempId === activeConfigId) || configs[0]
@@ -326,7 +414,7 @@ export default function FinderNuevoProyectoPage() {
   async function cargarSitios(clienteId: string) {
     if (!clienteId) {
       setSitiosCliente([])
-      setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
+      setConfigs([{ tempId: 'default', nombre: 'Alternativa A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
       setActiveConfigId('default')
       setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
       setIsRecomendacionNodo(false)
@@ -334,7 +422,7 @@ export default function FinderNuevoProyectoPage() {
     }
     const { data } = await supabase.from('sitios').select('*').eq('cliente_id', clienteId).order('nombre')
     setSitiosCliente((data ?? []) as Sitio[])
-    setConfigs([{ tempId: 'default', nombre: 'Configuración A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
+    setConfigs([{ tempId: 'default', nombre: 'Alternativa A', descripcion: '', sitiosSeleccionados: [], ahorro_estimado_anual: '', ahorro_moneda: 'MXN', productosMap: {} }])
     setActiveConfigId('default')
     setFinancingOptions([{ tempId: 'fin-default', nombre: 'Financiamiento 1', vehiculo_inversion: 'credito', ahorro_estimado_anual: '', ahorro_moneda: 'MXN', plazo_meses: '', notas: '', linkedConfigIds: ['default'] }])
     setIsRecomendacionNodo(false)
@@ -349,9 +437,15 @@ export default function FinderNuevoProyectoPage() {
   }
 
   function toggleSitio(sitioId: string) {
-    setSitiosSeleccionados(prev =>
-      prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
-    )
+    setSelectedSiteIds(prev => {
+      const next = prev.includes(sitioId) ? prev.filter(id => id !== sitioId) : [...prev, sitioId]
+      setConfigs(prevConfigs => prevConfigs.map(c => ({
+        ...c,
+        sitiosSeleccionados: next,
+        productosMap: Object.fromEntries(next.map(sId => [sId, c.productosMap[sId] || []]))
+      })))
+      return next
+    })
     if (addingToSitioId === sitioId) setAddingToSitioId(null)
   }
 
@@ -404,6 +498,10 @@ export default function FinderNuevoProyectoPage() {
     }))
     setAddingToSitioId(null)
     setAddProductError('')
+  }
+
+  function guardarProducto(_sId?: string) {
+    addProduct()
   }
 
   function removeProduct(sitioId: string, tempId: string) {
@@ -544,8 +642,12 @@ export default function FinderNuevoProyectoPage() {
   async function eliminarSitio(id: string) {
     await supabase.from('sitios').delete().eq('id', id)
     setSitiosCliente(prev => prev.filter(s => s.id !== id))
-    setSitiosSeleccionados(prev => prev.filter(sid => sid !== id))
-    setProductosMap(prev => { const next = { ...prev }; delete next[id]; return next })
+    setSelectedSiteIds(prev => prev.filter(sid => sid !== id))
+    setConfigs(prevConfigs => prevConfigs.map(c => ({
+      ...c,
+      sitiosSeleccionados: c.sitiosSeleccionados.filter(sid => sid !== id),
+      productosMap: Object.fromEntries(Object.entries(c.productosMap).filter(([sId]) => sId !== id))
+    })))
     setDeletingSitioId(null)
   }
 
@@ -564,27 +666,29 @@ export default function FinderNuevoProyectoPage() {
     return ''
   }
 
-  function validarConfig(c: CreationConfig, idx: number): string {
-    if (!c.nombre.trim()) return `La configuración ${idx + 1} debe tener un nombre.`
-    if (c.sitiosSeleccionados.length === 0) return `La configuración "${c.nombre}" debe tener al menos un sitio seleccionado.`
-    
-    const sinProductos = c.sitiosSeleccionados
-      .filter(sid => (c.productosMap[sid] ?? []).length === 0)
-      .map(sid => sitiosCliente.find(s => s.id === sid)?.nombre ?? sid)
-    if (sinProductos.length > 0) {
-      return `Los sitios ${sinProductos.map(n => `"${n}"`).join(', ')} en la configuración "${c.nombre}" no tienen productos.`
+  function validarPaso1() {
+    if (selectedSiteIds.length === 0) {
+      return 'Debes seleccionar al menos un sitio para el proyecto / You must select at least one site for the project.'
     }
     return ''
   }
 
-  function validarPaso1() {
-    if (form.tipo_instalacion === 'nodo_busca') {
-      if (configs[0].sitiosSeleccionados.length === 0) return 'Selecciona al menos un sitio.'
-      return ''
+  function validarConfig(c: CreationConfig, idx: number): string {
+    if (!c.nombre.trim()) return `La alternativa ${idx + 1} debe tener un nombre / Alternative ${idx + 1} must have a name.`
+    const prods = Object.values(c.productosMap).flat()
+    if (prods.length === 0) {
+      return `La alternativa "${c.nombre}" debe tener al menos un producto (FV o BESS) / Alternative "${c.nombre}" must have at least one product (PV or BESS).`
+    }
+    return ''
+  }
+
+  function validarPaso2() {
+    if (configs.length === 0) {
+      return 'Debes definir al menos una alternativa técnica / You must define at least one technical alternative.'
     }
     const nombres = configs.map(c => c.nombre.trim())
     if (new Set(nombres).size !== nombres.length) {
-      return 'Cada configuración debe tener un nombre único.'
+      return 'Cada alternativa técnica debe tener un nombre único / Each technical alternative must have a unique name.'
     }
     for (let i = 0; i < configs.length; i++) {
       const err = validarConfig(configs[i], i)
@@ -593,16 +697,16 @@ export default function FinderNuevoProyectoPage() {
     return ''
   }
 
-  function validarPaso2() {
+  function validarPaso3() {
     if (isRecomendacionNodo) return ''
-    if (financingOptions.length === 0) return 'Agrega al menos una opción de financiamiento o selecciona que Nodo te recomiende las mejores alternativas.'
+    if (financingOptions.length === 0) return 'Selecciona al menos una opción de financiamiento / Select at least one financing option.'
     
     for (let i = 0; i < financingOptions.length; i++) {
       const opt = financingOptions[i]
-      if (!opt.nombre.trim()) return `La opción de financiamiento ${i + 1} debe tener un nombre.`
-      if (!opt.vehiculo_inversion) return `La opción de financiamiento "${opt.nombre}" debe tener un vehículo de inversión.`
+      if (!opt.nombre.trim()) return `La opción de financiamiento ${i + 1} debe tener un nombre / Option ${i + 1} must have a name.`
+      if (!opt.vehiculo_inversion) return `La opción de financiamiento "${opt.nombre}" debe tener un vehículo de inversión / Option "${opt.nombre}" must have an investment vehicle.`
       if (opt.linkedConfigIds.length === 0) {
-        return `La opción de financiamiento "${opt.nombre}" debe estar vinculada a al menos una configuración técnica.`
+        return `La opción "${opt.nombre}" debe estar vinculada a al menos una alternativa técnica / Option "${opt.nombre}" must be linked to at least one technical alternative.`
       }
     }
     return ''
@@ -610,15 +714,38 @@ export default function FinderNuevoProyectoPage() {
 
   function handleNext() {
     setError('')
-    const err = step === 0 ? validarPaso0() : step === 1 ? validarPaso1() : ''
-    if (err) { setError(err); return }
+    if (step === 0) {
+      const err = validarPaso0()
+      if (err) { setError(err); return }
+    } else if (step === 1) {
+      const err = validarPaso1()
+      if (err) { setError(err); return }
+      if (form.tipo_instalacion === 'nodo_busca') {
+        handleSubmit()
+        return
+      }
+      setConfigs(prev => prev.map(c => ({
+        ...c,
+        sitiosSeleccionados: selectedSiteIds,
+        productosMap: Object.fromEntries(selectedSiteIds.map(sId => [sId, c.productosMap[sId] || []]))
+      })))
+    } else if (step === 2) {
+      const err = validarPaso2()
+      if (err) { setError(err); return }
+      setFinancingOptions(prev => prev.map(o => ({
+        ...o,
+        linkedConfigIds: o.linkedConfigIds.length > 0
+          ? o.linkedConfigIds.filter(id => configs.some(c => c.tempId === id))
+          : configs.map(c => c.tempId)
+      })))
+    }
     setStep(s => s + 1)
   }
 
   // ── Submit ───────────────────────────────────────────────────
   async function handleSubmit() {
     setError('')
-    const err = validarPaso2()
+    const err = validarPaso3()
     if (err) { setError(err); return }
     setLoading(true)
 
@@ -679,7 +806,7 @@ export default function FinderNuevoProyectoPage() {
     const { data: proyecto, error: dbErr } = await supabase.from('proyectos').insert(payload).select('id').single()
     if (dbErr) { setError('Error al guardar proyecto: ' + dbErr.message); setLoading(false); return }
 
-    const todosSitios = Array.from(new Set(configs.flatMap(c => c.sitiosSeleccionados)))
+    const todosSitios = selectedSiteIds.length > 0 ? selectedSiteIds : Array.from(new Set(configs.flatMap(c => c.sitiosSeleccionados)))
     if (todosSitios.length > 0) {
       const { error: sitiosErr } = await supabase.from('proyecto_sitios').insert(
         todosSitios.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id }))
@@ -840,11 +967,14 @@ export default function FinderNuevoProyectoPage() {
 
   const fvCalc = calcFV(fvForm)
   const bessCalc = calcBESS(bessForm)
+  const anyHighDemanda = (selectedSiteIds.length > 0 ? selectedSiteIds : sitiosSeleccionados).some(id => (sitiosCliente.find(s => s.id === id)?.demanda_contratada_kw ?? 0) > 1000)
   const activeConfigProducts = Object.values(activeConfig.productosMap).flat()
   const activeConfigCapex = activeConfigProducts.reduce((sum, p) => {
     const pCapex = p.tipo === 'fv' ? Number(p.fv?.capex) || 0 : Number(p.bess?.capex) || 0
     return sum + pCapex
   }, 0)
+  const activeProductCurrencies = activeConfigProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+  const activeConfigMoneda = activeProductCurrencies.length > 0 ? activeProductCurrencies[0] : form.moneda
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -855,7 +985,12 @@ export default function FinderNuevoProyectoPage() {
         </div>
       </div>
 
-      <StepIndicator steps={isNodoBusca ? ['Información básica', 'Sitios'] : ['Información básica', 'Sitios y productos', 'Financiamiento']} current={step} />
+      <StepIndicator
+        steps={isNodoBusca 
+          ? ['Información básica / Basic info', 'Sitios / Sites'] 
+          : ['Información básica / Basic info', 'Sitios / Sites', 'Alternativas / Alternatives', 'Financiamiento / Financing']}
+        current={step}
+      />
 
       <div className="rounded-2xl border border-borde p-8 shadow-sm bg-white">
 
@@ -957,143 +1092,48 @@ export default function FinderNuevoProyectoPage() {
           </div>
         )}
 
-        {/* ══ PASO 1 — Sitios y productos ══════════════════════ */}
+        {/* ══ PASO 1 — Sitios del Cliente / Client Sites ════════ */}
         {step === 1 && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Sitios y productos</h2>
-
-            {!isNodoBusca && <><div className="flex flex-wrap gap-2 pb-2 border-b border-borde">
-              {configs.map((c, idx) => (
-                <button
-                  key={c.tempId}
-                  type="button"
-                  onClick={() => {
-                    setActiveConfigId(c.tempId)
-                    setAddingToSitioId(null)
-                  }}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
-                  style={{
-                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
-                    color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
-                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
-                  }}
-                >
-                  <span>{c.nombre || `Configuración ${idx + 1}`}</span>
-                  {configs.length > 1 && (
-                    <X
-                      size={14}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConfigs(prev => {
-                          const next = prev.filter(item => item.tempId !== c.tempId)
-                          if (activeConfigId === c.tempId) {
-                            setActiveConfigId(next[0].tempId)
-                          }
-                          return next
-                        })
-                      }}
-                      className="hover:text-red-500 transition-colors"
-                    />
-                  )}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const newId = `config-${Date.now()}`
-                  setConfigs(prev => [
-                    ...prev,
-                    {
-                      tempId: newId,
-                      nombre: `Configuración ${String.fromCharCode(65 + prev.length)}`,
-                      descripcion: '',
-                      sitiosSeleccionados: [],
-                      ahorro_estimado_anual: '',
-                      ahorro_moneda: 'MXN',
-                      productosMap: {}
-                    }
-                  ])
-                  setActiveConfigId(newId)
-                }}
-                className="px-4 py-2 text-sm font-semibold rounded-lg border border-dashed border-borde bg-white hover:border-black transition-all flex items-center gap-1"
-              >
-                <Plus size={14} /> Nueva alternativa
-              </button>
+            <div>
+              <h2 className="font-bold text-lg">1. Sitios del Cliente / Client Sites</h2>
+              <p className="text-xs text-muted">
+                Selecciona o agrega los sitios del cliente que formarán parte de este proyecto.
+                <br />
+                <span className="text-[11px] text-gray-400">Select or add the client sites that will be part of this project.</span>
+              </p>
             </div>
 
-            <div className="bg-fondo/35 p-4 rounded-xl border border-borde flex flex-col gap-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted">Detalles de esta alternativa</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1">Nombre *</label>
-                  <input
-                    type="text"
-                    value={activeConfig.nombre}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, nombre: e.target.value } : c))
-                    }}
-                    className={inp}
-                    placeholder="Ej: Opción A - Solo FV"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Descripción</label>
-                  <input
-                    type="text"
-                    value={activeConfig.descripcion}
-                    onChange={e => {
-                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, descripcion: e.target.value } : c))
-                    }}
-                    className={inp}
-                    placeholder="Ej: Opción con 150 kWp"
-                  />
-                </div>
-              </div>
-              <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
-                <span>Inversión total estimada (CAPEX acumulado):</span>
-                <span className="font-bold text-sm text-principal">
-                  ${activeConfigCapex.toLocaleString('es-MX')} {activeConfigProducts.length > 0 ? (activeConfigProducts[0].tipo === 'fv' ? activeConfigProducts[0].fv?.capex_moneda : activeConfigProducts[0].bess?.capex_moneda) || 'USD' : form.moneda}
-                </span>
-              </div>
-              <div className='text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde'>
-                <span>Ahorro bruto estimado anual:</span>
-                <div className='flex gap-2 items-center'>
-                  <input type='text' value={activeConfig.ahorro_estimado_anual} onChange={e => {
-                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_anual: formatNumberInput(e.target.value) } : c))
-                  }} className={inp} style={{ width: '140px' }} placeholder='0' />
-                  <select value={activeConfig.ahorro_moneda} onChange={e => {
-                    setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value as Moneda } : c))
-                  }} className={inp} style={{ width: '90px' }}>
-                    <option value='MXN'>MXN</option>
-                    <option value='USD'>USD</option>
-                  </select>
-                </div>
-              </div>
-            </div></>}
-
             <div>
-              <label className="block text-sm font-medium mb-2">Sitios a cotizar *</label>
+              <label className="block text-sm font-medium mb-2">Sitios a cotizar / Sites to quote *</label>
 
               {sitiosCliente.length === 0 && !mostrarNuevoSitio && (
-                <p className="text-sm mb-3 text-muted">Este cliente no tiene sitios registrados.</p>
+                <p className="text-sm mb-3 text-muted">Este cliente no tiene sitios registrados / This client has no registered sites.</p>
               )}
 
-              <div className="flex flex-col gap-1 mb-3">
+              {/* Lista de sitios */}
+              <div className="flex flex-col gap-2 mb-3">
                 {sitiosCliente.map(s => {
-                  const selected = sitiosSeleccionados.includes(s.id)
-                  const productos = productosMap[s.id] ?? []
-                  const isAdding = addingToSitioId === s.id
+                  const selected = selectedSiteIds.includes(s.id)
 
                   return (
                     <div key={s.id}>
+                      {/* Fila sitio */}
                       <div className="flex items-center gap-3 border rounded-xl p-3 shadow-sm transition-all" style={{
                         borderColor: selected ? 'var(--color-principal)' : '#E5E5E5',
-                        backgroundColor: selected ? '#fafafa' : '#fff',
+                        backgroundColor: selected ? '#fbfdf9' : '#fff',
                       }}>
                         <input type="checkbox" id={`s-${s.id}`} checked={selected}
-                          onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0" />
+                          onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0 cursor-pointer" />
                         <label htmlFor={`s-${s.id}`} className="flex-1 cursor-pointer min-w-0">
-                          <div className="text-sm font-semibold">{s.nombre}</div>
+                          <div className="text-sm font-semibold flex items-center gap-2">
+                            <span>{s.nombre}</span>
+                            {selected && (
+                              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-principal text-acento">
+                                Incluido / Included
+                              </span>
+                            )}
+                          </div>
                           {(s.ciudad || s.ubicacion_estado) && (
                             <div className="text-xs truncate text-muted">
                               {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
@@ -1131,6 +1171,7 @@ export default function FinderNuevoProyectoPage() {
                         </div>
                       </div>
 
+                      {/* Confirmación eliminar */}
                       {deletingSitioId === s.id && (
                         <div className="border border-t-0 px-4 py-3 flex items-center justify-between" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
                           <p className="text-sm">¿Eliminar <strong>{s.nombre}</strong>?</p>
@@ -1143,6 +1184,7 @@ export default function FinderNuevoProyectoPage() {
                         </div>
                       )}
 
+                      {/* Panel Ver */}
                       {viendoSitioId === s.id && (
                         <div className="border border-t-0 px-4 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
@@ -1154,7 +1196,7 @@ export default function FinderNuevoProyectoPage() {
                               <div className="col-span-2">
                                 <a href={s.recibo_url} target="_blank" rel="noopener noreferrer"
                                   className="flex items-center gap-1 underline font-medium" style={{ color: 'var(--color-principal)' }}>
-                                  <FileText size={11} /> Ver recibo CFE
+                                  <FileText size={11} /> Ver recibo CFE / View bill
                                 </a>
                               </div>
                             )}
@@ -1162,9 +1204,10 @@ export default function FinderNuevoProyectoPage() {
                         </div>
                       )}
 
+                      {/* Panel Editar sitio */}
                       {editandoSitioId === s.id && (
                         <div className="border border-t-0 px-4 py-4" style={{ borderColor: 'var(--color-principal)' }}>
-                          <p className="text-xs font-bold mb-3">Editar sitio</p>
+                          <p className="text-xs font-bold mb-3">Editar sitio / Edit site</p>
                           <div className="flex flex-col gap-3">
                             <input type="text" value={editSitioForm.nombre}
                               onChange={e => setEditSitioForm(f => ({ ...f, nombre: e.target.value }))}
@@ -1219,207 +1262,522 @@ export default function FinderNuevoProyectoPage() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )
+                })}
+              </div>
 
-                      {selected && !isNodoBusca && (
-                        <div className="border border-t-0 px-3 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
-                          <p className="text-xs font-bold uppercase tracking-wide mb-2 text-muted">
-                            Productos del sitio
-                          </p>
+              {/* Formulario nuevo sitio */}
+              {mostrarNuevoSitio ? (
+                <div className="border border-borde rounded-xl p-4 flex flex-col gap-3 bg-gray-50/50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Nuevo sitio / New Site</p>
+                    <button type="button" onClick={() => setMostrarNuevoSitio(false)} className="text-muted"><X size={14} /></button>
+                  </div>
+                  {sitioError && <p className="text-xs text-red-600 font-medium">{sitioError}</p>}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Nombre del sitio *</label>
+                      <input type="text" value={nuevoSitio.nombre}
+                        onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
+                        className={inp} placeholder="Planta Norte" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Nombre en recibo CFE</label>
+                      <input type="text" value={nuevoSitio.nombre_recibo}
+                        onChange={e => setNuevoSitio(f => ({ ...f, nombre_recibo: e.target.value }))}
+                        className={inp} placeholder="Razón social en el recibo" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Ciudad</label>
+                      <input type="text" value={nuevoSitio.ciudad}
+                        onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
+                        className={inp} placeholder="Monterrey" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Estado</label>
+                      <select value={nuevoSitio.ubicacion_estado}
+                        onChange={e => setNuevoSitio(f => ({ ...f, ubicacion_estado: e.target.value }))}
+                        className={inp}>
+                        <option value="">Selecciona estado</option>
+                        {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">RPU</label>
+                      <input type="text" value={nuevoSitio.rpu}
+                        onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
+                        className={inp} placeholder="Registro Permanente de Usuario" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
+                      <input type="number" min="0" value={nuevoSitio.demanda_contratada_kw}
+                        onChange={e => setNuevoSitio(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
+                        className={inp} placeholder="Ej: 500" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="recibo-pdf-input" />
+                    <label htmlFor="recibo-pdf-input"
+                      className="flex items-center gap-1.5 px-3 py-2 border text-xs font-medium cursor-pointer border-borde rounded-xl bg-white hover:bg-gray-50">
+                      <Upload size={12} />
+                      {subiendoPdfNuevo ? 'Subiendo recibo…' : 'Subir recibo CFE (PDF)'}
+                    </label>
+                    {reciboUrlNuevo && (
+                      <span className="text-xs text-green-700 font-medium flex items-center gap-1">
+                        <FileText size={12} /> Recibo cargado
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2 mt-2">
+                    <button type="button" onClick={() => setMostrarNuevoSitio(false)}
+                      className="px-3 py-1.5 text-xs border border-borde rounded-xl">Cancelar</button>
+                    <button type="button" onClick={guardarNuevoSitio} disabled={guardandoSitio}
+                      className="px-4 py-1.5 text-xs font-bold bg-principal text-acento rounded-xl disabled:opacity-50">
+                      {guardandoSitio ? 'Guardando…' : 'Guardar sitio'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button"
+                  onClick={() => { setMostrarNuevoSitio(true); setSitioError(''); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null) }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm border font-medium w-full justify-center border-borde border-dashed rounded-xl hover:border-black transition-colors">
+                  <Plus size={14} />
+                  {sitiosCliente.length === 0 ? 'Agregar primer sitio / Add first site' : 'Agregar otro sitio / Add another site'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
-                          {productos.length > 0 && (
-                            <div className="flex flex-col gap-2 mb-3">
-                              {productos.map(p => (
-                                <ProductoCard key={p.tempId} p={p}
-                                  onRemove={() => removeProduct(s.id, p.tempId)} sitioProducts={productos} />
-                              ))}
-                            </div>
+        {/* ══ PASO 2 — Alternativas Técnicas por Sitio (1:n) ═════ */}
+        {step === 2 && !isNodoBusca && (
+          <div className="flex flex-col gap-5">
+            <div>
+              <h2 className="font-bold text-lg">2. Alternativas Técnicas / Technical Alternatives</h2>
+              <p className="text-xs text-muted">
+                Define una o varias propuestas técnicas para los sitios seleccionados (relación 1:n).
+                <br />
+                <span className="text-[11px] text-gray-400">Define one or more technical proposals for the selected sites (1:n relationship).</span>
+              </p>
+            </div>
+
+            {/* Configurations Tab Bar */}
+            <div className="flex flex-wrap gap-2 pb-2 border-b border-borde">
+              {configs.map((c, idx) => (
+                <button
+                  key={c.tempId}
+                  type="button"
+                  onClick={() => {
+                    setActiveConfigId(c.tempId)
+                    setAddingToSitioId(null)
+                  }}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
+                  style={{
+                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
+                    color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
+                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
+                  }}
+                >
+                  <span>{c.nombre || `Alternativa ${idx + 1}`}</span>
+                  {configs.length > 1 && (
+                    <X
+                      size={14}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfigs(prev => {
+                          const next = prev.filter(item => item.tempId !== c.tempId)
+                          if (activeConfigId === c.tempId) {
+                            setActiveConfigId(next[0].tempId)
+                          }
+                          return next
+                        })
+                      }}
+                      className="hover:text-red-500 transition-colors"
+                    />
+                  )}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const newId = `config-${Date.now()}`
+                  setConfigs(prev => [
+                    ...prev,
+                    {
+                      tempId: newId,
+                      nombre: `Alternativa ${String.fromCharCode(65 + prev.length)}`,
+                      descripcion: '',
+                      sitiosSeleccionados: selectedSiteIds,
+                      productosMap: Object.fromEntries(selectedSiteIds.map(sId => [sId, []])),
+                      ahorro_estimado_anual: '',
+                      ahorro_moneda: 'MXN'
+                    }
+                  ])
+                  setActiveConfigId(newId)
+                }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-dashed border-borde bg-white hover:border-black transition-all flex items-center gap-1"
+              >
+                <Plus size={14} /> Nueva alternativa / New Alternative
+              </button>
+            </div>
+
+            {/* Active Configuration Details Form */}
+            <div className="bg-fondo/35 p-4 rounded-xl border border-borde flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                Detalles de esta alternativa / Alternative Details
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Nombre de la alternativa / Name *</label>
+                  <input
+                    type="text"
+                    value={activeConfig.nombre}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, nombre: e.target.value } : c))
+                    }}
+                    className={inp}
+                    placeholder="Ej: Alternativa A - Solo FV 100 kWp"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1">Descripción / Description <span className="text-muted text-[10px]">(opcional)</span></label>
+                  <input
+                    type="text"
+                    value={activeConfig.descripcion}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, descripcion: e.target.value } : c))
+                    }}
+                    className={inp}
+                    placeholder="Ej: Opción con 150 kWp y sin baterías"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
+                <span>Inversión total estimada (CAPEX acumulado):</span>
+                <span className="font-bold text-sm text-principal">
+                  ${activeConfigCapex.toLocaleString('es-MX')} {activeConfigMoneda}
+                </span>
+              </div>
+
+              <div className="text-xs text-muted flex justify-between items-center mt-1 pt-2 border-t border-borde">
+                <span>Ahorro bruto estimado anual / Estimated Gross Annual Savings:</span>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={activeConfig.ahorro_estimado_anual}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_estimado_anual: formatNumberInput(e.target.value) } : c))
+                    }}
+                    className={inp}
+                    style={{ width: '140px' }}
+                    placeholder="0"
+                  />
+                  <select
+                    value={activeConfig.ahorro_moneda}
+                    onChange={e => {
+                      setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value as Moneda } : c))
+                    }}
+                    className={inp}
+                    style={{ width: '90px' }}
+                  >
+                    <option value="MXN">MXN</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Sites & Products under this active alternative */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Productos por Sitio / Products per Site
+              </label>
+
+              <div className="flex flex-col gap-4">
+                {(selectedSiteIds.length > 0 ? selectedSiteIds : sitiosSeleccionados).map(sId => {
+                  const s = sitiosCliente.find(site => site.id === sId)
+                  if (!s) return null
+                  const productos = productosMap[sId] ?? []
+                  const isAdding = addingToSitioId === sId
+
+                  return (
+                    <div key={sId} className="border border-borde rounded-xl p-4 bg-white shadow-sm flex flex-col gap-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-borde">
+                        <div>
+                          <span className="font-bold text-sm text-principal">{s.nombre}</span>
+                          {(s.ciudad || s.ubicacion_estado) && (
+                            <span className="text-xs text-muted ml-2">
+                              {[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}
+                            </span>
                           )}
+                          {s.demanda_contratada_kw && (
+                            <span className="text-xs font-semibold text-gray-500 ml-2">
+                              · {s.demanda_contratada_kw.toLocaleString('es-MX')} kW
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted font-medium">
+                          {productos.length} {productos.length === 1 ? 'producto' : 'productos'}
+                        </span>
+                      </div>
 
-                          {isAdding ? (
-                            <div className="border p-4" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fff' }}>
-                              {!productTipo ? (
-                                <div>
-                                  <p className="text-xs font-bold mb-3">¿Qué tipo de producto?</p>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <button type="button" onClick={() => setProductTipo('fv')}
-                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black border-borde rounded-xl">
-                                      <Zap size={20} />
-                                      <span className="text-sm font-bold">Fotovoltaico</span>
-                                      <span className="text-xs text-center text-muted">Paneles solares e inversores</span>
-                                    </button>
-                                    <button type="button" onClick={() => setProductTipo('bess')}
-                                      className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black border-borde rounded-xl">
-                                      <Battery size={20} />
-                                      <span className="text-sm font-bold">BESS</span>
-                                      <span className="text-xs text-center text-muted">Sistema de almacenamiento</span>
-                                    </button>
-                                  </div>
-                                  <div className="flex justify-end mt-3">
-                                    <button type="button" onClick={() => setAddingToSitioId(null)}
-                                      className="px-3 py-1.5 text-xs border border-borde rounded-xl">
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : productTipo === 'fv' ? (
-                                <div>
-                                  <div className="flex items-center justify-between mb-4">
-                                    <p className="text-sm font-bold flex items-center gap-2"><Zap size={14} /> Fotovoltaico</p>
-                                    <button type="button" onClick={() => setProductTipo(null)}
-                                      className="text-xs underline text-muted">← Cambiar tipo</button>
-                                  </div>
-                                  <div className="flex flex-col gap-3">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Módulos</p>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">No. Módulos *</label>
-                                        <input type="text" value={fvForm.num_modulos}
-                                          onChange={e => setFvForm(f => ({ ...f, num_modulos: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Potencia (W) *</label>
-                                        <input type="text" value={fvForm.potencia_modulos_w}
-                                          onChange={e => setFvForm(f => ({ ...f, potencia_modulos_w: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Marca *</label>
-                                        <input type="text" value={fvForm.marca_modulos}
-                                          onChange={e => setFvForm(f => ({ ...f, marca_modulos: e.target.value }))}
-                                          className={inp} style={borde} placeholder="Jinko, LONGi…" />
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <CalcField label="kWp sistema" value={fvCalc.kwpSistema} unit="kWp" />
-                                    </div>
+                      {/* Lista de productos para este sitio */}
+                      {productos.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          {productos.map(p => (
+                            <ProductoCard
+                              key={p.tempId}
+                              p={p}
+                              onRemove={() => {
+                                setProductosMap(prev => ({
+                                  ...prev,
+                                  [sId]: (prev[sId] ?? []).filter(item => item.tempId !== p.tempId)
+                                }))
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
 
-                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Inversores</p>
-                                    {addingToSitioId && (productosMap[addingToSitioId] ?? []).some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos === true) && (
-                                      <div className='text-xs text-blue-600 bg-blue-50 p-2 rounded-lg mb-2'>Los inversores del BESS híbrido cubren este producto FV. Los campos de inversores son opcionales.</div>
-                                    )}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">No. Inversores *</label>
-                                        <input type="text" value={fvForm.num_inversores}
-                                          onChange={e => setFvForm(f => ({ ...f, num_inversores: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
-                                        <input type="text" value={fvForm.potencia_inversores_kw}
-                                          onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Marca *</label>
-                                        <input type="text" value={fvForm.marca_inversores}
-                                          onChange={e => setFvForm(f => ({ ...f, marca_inversores: e.target.value }))}
-                                          className={inp} style={borde} placeholder="Huawei, SMA…" />
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <CalcField label="kWp inversores" value={fvCalc.kwpInversores} unit="kW" />
-                                    </div>
-
-                                    <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Energía y costos</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Generación anual (kWh) *</label>
-                                        <input type="text" value={fvForm.generacion_anual_kwh}
-                                          onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                                                            <div>
-                                        <label className="block text-xs font-medium mb-1">CAPEX *</label>
-                                        <div className="flex gap-2">
-                                          <div className="flex-1">
-                                            <input type="text" value={fvForm.capex}
-                                              onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
-                                              className={inp} style={borde} placeholder="0" />
-                                          </div>
-                                          <div className="w-24">
-                                            <select value={fvForm.capex_moneda || 'USD'}
-                                              onChange={e => setFvForm(f => ({ ...f, capex_moneda: e.target.value as Moneda }))}
-                                              className={inp} style={borde}>
-                                              <option value="USD">USD</option>
-                                              <option value="MXN">MXN</option>
-                                            </select>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <CalcField label="Precio por Watt" value={fvCalc.precioWatt} unit="$/W" />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="flex items-center justify-between mb-4">
-                                    <p className="text-sm font-bold flex items-center gap-2"><Battery size={14} /> BESS</p>
-                                    <button type="button" onClick={() => setProductTipo(null)}
-                                      className="text-xs underline text-muted">← Cambiar tipo</button>
-                                  </div>
-                                  <div className="flex flex-col gap-3">
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
-                                        <input type="text" value={bessForm.potencia_kw}
-                                          onChange={e => setBessForm(f => ({ ...f, potencia_kw: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Capacidad (kWh) *</label>
-                                        <input type="text" value={bessForm.capacidad_kwh}
-                                          onChange={e => setBessForm(f => ({ ...f, capacidad_kwh: formatNumberInput(e.target.value) }))}
-                                          className={inp} style={borde} placeholder="0" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs font-medium mb-1">Marca *</label>
-                                        <input type="text" value={bessForm.marca}
-                                          onChange={e => setBessForm(f => ({ ...f, marca: e.target.value }))}
-                                          className={inp} style={borde} placeholder="Tesla, BYD…" />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium mb-1">Uso *</label>
-                                      <select value={bessForm.uso} onChange={e => setBessForm(f => ({ ...f, uso: e.target.value }))}
-                                        className={inp} style={borde}>
-                                        <option value="">Selecciona</option>
-                                        <option value="load_shifting">Load Shifting</option>
-                                        <option value="ups">Backup / UPS</option>
-                                        <option value="load_shifting_ups">Load Shifting + UPS</option>
-                                      </select>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <input type="checkbox" id="bess-hibrido" checked={bessForm.inversores_hibridos}
-                                        onChange={e => setBessForm(f => ({ ...f, inversores_hibridos: e.target.checked }))} className="w-4 h-4" />
-                                      <label htmlFor="bess-hibrido" className="text-sm font-medium">Inversores híbridos (también manejan FV)</label>
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium mb-1">CAPEX ($) *</label>
-                                      <input type="text" value={bessForm.capex}
-                                        onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
-                                        className={inp} style={borde} placeholder="0" />
-                                    </div>
-                                    <CalcField label="Precio por kWh" value={bessCalc.precioKwh} unit="$/kWh" />
-                                  </div>
-                                </div>
-                              )}
-
-                              {addProductError && <p className="text-xs text-red-600 mt-3">{addProductError}</p>}
-
-                              <div className="flex justify-between mt-4 pt-3 border-t border-borde">
+                      {/* Botón / Formulario agregar producto */}
+                      {!isAdding ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingToSitioId(sId)
+                            setProductTipo(null)
+                            setFvForm(emptyFv)
+                            setBessForm(emptyBess)
+                            setAddProductError('')
+                          }}
+                          className="flex items-center justify-center gap-1.5 py-2 px-3 border border-dashed border-borde rounded-xl text-xs font-medium text-muted hover:border-principal hover:text-principal transition-colors bg-gray-50/50"
+                        >
+                          <Plus size={13} />
+                          {productos.length === 0 ? 'Agregar primer producto (FV o BESS) / Add product' : 'Agregar otro producto / Add another product'}
+                        </button>
+                      ) : (
+                        <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fff' }}>
+                          {/* Selector de tipo */}
+                          {!productTipo ? (
+                            <div>
+                              <p className="text-xs font-bold mb-3">¿Qué tipo de producto? / Product type</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <button type="button" onClick={() => setProductTipo('fv')}
+                                  className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black border-borde rounded-xl">
+                                  <Zap size={20} />
+                                  <span className="text-sm font-bold">Fotovoltaico</span>
+                                  <span className="text-xs text-center text-muted">Paneles solares e inversores</span>
+                                </button>
+                                <button type="button" onClick={() => setProductTipo('bess')}
+                                  className="border p-4 flex flex-col items-center gap-2 transition-colors hover:border-black border-borde rounded-xl">
+                                  <Battery size={20} />
+                                  <span className="text-sm font-bold">BESS</span>
+                                  <span className="text-xs text-center text-muted">Sistema de almacenamiento</span>
+                                </button>
+                              </div>
+                              <div className="flex justify-end mt-3">
+                                <button type="button" onClick={() => setAddingToSitioId(null)}
+                                  className="px-3 py-1.5 text-xs border border-borde rounded-xl">
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : productTipo === 'fv' ? (
+                            /* Formulario FV */
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <p className="text-sm font-bold flex items-center gap-2"><Zap size={14} /> Fotovoltaico / Solar PV</p>
                                 <button type="button" onClick={() => setProductTipo(null)}
-                                  className="px-3 py-1.5 text-xs border border-borde rounded-xl">Atrás</button>
-                                <button type="button" onClick={addProduct} disabled={!productTipo}
-                                  className="px-4 py-1.5 text-xs font-bold bg-acento text-principal rounded-xl">Agregar producto</button>
+                                  className="text-xs underline text-muted">← Cambiar tipo</button>
+                              </div>
+                              <div className="flex flex-col gap-3">
+                                {/* Módulos */}
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Módulos</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">No. Módulos *</label>
+                                    <input type="text" value={fvForm.num_modulos}
+                                      onChange={e => setFvForm(f => ({ ...f, num_modulos: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Potencia (W) *</label>
+                                    <input type="text" value={fvForm.potencia_modulos_w}
+                                      onChange={e => setFvForm(f => ({ ...f, potencia_modulos_w: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Marca *</label>
+                                    <input type="text" value={fvForm.marca_modulos}
+                                      onChange={e => setFvForm(f => ({ ...f, marca_modulos: e.target.value }))}
+                                      className={inp} style={borde} placeholder="Jinko, LONGi…" />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <CalcField label="kWp sistema" value={fvCalc.kwpSistema} unit="kWp" />
+                                </div>
+
+                                {/* Inversores */}
+                                <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Inversores</p>
+                                {addingToSitioId && (productosMap[addingToSitioId] ?? []).some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos) && (
+                                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded-lg mb-2">Los inversores del BESS híbrido cubren este producto FV. Los campos de inversores son opcionales.</div>
+                                )}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">No. Inversores *</label>
+                                    <input type="text" value={fvForm.num_inversores}
+                                      onChange={e => setFvForm(f => ({ ...f, num_inversores: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
+                                    <input type="text" value={fvForm.potencia_inversores_kw}
+                                      onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Marca *</label>
+                                    <input type="text" value={fvForm.marca_inversores}
+                                      onChange={e => setFvForm(f => ({ ...f, marca_inversores: e.target.value }))}
+                                      className={inp} style={borde} placeholder="Huawei, SMA…" />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <CalcField label="kWp inversores" value={fvCalc.kwpInversores} unit="kW" />
+                                </div>
+
+                                {/* Generación y CAPEX */}
+                                <p className="text-xs font-semibold uppercase tracking-wide mt-1 text-muted">Generación y CAPEX</p>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Generación anual estimada (kWh) *</label>
+                                  <input type="text" value={fvForm.generacion_anual_kwh}
+                                    onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: formatNumberInput(e.target.value) }))}
+                                    className={inp} style={borde} placeholder="0" />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '10px' }}>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">CAPEX *</label>
+                                    <input type="text" value={fvForm.capex}
+                                      onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Moneda</label>
+                                    <select value={fvForm.capex_moneda}
+                                      onChange={e => setFvForm(f => ({ ...f, capex_moneda: e.target.value as Moneda }))}
+                                      className={inp} style={borde}>
+                                      <option value="USD">USD</option>
+                                      <option value="MXN">MXN</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <CalcField label="Precio / Watt" value={fvCalc.precioWatt} unit={`USD/W`} />
+                                </div>
+
+                                {addProductError && <p className="text-xs text-red-600 font-medium">{addProductError}</p>}
+
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <button type="button" onClick={() => setAddingToSitioId(null)}
+                                    className="px-3 py-1.5 text-xs border border-borde rounded-xl">Cancelar</button>
+                                  <button type="button" onClick={() => guardarProducto(sId)}
+                                    className="px-4 py-1.5 text-xs font-bold bg-principal text-acento rounded-xl">
+                                    Guardar producto
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ) : (
-                            <button type="button" onClick={() => startAddingProduct(s.id)}
-                              className="w-full py-2.5 border border-dashed border-borde hover:border-black transition-all rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold bg-white/40">
-                              <Plus size={13} /> Agregar producto (FV / BESS)
-                            </button>
+                            /* Formulario BESS */
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <p className="text-sm font-bold flex items-center gap-2"><Battery size={14} /> BESS / Energy Storage</p>
+                                <button type="button" onClick={() => setProductTipo(null)}
+                                  className="text-xs underline text-muted">← Cambiar tipo</button>
+                              </div>
+                              <div className="flex flex-col gap-3">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Potencia (kW) *</label>
+                                    <input type="text" value={bessForm.potencia_kw}
+                                      onChange={e => setBessForm(f => ({ ...f, potencia_kw: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Capacidad (kWh) *</label>
+                                    <input type="text" value={bessForm.capacidad_kwh}
+                                      onChange={e => setBessForm(f => ({ ...f, capacidad_kwh: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Marca *</label>
+                                  <input type="text" value={bessForm.marca}
+                                    onChange={e => setBessForm(f => ({ ...f, marca: e.target.value }))}
+                                    className={inp} style={borde} placeholder="Tesla, BYD, CATL…" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Uso *</label>
+                                  <select value={bessForm.uso}
+                                    onChange={e => setBessForm(f => ({ ...f, uso: e.target.value }))}
+                                    className={inp} style={borde}>
+                                    <option value="load_shifting">Load shifting</option>
+                                    <option value="ups">Respaldo (UPS)</option>
+                                    <option value="load_shifting_ups">Load shifting + Respaldo</option>
+                                  </select>
+                                </div>
+                                <div className="pt-1">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={bessForm.inversores_hibridos}
+                                      onChange={e => setBessForm(f => ({ ...f, inversores_hibridos: e.target.checked }))}
+                                      className="w-4 h-4 rounded border-gray-300 text-principal focus:ring-acento"
+                                    />
+                                    <span className="text-xs font-medium text-principal">
+                                      Inversores híbridos (también manejan FV)
+                                    </span>
+                                  </label>
+                                  <p className="text-[11px] text-muted ml-6 mt-0.5">
+                                    Si se activa, los productos FV en este mismo sitio no requerirán especificar inversores adicionales.
+                                  </p>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '10px' }}>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">CAPEX *</label>
+                                    <input type="text" value={bessForm.capex}
+                                      onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))}
+                                      className={inp} style={borde} placeholder="0" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1">Moneda</label>
+                                    <select value={bessForm.capex_moneda}
+                                      onChange={e => setBessForm(f => ({ ...f, capex_moneda: e.target.value as Moneda }))}
+                                      className={inp} style={borde}>
+                                      <option value="USD">USD</option>
+                                      <option value="MXN">MXN</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <CalcField label="Precio / kWh" value={bessCalc.precioKwh} unit={`USD/kWh`} />
+                                </div>
+
+                                {addProductError && <p className="text-xs text-red-600 font-medium">{addProductError}</p>}
+
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <button type="button" onClick={() => setAddingToSitioId(null)}
+                                    className="px-3 py-1.5 text-xs border border-borde rounded-xl">Cancelar</button>
+                                  <button type="button" onClick={() => guardarProducto(sId)}
+                                    className="px-4 py-1.5 text-xs font-bold bg-principal text-acento rounded-xl">
+                                    Guardar producto
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
                       )}
@@ -1427,339 +1785,208 @@ export default function FinderNuevoProyectoPage() {
                   )
                 })}
               </div>
-
-              {/* Formulario nuevo sitio inline */}
-              {form.cliente_id && (
-                <div className="mt-4">
-                  {mostrarNuevoSitio ? (
-                    <div className="border p-5 glass-card" style={{ borderColor: 'var(--color-principal)' }}>
-                      <p className="text-sm font-bold mb-4">Registrar nuevo sitio</p>
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="block text-xs font-medium mb-1">Nombre interno del sitio *</label>
-                          <input type="text" value={nuevoSitio.nombre}
-                            onChange={e => setNuevoSitio(f => ({ ...f, nombre: e.target.value }))}
-                            className={inp} style={borde} placeholder="Ej: Planta Guadalajara" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium mb-1">Razón social en recibo CFE</label>
-                          <input type="text" value={nuevoSitio.nombre_recibo}
-                            onChange={e => setNuevoSitio(f => ({ ...f, nombre_recibo: e.target.value }))}
-                            className={inp} style={borde} placeholder="Ej: Industrias del Pacífico S.A." />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div>
-                            <label className="block text-xs font-medium mb-1">Ciudad</label>
-                            <input type="text" value={nuevoSitio.ciudad}
-                              onChange={e => setNuevoSitio(f => ({ ...f, ciudad: e.target.value }))}
-                              className={inp} style={borde} placeholder="Ej: Zapopan" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-1">Estado</label>
-                            <select value={nuevoSitio.ubicacion_estado}
-                              onChange={e => setNuevoSitio(f => ({ ...f, ubicacion_estado: e.target.value }))}
-                              className={inp} style={borde}>
-                              <option value="">Selecciona</option>
-                              {ESTADOS_MX.map(est => <option key={est} value={est}>{est}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '12px' }}>
-                          <div>
-                            <label className="block text-xs font-medium mb-1">RPU / Servicio</label>
-                            <input type="text" value={nuevoSitio.rpu}
-                              onChange={e => setNuevoSitio(f => ({ ...f, rpu: e.target.value }))}
-                              className={inp} style={borde} placeholder="12 dígitos" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
-                            <input type="number" min="0" value={nuevoSitio.demanda_contratada_kw}
-                              onChange={e => setNuevoSitio(f => ({ ...f, demanda_contratada_kw: e.target.value }))}
-                              className={inp} style={borde} placeholder="Ej: 500" />
-                          </div>
-                        </div>
-
-                        {/* Recibo PDF */}
-                        <div className="flex items-center gap-3 mt-1">
-                          <input ref={fileRefNuevo} type="file" accept=".pdf" onChange={subirPdfNuevo} className="hidden" id="recibo-pdf-nuevo" />
-                          <label htmlFor="recibo-pdf-nuevo"
-                            className="flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium cursor-pointer border-borde rounded-xl bg-white hover:bg-gray-50">
-                            <Upload size={11} />
-                            {subiendoPdfNuevo ? 'Subiendo…' : 'Subir recibo CFE (PDF)'}
-                          </label>
-                          {reciboUrlNuevo && (
-                            <span className="text-xs text-green-700 flex items-center gap-1 font-medium">✓ Archivo cargado</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {sitioError && <p className="text-xs text-red-600 mt-3">{sitioError}</p>}
-
-                      <div className="flex justify-between mt-5 pt-3 border-t border-borde">
-                        <button type="button" onClick={() => { setMostrarNuevoSitio(false); setSitioError('') }}
-                          className="px-3 py-1.5 text-xs border border-borde rounded-xl">Cancelar</button>
-                        <button type="button" onClick={guardarNuevoSitio}
-                          disabled={guardandoSitio || !nuevoSitio.nombre.trim()}
-                          className="px-4 py-1.5 text-xs font-bold disabled:opacity-50 bg-acento text-principal rounded-xl">
-                          {guardandoSitio ? 'Guardando…' : 'Guardar sitio'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" onClick={() => { setMostrarNuevoSitio(true); setViendoSitioId(null); setEditandoSitioId(null); setAddingToSitioId(null); setSitioError('') }}
-                      className="w-full py-3 border border-dashed border-borde hover:border-black transition-all rounded-xl flex items-center justify-center gap-2 text-sm font-semibold bg-white shadow-sm">
-                      <Plus size={15} /> Registrar nuevo sitio del cliente
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* ══ PASO 2 — Financiamiento ══════════════════════════ */}
-        {step === 2 && (
+        {/* ══ PASO 3 — Esquemas de Financiamiento (n:n) ════════ */}
+        {step === 3 && !isNodoBusca && (
           <div className="flex flex-col gap-5">
-            <h2 className="font-bold text-lg">Financiamiento</h2>
-
-            {/* Modo Selection */}
             <div>
-              <label className="block text-sm font-semibold mb-3">¿Cómo prefieres definir las opciones de financiamiento? *</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-                <button
-                  type="button"
-                  onClick={() => setIsRecomendacionNodo(true)}
-                  className="border rounded-xl p-4 text-left transition-all"
-                  style={{
-                    borderColor: isRecomendacionNodo ? 'var(--color-principal)' : '#E5E5E5',
-                    backgroundColor: isRecomendacionNodo ? 'var(--color-principal)' : '#fff',
-                    color: isRecomendacionNodo ? 'var(--color-acento)' : 'var(--color-principal)',
-                  }}
-                >
-                  <p className="font-bold text-sm">Nodo Recomienda</p>
-                  <p className="text-xs opacity-75 mt-1">El analista de Nodo definirá y presentará las mejores opciones para el cliente.</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsRecomendacionNodo(false)}
-                  className="border rounded-xl p-4 text-left transition-all"
-                  style={{
-                    borderColor: !isRecomendacionNodo ? 'var(--color-principal)' : '#E5E5E5',
-                    backgroundColor: !isRecomendacionNodo ? 'var(--color-principal)' : '#fff',
-                    color: !isRecomendacionNodo ? 'var(--color-acento)' : 'var(--color-principal)',
-                  }}
-                >
-                  <p className="font-bold text-sm">Ingresar opciones manualmente</p>
-                  <p className="text-xs opacity-75 mt-1">Configura y vincula múltiples opciones de financiamiento a tus alternativas técnicas.</p>
-                </button>
-              </div>
+              <h2 className="font-bold text-lg">3. Esquemas de Financiamiento / Financing Schemes</h2>
+              <p className="text-xs text-muted">
+                Selecciona los esquemas de financiamiento a cotizar para las alternativas técnicas (relación n:n).
+                <br />
+                <span className="text-[11px] text-gray-400">Select the financing schemes to quote for the technical alternatives (n:n relationship).</span>
+              </p>
             </div>
 
-            {!isRecomendacionNodo && (
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between pb-2 border-b border-borde">
-                  <h3 className="font-bold text-sm text-principal">Opciones de Financiamiento</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newId = `fin-${Date.now()}`
-                      setFinancingOptions(prev => [
-                        ...prev,
-                        {
-                          tempId: newId,
-                          nombre: `Financiamiento ${prev.length + 1}`,
-                          vehiculo_inversion: 'credito',
-                          ahorro_estimado_anual: '',
-                          ahorro_moneda: 'MXN',
-                          plazo_meses: '',
-                          notas: '',
-                          linkedConfigIds: configs.map(c => c.tempId)
-                        }
-                      ])
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-borde font-semibold rounded-xl bg-white hover:border-black transition-all"
-                  >
-                    <Plus size={12} /> Agregar opción
-                  </button>
-                </div>
-
-                {financingOptions.map((opt, oIdx) => (
-                  <div key={opt.tempId} className="border border-borde p-4 rounded-xl bg-fondo/10 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-muted uppercase">Opción #{oIdx + 1}</span>
-                      {financingOptions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFinancingOptions(prev => prev.filter(item => item.tempId !== opt.tempId))
-                          }}
-                          className="text-red-500 hover:text-red-700 transition-colors p-1"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Nombre de la opción *</label>
-                        <input
-                          type="text"
-                          value={opt.nombre}
-                          onChange={e => {
-                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, nombre: e.target.value } : o))
-                          }}
-                          className={inp}
-                          placeholder="Ej: Crédito a 5 años"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Vehículo de inversión *</label>
-                        <select
-                          value={opt.vehiculo_inversion}
-                          onChange={e => {
-                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, vehiculo_inversion: e.target.value } : o))
-                          }}
-                          className={inp}
-                        >
-                          <option value="credito">Crédito</option>
-                          <option value="arrendamiento">Arrendamiento</option>
-                          <option value="ensaas">EnSaaS</option>
-                          <option value="mem">Mercado Eléctrico Mayorista</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Ahorro neto anual (post-financiamiento)</label>
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              value={opt.ahorro_estimado_anual}
-                              onChange={e => {
-                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_anual: formatNumberInput(e.target.value) } : o))
-                              }}
-                              className={inp}
-                              placeholder="0"
-                            />
-                          </div>
-                          <div className="w-24">
-                            <select
-                              value={opt.ahorro_moneda || 'MXN'}
-                              onChange={e => {
-                                setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_moneda: e.target.value as Moneda } : o))
-                              }}
-                              className={inp}
-                            >
-                              <option value="MXN">MXN</option>
-                              <option value="USD">USD</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Plazo (meses)</label>
-                        <input
-                          type="text"
-                          value={opt.plazo_meses}
-                          onChange={e => {
-                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, plazo_meses: formatNumberInput(e.target.value) } : o))
-                          }}
-                          className={inp}
-                          placeholder="60"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium mb-1">Notas</label>
-                        <input
-                          type="text"
-                          value={opt.notas}
-                          onChange={e => {
-                            setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, notas: e.target.value } : o))
-                          }}
-                          className={inp}
-                          placeholder="Detalles sobre tasa de interés, enganche u observaciones…"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="block text-xs font-semibold mb-2 text-muted uppercase">Vincular a Alternativas Técnicas *</span>
-                      <div className="flex flex-wrap gap-4 bg-white p-3 rounded-lg border border-borde">
-                        {configs.map(c => {
-                          const isLinked = opt.linkedConfigIds.includes(c.tempId)
-                          return (
-                            <label key={c.tempId} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isLinked}
-                                onChange={() => {
-                                  setFinancingOptions(prev => prev.map(o => {
-                                    if (o.tempId === opt.tempId) {
-                                      const nextIds = o.linkedConfigIds.includes(c.tempId)
-                                        ? o.linkedConfigIds.filter(id => id !== c.tempId)
-                                        : [...o.linkedConfigIds, c.tempId]
-                                      return { ...o, linkedConfigIds: nextIds }
-                                    }
-                                    return o
-                                  }))
-                                }}
-                                className="w-3.5 h-3.5"
-                              />
-                              <span>{c.nombre}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
+            {anyHighDemanda && (
+              <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-acento)', backgroundColor: '#fffff0' }}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.incluye_mem}
+                    onChange={e => setF('incluye_mem', e.target.checked)}
+                    className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Considerar alternativa de Mercado Eléctrico Mayorista (MEM)</p>
+                    <p className="text-xs mt-0.5 text-muted">
+                      Uno o más sitios seleccionados tienen más de 1,000 kW de demanda contratada. El analista evaluará si conviene migrar al MEM.
+                    </p>
                   </div>
-                ))}
+                </label>
               </div>
             )}
 
-            {/* Moneda y CAPEX */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Moneda del proyecto</label>
-                <div className="flex gap-2">
-                  {(['MXN', 'USD'] as Moneda[]).map(mon => (
-                    <button key={mon} type="button" onClick={() => setF('moneda', mon)}
-                      className="flex-1 py-2 text-sm font-bold border rounded-lg transition-all"
+            {/* Simple Multi-Choice Selection */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Selecciona los esquemas de financiamiento / Select financing schemes *
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                {VEHICULOS_FINANCIAMIENTO.map(v => {
+                  const isSelected = financingOptions.some(o => o.vehiculo_inversion === v.id)
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => toggleVehiculo(v.id, v.nombreEs, v.nombreEn)}
+                      className="border rounded-xl p-3.5 text-left transition-all flex items-start gap-3"
                       style={{
-                        borderColor: form.moneda === mon ? 'var(--color-principal)' : '#E5E5E5',
-                        backgroundColor: form.moneda === mon ? 'var(--color-principal)' : '#fff',
-                        color: form.moneda === mon ? 'var(--color-acento)' : 'var(--color-principal)',
-                      }}>
-                      {mon}
+                        borderColor: isSelected ? 'var(--color-principal)' : '#E5E5E5',
+                        backgroundColor: isSelected ? '#f8fbf5' : '#fff',
+                      }}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center mt-0.5 shrink-0 border font-bold text-xs ${isSelected ? 'bg-principal text-acento border-principal' : 'border-gray-300'}`}>
+                        {isSelected ? '✓' : ''}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-principal">{v.nombreEs}</p>
+                        <p className="text-xs text-muted">{v.nombreEn}</p>
+                        <p className="text-[11px] text-gray-400 mt-1">{v.descEs}</p>
+                      </div>
                     </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">CAPEX total estimado</label>
-                <div className="h-10 border border-borde rounded-lg bg-gray-50 flex items-center px-4 font-bold text-sm text-principal">
-                  ${activeConfigCapex.toLocaleString('es-MX')} {form.moneda}
-                </div>
+                  )
+                })}
               </div>
             </div>
 
-            <hr className="border-borde rounded-xl" />
+            {/* Selected Options List with Folded Characteristics */}
+            <div className="flex flex-col gap-3">
+              <label className="block text-sm font-semibold">
+                Esquemas Seleccionados / Selected Schemes ({financingOptions.length})
+              </label>
+
+              {financingOptions.map((opt) => {
+                const isFolded = foldedCharacteristics[opt.tempId] !== false // folded by default!
+                return (
+                  <div key={opt.tempId} className="border border-borde rounded-xl p-4 bg-white shadow-sm flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-principal" />
+                        <span className="font-bold text-sm text-principal">{opt.nombre}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFoldedCharacteristics(prev => ({ ...prev, [opt.tempId]: !isFolded }))}
+                        className="text-xs font-semibold text-principal px-3 py-1.5 rounded-lg border border-borde hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                      >
+                        {isFolded ? (
+                          <>
+                            <span>▸</span>
+                            <span>Características de Financiamiento (Opcional) / Financing Characteristics (Optional)</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>▾</span>
+                            <span>Ocultar Características / Hide Characteristics</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Folded content */}
+                    {!isFolded && (
+                      <div className="pt-3 border-t border-borde flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium mb-1">
+                              Plazo (meses) / Term (months) <span className="text-muted text-[10px]">(opcional)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={opt.plazo_meses}
+                              onChange={e => setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, plazo_meses: formatNumberInput(e.target.value) } : o))}
+                              className={inp}
+                              placeholder="60"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium mb-1">
+                              Ahorro neto anual estimado / Estimated Net Annual Savings <span className="text-muted text-[10px]">(opcional)</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={opt.ahorro_estimado_anual}
+                                onChange={e => setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_estimado_anual: formatNumberInput(e.target.value) } : o))}
+                                className={inp}
+                                placeholder="0"
+                              />
+                              <select
+                                value={opt.ahorro_moneda || 'MXN'}
+                                onChange={e => setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, ahorro_moneda: e.target.value as Moneda } : o))}
+                                className={inp}
+                                style={{ width: '90px' }}
+                              >
+                                <option value="MXN">MXN</option>
+                                <option value="USD">USD</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium mb-1">
+                            Notas y condiciones / Notes & Terms <span className="text-muted text-[10px]">(opcional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={opt.notas}
+                            onChange={e => setFinancingOptions(prev => prev.map(o => o.tempId === opt.tempId ? { ...o, notas: e.target.value } : o))}
+                            className={inp}
+                            placeholder="Tasa, enganche, condiciones de compra..."
+                          />
+                        </div>
+
+                        <div>
+                          <span className="block text-xs font-semibold mb-1.5 text-muted uppercase tracking-wider">
+                            Vincular a Alternativas Técnicas / Link to Technical Alternatives (n:n)
+                          </span>
+                          <div className="flex flex-wrap gap-3 bg-gray-50 p-2.5 rounded-lg border border-borde">
+                            {configs.map(c => {
+                              const isLinked = opt.linkedConfigIds.includes(c.tempId)
+                              return (
+                                <label key={c.tempId} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={isLinked}
+                                    onChange={() => {
+                                      setFinancingOptions(prev => prev.map(o => {
+                                        if (o.tempId === opt.tempId) {
+                                          const next = o.linkedConfigIds.includes(c.tempId)
+                                            ? o.linkedConfigIds.filter(id => id !== c.tempId)
+                                            : [...o.linkedConfigIds, c.tempId]
+                                          return { ...o, linkedConfigIds: next }
+                                        }
+                                        return o
+                                      }))
+                                    }}
+                                    className="w-3.5 h-3.5"
+                                  />
+                                  <span>{c.nombre}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Notas internas / Comentarios adicionales</label>
+              <label className="block text-sm font-medium mb-1">
+                Notas adicionales / Additional Notes <span className="text-muted text-[10px]">(opcional)</span>
+              </label>
               <textarea value={form.notas_adicionales} onChange={e => setF('notas_adicionales', e.target.value)}
-                rows={3} className={inp} placeholder="Ingresa notas o comentarios del proyecto para el analista…" />
+                rows={3} className={inp} style={borde}
+                placeholder="Cualquier información adicional relevante para el analista de Nodo…" />
             </div>
-
-            <label className="flex items-start gap-3 mt-1 cursor-pointer">
-              <input type="checkbox" checked={form.incluye_mem} onChange={e => setF('incluye_mem', e.target.checked)}
-                className="mt-1" />
-              <div>
-                <div className="text-sm font-semibold">Incluir suministro calificado MEM</div>
-                <div className="text-xs text-muted">¿Este proyecto requiere cotización complementaria en el Mercado Eléctrico Mayorista?</div>
-              </div>
-            </label>
           </div>
         )}
+
 
         {error && <p className="text-sm text-red-600 mt-6">{error}</p>}
 
@@ -1768,27 +1995,24 @@ export default function FinderNuevoProyectoPage() {
           {step > 0 ? (
             <button type="button" onClick={() => { setStep(s => s - 1); setError('') }}
               className="px-5 py-2.5 text-sm font-semibold border border-borde rounded-xl hover:bg-gray-50 transition-colors">
-              Atrás
+              Atrás / Back
             </button>
           ) : (
             <button type="button" onClick={() => router.push('/finder')}
               className="px-5 py-2.5 text-sm font-semibold border border-borde rounded-xl hover:bg-gray-50 transition-colors">
-              Cancelar
+              Cancelar / Cancel
             </button>
           )}
 
-          {step < (isNodoBusca ? 1 : 2) ? (
-            <button type="button" onClick={() => {
-              if (isNodoBusca && step === 1) handleSubmit()
-              else handleNext()
-            }}
+          {step < (isNodoBusca ? 1 : 3) ? (
+            <button type="button" onClick={handleNext}
               className="px-6 py-2.5 text-sm font-bold bg-acento text-principal rounded-xl hover:opacity-90 transition-all active:scale-[0.98]">
-              Siguiente paso
+              Siguiente paso / Next
             </button>
           ) : (
             <button type="button" onClick={handleSubmit} disabled={loading}
               className="px-6 py-2.5 text-sm font-bold bg-acento text-principal rounded-xl hover:opacity-90 disabled:opacity-50 transition-all active:scale-[0.98]">
-              {loading ? 'Creando propuesta…' : 'Crear y enviar propuesta'}
+              {loading ? 'Creando propuesta… / Creating…' : 'Crear y enviar propuesta / Submit project'}
             </button>
           )}
         </div>
