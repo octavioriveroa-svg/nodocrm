@@ -119,7 +119,10 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       const list = configuraciones ?? []
       const mapped: CreationConfig[] = list.map(c => {
         const configProducts = (productos ?? []).filter(p => p.configuracion_id === c.id || (c.id === 'legacy' && !p.configuracion_id))
-        const sitiosSeleccionados = Array.from(new Set(configProducts.map(p => p.sitio_id)))
+        const productSites = Array.from(new Set(configProducts.map(p => p.sitio_id)))
+        const sitiosSeleccionados = productSites.length > 0
+          ? productSites
+          : (sitios ?? []).map(s => s.id)
 
         const productosMap: Record<string, Producto[]> = {}
         for (const p of configProducts) {
@@ -309,11 +312,14 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       }
 
       // 2. Insert new configs & update existing configs
-      const newConfigs = configs.filter(c => c.tempId.startsWith('config-') || c.tempId === 'default')
-      const existingConfigs = configs.filter(c => !c.tempId.startsWith('config-') && c.tempId !== 'default')
+      const isNewConfig = (c: CreationConfig) =>
+        !c.id || c.id === 'legacy' || c.tempId.startsWith('config-') || c.tempId === 'default'
+      const newConfigs = configs.filter(isNewConfig)
+      const existingConfigs = configs.filter(c => !isNewConfig(c))
 
       // A. Update existing configurations
       for (const c of existingConfigs) {
+        if (!c.id || c.id === 'legacy') continue
         const configProducts = Object.values(c.productosMap).flat()
         const inversion_total = configProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
@@ -366,41 +372,22 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         insertedConfigs = data || []
       }
 
-      // Map tempId to DB UUID
+      // Map tempId to DB UUID (using index mapping to avoid collisions)
       const idMap: Record<string, string> = {}
       existingConfigs.forEach(c => { idMap[c.tempId] = c.id! })
-      newConfigs.forEach(c => {
-        const dbConfig = insertedConfigs.find(db => db.nombre === c.nombre)
-        if (dbConfig) idMap[c.tempId] = dbConfig.id
+      newConfigs.forEach((c, idx) => {
+        if (insertedConfigs[idx]) idMap[c.tempId] = insertedConfigs[idx].id
       })
 
       // C. Delete removed configurations
-      const configIdsToKeep = configs.map(c => c.id).filter(Boolean) as string[]
-      const configsToDelete = (configuraciones ?? []).filter(c => !configIdsToKeep.includes(c.id))
+      const configIdsToKeep = configs.map(c => c.id).filter(id => id && id !== 'legacy') as string[]
+      const configsToDelete = (configuraciones ?? []).filter(c => c.id && c.id !== 'legacy' && !configIdsToKeep.includes(c.id))
       if (configsToDelete.length > 0) {
         const { error: err } = await supabase.from('configuraciones_tecnicas').delete().in('id', configsToDelete.map(c => c.id))
         if (err) throw err
       }
 
-      // 3. Sync project sites (proyecto_sitios relation)
-      const activeSitesUnion = Array.from(new Set(configs.flatMap(c => c.sitiosSeleccionados)))
-      const existingSiteIds = (sitios ?? []).map(s => s.id)
-
-      const sitesToInsert = activeSitesUnion.filter(id => !existingSiteIds.includes(id))
-      if (sitesToInsert.length > 0) {
-        const { error: err } = await supabase.from('proyecto_sitios').insert(
-          sitesToInsert.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id }))
-        )
-        if (err) throw err
-      }
-
-      const sitesToDelete = existingSiteIds.filter(id => !activeSitesUnion.includes(id))
-      if (sitesToDelete.length > 0) {
-        const { error: err } = await supabase.from('proyecto_sitios').delete().eq('proyecto_id', proyecto.id).in('sitio_id', sitesToDelete)
-        if (err) throw err
-      }
-
-      // 4. Sync products (proyecto_sitio_productos)
+      // 3. Sync products (proyecto_sitio_productos) first before altering sites
       const activeProductsList: any[] = []
       configs.forEach(c => {
         const configDbId = idMap[c.tempId]
@@ -426,7 +413,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         if (err) throw err
       }
 
-      // Separate existing products from new products to avoid batch upsert primary key conflicts
+      // Update existing and insert new products
       const prodsToUpdate = activeProductsList.filter(p => p.id && !p.id.startsWith('prod-'))
       const prodsToInsert = activeProductsList.filter(p => !p.id || p.id.startsWith('prod-'))
 
@@ -453,18 +440,50 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         if (err) throw err
       }
 
+      // 4. Sync project sites (proyecto_sitios relation) by querying DB directly
+      const activeSitesUnion = Array.from(new Set(configs.flatMap(c => c.sitiosSeleccionados)))
+
+      const { data: dbLinks, error: linksErr } = await supabase
+        .from('proyecto_sitios')
+        .select('sitio_id')
+        .eq('proyecto_id', proyecto.id)
+      if (linksErr) throw linksErr
+
+      const currentDbSiteIds = (dbLinks ?? []).map(r => r.sitio_id)
+
+      const sitesToInsert = activeSitesUnion.filter(id => !currentDbSiteIds.includes(id))
+      if (sitesToInsert.length > 0) {
+        const { error: err } = await supabase.from('proyecto_sitios').upsert(
+          sitesToInsert.map(sitio_id => ({ proyecto_id: proyecto.id, sitio_id })),
+          { onConflict: 'proyecto_id,sitio_id', ignoreDuplicates: true }
+        )
+        if (err) throw err
+      }
+
+      const sitesToDelete = currentDbSiteIds.filter(id => !activeSitesUnion.includes(id))
+      if (sitesToDelete.length > 0) {
+        const { error: err } = await supabase.from('proyecto_sitios').delete().eq('proyecto_id', proyecto.id).in('sitio_id', sitesToDelete)
+        if (err) throw err
+      }
+
       // 5. Update summary fields on the project using the selected config (or first config)
       const selectedConfig = configs.find(c => {
-        if (c.id) {
+        if (c.id && c.id !== 'legacy') {
           const orig = configuraciones?.find(o => o.id === c.id)
           return orig?.seleccionada
         }
         return false
       }) || configs[0]
-      const winningInversion = Object.values(selectedConfig.productosMap).flat().reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
+
+      const selectedProducts = Object.values(selectedConfig.productosMap).flat()
+      const winningInversion = selectedProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
+
+      const currencies = selectedProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
+      const winningMoneda = (currencies.length > 0 ? currencies[0] : (proyecto.moneda || 'MXN')) as Moneda
 
       await supabase.from('proyectos').update({
-        capex_estimado: winningInversion
+        capex_estimado: winningInversion,
+        moneda: winningMoneda
       }).eq('id', proyecto.id)
 
       onSave()

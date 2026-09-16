@@ -42,13 +42,13 @@ export default async function AnalistaDashboard() {
 
   let proyectos: ProyectoRow[] = []
   if (prs.length > 0) {
-    const ids = [...new Set(prs.map(p => p.epcista_id))]
+    const ids = [...new Set(prs.map(p => p.epcista_id).filter(Boolean))] as string[]
     const { data: profilesData } = await supabase.from('profiles').select('id, nombre').in('id', ids)
     const nameMap: Record<string, string> = {}
     for (const pf of profilesData ?? []) {
       nameMap[(pf as { id: string; nombre: string }).id] = (pf as { id: string; nombre: string }).nombre
     }
-    proyectos = prs.map(p => ({ ...p, epcista_nombre: nameMap[p.epcista_id] ?? '—' }))
+    proyectos = prs.map(p => ({ ...p, epcista_nombre: p.epcista_id ? (nameMap[p.epcista_id] ?? '—') : '—' }))
   }
 
   // Fetch Ofertas MEM
