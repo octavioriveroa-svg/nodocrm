@@ -722,7 +722,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                       <label className="block text-xs font-medium mb-1">EPC Asignado</label>
                       <select
                         value={form.epcista_id || ''}
-                        onChange={e => setForm(f => ({...f, epcista_id: e.target.value || proyecto.epcista_id}))}
+                        onChange={e => setForm(f => ({...f, epcista_id: e.target.value || null}))}
                         className="w-full border rounded p-2 text-sm bg-white"
                       >
                         <option value="">Sin asignar</option>
@@ -736,12 +736,94 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               </div>
             )}
 
-            {/* Group 4 — Solución técnica */}
+            {/* Grupo 4 — Datos del Sitio (Requerimientos de ingeniería) */}
             {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
               <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
-                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 4: Solución técnica</h4>
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 4: Datos del Sitio (Requerimientos de ingeniería)</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={form.demanda_kw ?? ''}
+                      onChange={e => setForm(f => ({...f, demanda_kw: e.target.value ? Number(e.target.value) : null}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                      placeholder="Ej: 500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Punto de interconexión</label>
+                    <input
+                      type="text"
+                      value={form.punto_interconexion || ''}
+                      onChange={e => setForm(f => ({...f, punto_interconexion: e.target.value || null}))}
+                      className="w-full border rounded p-2 text-sm bg-white"
+                      placeholder="Ej: Subestación A, 13.8 kV"
+                    />
+                  </div>
+
+                  {/* BESS site requirements */}
+                  <div className="col-span-2 border-t border-gray-200/60 pt-3 mt-1 grid grid-cols-2 gap-4">
+                    <p className="col-span-2 text-xs font-bold uppercase tracking-wide text-gray-400">Requerimientos BESS del Sitio</p>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Capacidad (MWh)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={form.capacidad_mwh ?? ''}
+                        onChange={e => setForm(f => ({...f, capacidad_mwh: e.target.value ? Number(e.target.value) : null}))}
+                        className="w-full border rounded p-2 text-sm bg-white"
+                        placeholder="Ej: 1.2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Potencia (MW)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={form.capacidad_mw ?? ''}
+                        onChange={e => setForm(f => ({...f, capacidad_mw: e.target.value ? Number(e.target.value) : null}))}
+                        className="w-full border rounded p-2 text-sm bg-white"
+                        placeholder="Ej: 0.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Tecnología de batería</label>
+                      <select
+                        value={form.tecnologia_bateria || ''}
+                        onChange={e => setForm(f => ({...f, tecnologia_bateria: e.target.value as TecnologiaBateria || null}))}
+                        className="w-full border rounded p-2 text-sm bg-white"
+                      >
+                        <option value="">Selecciona</option>
+                        <option value="Li-ion">Li-ion</option>
+                        <option value="LFP">LFP</option>
+                        <option value="NMC">NMC</option>
+                        <option value="Otra">Otra</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Duración descarga (hrs)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={form.duracion_descarga_hrs ?? ''}
+                        onChange={e => setForm(f => ({...f, duracion_descarga_hrs: e.target.value ? Number(e.target.value) : null}))}
+                        className="w-full border rounded p-2 text-sm bg-white"
+                        placeholder="Ej: 4"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Grupo 5 — Solución técnica */}
+            {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
+              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+                <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 5: Solución técnica</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="block text-xs font-medium mb-1">Tipo de proyecto *</label>
                     <select
                       value={form.tipo || ''}
@@ -755,80 +837,6 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                       <option value="BESS+MEM">BESS + MEM</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Demanda contratada (kW)</label>
-                    <input
-                      type="number"
-                      value={form.demanda_kw ?? ''}
-                      onChange={e => setForm(f => ({...f, demanda_kw: e.target.value ? Number(e.target.value) : null}))}
-                      className="w-full border rounded p-2 text-sm bg-white"
-                      placeholder="Ej: 500"
-                    />
-                  </div>
-
-                  {/* BESS fields */}
-                  {(form.tipo === 'BESS' || form.tipo === 'FV+BESS' || form.tipo === 'BESS+MEM') && (
-                    <div className="col-span-2 border-t border-gray-200/60 pt-4 mt-2 grid grid-cols-2 gap-4">
-                      <p className="col-span-2 text-xs font-bold uppercase tracking-wide text-gray-400">Datos BESS</p>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Capacidad (MWh)</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={form.capacidad_mwh ?? ''}
-                          onChange={e => setForm(f => ({...f, capacidad_mwh: e.target.value ? Number(e.target.value) : null}))}
-                          className="w-full border rounded p-2 text-sm bg-white"
-                          placeholder="Ej: 1.2"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Potencia (MW)</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={form.capacidad_mw ?? ''}
-                          onChange={e => setForm(f => ({...f, capacidad_mw: e.target.value ? Number(e.target.value) : null}))}
-                          className="w-full border rounded p-2 text-sm bg-white"
-                          placeholder="Ej: 0.5"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Tecnología de batería</label>
-                        <select
-                          value={form.tecnologia_bateria || ''}
-                          onChange={e => setForm(f => ({...f, tecnologia_bateria: e.target.value as TecnologiaBateria || null}))}
-                          className="w-full border rounded p-2 text-sm bg-white"
-                        >
-                          <option value="">Selecciona</option>
-                          <option value="Li-ion">Li-ion</option>
-                          <option value="LFP">LFP</option>
-                          <option value="NMC">NMC</option>
-                          <option value="Otra">Otra</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Duración descarga (hrs)</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={form.duracion_descarga_hrs ?? ''}
-                          onChange={e => setForm(f => ({...f, duracion_descarga_hrs: e.target.value ? Number(e.target.value) : null}))}
-                          className="w-full border rounded p-2 text-sm bg-white"
-                          placeholder="Ej: 4"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium mb-1">Punto de interconexión</label>
-                        <input
-                          type="text"
-                          value={form.punto_interconexion || ''}
-                          onChange={e => setForm(f => ({...f, punto_interconexion: e.target.value || null}))}
-                          className="w-full border rounded p-2 text-sm bg-white"
-                          placeholder="Ej: Subestación A, 13.8 kV"
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {/* MEM fields */}
                   {(form.tipo === 'MEM' || form.tipo === 'BESS+MEM') && (
@@ -1088,6 +1096,32 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                 ? 'Quiero que Nodo me ayude a encontrar un instalador'
                 : 'La empresa EPCista realizará la instalación'}
             </p>
+          </div>
+        </Seccion>
+      )}
+
+      {/* Datos del sitio (Requerimientos de ingeniería) */}
+      {(proyecto.demanda_kw != null || proyecto.capacidad_mwh != null || proyecto.capacidad_mw != null || proyecto.tecnologia_bateria || proyecto.duracion_descarga_hrs != null || proyecto.punto_interconexion) && (
+        <Seccion title="Datos del sitio (Requerimientos de ingeniería)">
+          <div className="grid grid-cols-2 gap-4">
+            {proyecto.demanda_kw != null && (
+              <Campo label="Demanda contratada" value={fmtUnit(proyecto.demanda_kw, 'kW')} />
+            )}
+            {proyecto.punto_interconexion && (
+              <Campo label="Punto de interconexión" value={proyecto.punto_interconexion} />
+            )}
+            {proyecto.capacidad_mwh != null && (
+              <Campo label="Capacidad requerida (MWh)" value={`${proyecto.capacidad_mwh} MWh`} />
+            )}
+            {proyecto.capacidad_mw != null && (
+              <Campo label="Potencia requerida (MW)" value={`${proyecto.capacidad_mw} MW`} />
+            )}
+            {proyecto.tecnologia_bateria && (
+              <Campo label="Tecnología de batería" value={proyecto.tecnologia_bateria} />
+            )}
+            {proyecto.duracion_descarga_hrs != null && (
+              <Campo label="Duración de descarga" value={`${proyecto.duracion_descarga_hrs} hrs`} />
+            )}
           </div>
         </Seccion>
       )}
@@ -1492,18 +1526,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Técnico legacy */}
-      {(proyecto.tipo === 'BESS' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
-        <Seccion title="Datos técnicos — BESS">
-          <div className="grid grid-cols-2 gap-4">
-            <Campo label="Capacidad" value={proyecto.capacidad_mwh ? `${proyecto.capacidad_mwh} MWh` : null} />
-            <Campo label="Potencia" value={proyecto.capacidad_mw ? `${proyecto.capacidad_mw} MW` : null} />
-            <Campo label="Tecnología de batería" value={proyecto.tecnologia_bateria} />
-            <Campo label="Duración de descarga" value={proyecto.duracion_descarga_hrs ? `${proyecto.duracion_descarga_hrs} hrs` : null} />
-            <Campo label="Punto de interconexión" value={proyecto.punto_interconexion} />
-          </div>
-        </Seccion>
-      )}
+      {/* Técnico legacy — MEM */}
       {(proyecto.tipo === 'MEM' || proyecto.tipo === 'BESS+MEM') && productos.length === 0 && (
         <Seccion title="Datos técnicos — MEM">
           <div className="grid grid-cols-2 gap-4">

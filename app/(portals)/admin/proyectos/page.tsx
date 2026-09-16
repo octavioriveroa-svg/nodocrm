@@ -69,8 +69,8 @@ export default function AdminProyectosPage() {
 
       setProyectos(prs.map((p: Proyecto) => ({
         ...p,
-        epcista_nombre: nameMap[p.epcista_id]?.nombre ?? '—',
-        epcista_empresa: nameMap[p.epcista_id]?.empresa ?? '—',
+        epcista_nombre: p.epcista_id ? nameMap[p.epcista_id]?.nombre ?? '—' : '—',
+        epcista_empresa: p.epcista_id ? nameMap[p.epcista_id]?.empresa ?? '—' : '—',
         responsable_nombre: p.responsable_nodo_id ? nameMap[p.responsable_nodo_id]?.nombre ?? '—' : '—',
         finder_nombre: p.finder_id ? nameMap[p.finder_id]?.nombre ?? '—' : '—',
         finder_empresa: p.finder_id ? nameMap[p.finder_id]?.empresa ?? '—' : '—',

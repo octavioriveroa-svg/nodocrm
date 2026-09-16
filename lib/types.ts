@@ -19,7 +19,7 @@ export interface Profile {
  
 export interface Proyecto {
   id: string
-  epcista_id: string
+  epcista_id: string | null
   responsable_nodo_id: string | null
   cliente_id: string | null
   finder_id: string | null
