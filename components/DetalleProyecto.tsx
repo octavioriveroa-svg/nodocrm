@@ -435,6 +435,40 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   const modalidades = proyecto.modalidad_financiamiento ?? []
   const noSabe = modalidades.includes('no_sabe')
 
+  // Derived Leading Alternative and Official Project Financials
+  const leadingConfig = configsList.find(c => c.seleccionada) || configsList[0]
+  const leadingOpt = opcionesFin.find(o => o.seleccionada) || opcionesFin[0]
+
+  const leadingNetSavings = leadingOpt
+    ? (leadingOpt.ahorro_estimado_anual != null
+        ? Number(leadingOpt.ahorro_estimado_anual)
+        : (leadingOpt.ahorro_estimado_mensual != null ? Number(leadingOpt.ahorro_estimado_mensual) * 12 : null))
+    : null
+
+  const leadingGrossSavings = leadingConfig
+    ? ((leadingConfig as any).ahorro_estimado_anual != null
+        ? Number((leadingConfig as any).ahorro_estimado_anual)
+        : ((leadingConfig as any).ahorro_estimado_mensual != null ? Number((leadingConfig as any).ahorro_estimado_mensual) * 12 : null))
+    : null
+
+  const effectiveSavings = (leadingNetSavings != null && leadingNetSavings > 0) ? leadingNetSavings : (leadingGrossSavings || null)
+  const isNetSavings = leadingNetSavings != null && leadingNetSavings > 0
+  const effectiveSavingsMoneda = isNetSavings
+    ? (leadingOpt?.moneda || 'MXN')
+    : ((leadingConfig as any)?.ahorro_moneda || (leadingConfig as any)?.moneda || proyecto.moneda || 'MXN')
+
+  const effectiveCapex = proyecto.capex_estimado || leadingConfig?.inversion_total || 0
+  const effectiveCapexMoneda = proyecto.moneda || leadingConfig?.moneda || 'MXN'
+  const effectivePaybackYears = (effectiveCapex > 0 && effectiveSavings && effectiveSavings > 0)
+    ? (effectiveCapex / effectiveSavings)
+    : null
+
+  const leadingVehiculoLabel = leadingOpt
+    ? (MODALIDAD_LABELS[leadingOpt.vehiculo_inversion as ModalidadFinanciamiento] || leadingOpt.vehiculo_inversion)
+    : (Array.isArray(proyecto.modalidad_financiamiento)
+        ? (proyecto.modalidad_financiamiento.length > 0 ? proyecto.modalidad_financiamiento.map(m => MODALIDAD_LABELS[m as ModalidadFinanciamiento] || m).join(', ') : 'Sin definir')
+        : (proyecto.modalidad_financiamiento ? (MODALIDAD_LABELS[proyecto.modalidad_financiamiento as ModalidadFinanciamiento] || String(proyecto.modalidad_financiamiento)) : 'Sin definir'))
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
@@ -552,6 +586,89 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
                   </div>
                 )
               })}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Resumen Financiero del Proyecto — Alternativa Ganadora */}
+      {!editando && (
+        <Card className="mb-4 bg-gradient-to-br from-white to-gray-50/50 border border-borde shadow-sm overflow-hidden">
+          <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-principal">
+                  Resumen Financiero Oficial
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                  Alternativa Ganadora
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Cifras oficiales basadas en la alternativa seleccionada. Las alternativas técnicas y de financiamiento son mutuamente excluyentes.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {leadingConfig && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 border border-gray-200" title="Configuración técnica considerada">
+                  ⚙️ {leadingConfig.nombre}
+                </span>
+              )}
+              {leadingOpt && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 border border-gray-200" title="Opción de financiamiento considerada">
+                  💳 {leadingOpt.nombre}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Inversión Total (CAPEX)
+              </span>
+              <div className="text-xl font-black text-principal">
+                {effectiveCapex > 0 ? fmtCurrency(effectiveCapex, effectiveCapexMoneda) : '—'}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1 truncate" title={leadingConfig ? leadingConfig.nombre : 'Estimación del proyecto'}>
+                {leadingConfig ? leadingConfig.nombre : 'Estimación del proyecto'}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Ahorro Anual Estimado
+              </span>
+              <div className="text-xl font-black text-emerald-600">
+                {effectiveSavings && effectiveSavings > 0 ? fmtCurrency(effectiveSavings, effectiveSavingsMoneda) : '—'}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1 truncate">
+                {isNetSavings ? 'Ahorro neto (Financiamiento)' : (effectiveSavings ? 'Ahorro bruto (Solución técnica)' : 'Sin ahorro registrado')}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Retorno Simple (Payback)
+              </span>
+              <div className="text-xl font-black text-principal">
+                {effectivePaybackYears ? `${fmtNum(effectivePaybackYears, 1)} años` : '—'}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                {effectivePaybackYears ? `~${Math.round(effectivePaybackYears * 12)} meses de retorno` : 'Requiere CAPEX y ahorro'}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Vehículo Financiero
+              </span>
+              <div className="text-sm font-bold text-principal truncate mt-1.5" title={leadingVehiculoLabel}>
+                {leadingVehiculoLabel}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1 truncate" title={leadingOpt?.plazo_meses ? `Plazo: ${leadingOpt.plazo_meses} meses` : (leadingOpt ? leadingOpt.nombre : 'Modalidad inicial')}>
+                {leadingOpt?.plazo_meses ? `Plazo: ${leadingOpt.plazo_meses} meses` : (leadingOpt ? leadingOpt.nombre : 'Modalidad inicial')}
+              </p>
             </div>
           </div>
         </Card>
@@ -1211,6 +1328,121 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               </div>
             )}
 
+            {/* Comparativa de Alternativas Técnicas */}
+            {configsToUse.length > 1 && (
+              <div className="mb-6 bg-white border border-borde rounded-xl p-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-principal">
+                      Comparativa de Alternativas Técnicas
+                    </h4>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Las configuraciones son alternativas mutuamente excluyentes. Solo la alternativa marcada como <strong className="text-emerald-700">Ganadora</strong> se computa en el CAPEX y ahorros oficiales del proyecto y portafolio.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-2.5 px-3">Alternativa</th>
+                        <th className="py-2.5 px-3">Inversión (CAPEX)</th>
+                        <th className="py-2.5 px-3">Ahorro Bruto Anual</th>
+                        <th className="py-2.5 px-3">Payback Estimado</th>
+                        <th className="py-2.5 px-3">Capacidad</th>
+                        <th className="py-2.5 px-3 text-center">Estado</th>
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {configsToUse.map(c => {
+                        const isWin = !!c.seleccionada
+                        const isActive = activeConfig.id === c.id
+                        const confProds = productos.filter(p => p.configuracion_id === c.id || (c.id === 'legacy' && !p.configuracion_id))
+                        let confKwp = 0, confKwh = 0
+                        for (const prod of confProds) {
+                          const d = prod.datos as Record<string, unknown>
+                          if (prod.tipo === 'fv') {
+                            const nm = parseNum(d.num_modulos as string) || 0
+                            const pw = parseNum(d.potencia_modulos_w as string) || 0
+                            confKwp += nm > 0 && pw > 0 ? (nm * pw) / 1000 : 0
+                          } else if (prod.tipo === 'bess') {
+                            confKwh += parseNum(d.capacidad_kwh as string) || 0
+                          }
+                        }
+                        const cAhorroAnual = (c as any).ahorro_estimado_anual != null
+                          ? Number((c as any).ahorro_estimado_anual)
+                          : ((c as any).ahorro_estimado_mensual != null ? Number((c as any).ahorro_estimado_mensual) * 12 : null)
+                        const cPayback = (c.inversion_total && cAhorroAnual && cAhorroAnual > 0)
+                          ? (Number(c.inversion_total) / cAhorroAnual)
+                          : null
+
+                        return (
+                          <tr key={c.id} className={`transition-colors ${isActive ? 'bg-amber-50/30' : 'hover:bg-gray-50/50'}`}>
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-principal flex items-center gap-1.5">
+                                {c.nombre}
+                                {isActive && <span className="text-[9px] bg-principal/10 text-principal px-1.5 py-0.5 rounded font-medium">Viendo</span>}
+                              </div>
+                              {c.descripcion && <div className="text-[10px] text-gray-400 truncate max-w-xs">{c.descripcion}</div>}
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-principal">
+                              {c.inversion_total ? fmtCurrency(c.inversion_total, c.moneda) : '—'}
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-emerald-600">
+                              {cAhorroAnual && cAhorroAnual > 0 ? fmtCurrency(cAhorroAnual, (c as any).ahorro_moneda || c.moneda || 'MXN') : '—'}
+                            </td>
+                            <td className="py-3 px-3 text-gray-600">
+                              {cPayback ? `${fmtNum(cPayback, 1)} años` : '—'}
+                            </td>
+                            <td className="py-3 px-3 text-gray-500">
+                              {[confKwp > 0 ? `${fmtNum(confKwp, 1)} kWp FV` : null, confKwh > 0 ? `${fmtNum(confKwh, 1)} kWh BESS` : null].filter(Boolean).join(' + ') || '—'}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {isWin ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                                  ✓ Ganadora
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                  Alternativa
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {!isActive && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedConfigId(c.id)}
+                                    className="px-2 py-1 text-[11px] font-semibold text-gray-600 hover:text-principal underline"
+                                  >
+                                    Ver desglose
+                                  </button>
+                                )}
+                                {canSelectConfig && !isWin && c.id !== 'legacy' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={seleccionandoConfig}
+                                    onClick={() => handleSelectConfig(c.id)}
+                                    className="text-[11px] py-1 px-2.5 h-auto"
+                                  >
+                                    {seleccionandoConfig ? '...' : 'Elegir ganadora'}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Config Tabs */}
             {configsToUse.length > 1 && (
               <div className="flex flex-wrap gap-2 mb-4 border-b border-borde pb-3">
@@ -1418,6 +1650,9 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             <p className="text-sm text-gray-400">Sin opciones de financiamiento configuradas para este proyecto.</p>
           ) : (
             <div className="flex flex-col gap-4">
+              <p className="text-xs text-gray-500">
+                Las opciones de financiamiento representan escenarios alternativos independientes. Solo la opción seleccionada como <strong className="text-emerald-700">Ganadora</strong> se refleja en el ahorro neto y retorno oficial del proyecto.
+              </p>
               {/* Warning if no financing selected and state is negociacion or beyond */}
               {!opcionesFin.some(o => o.seleccionada) && ['negociacion', 'aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
                 <div className="mb-2 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5 text-amber-800 text-xs font-semibold">
@@ -1539,8 +1774,9 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* Ubicación y Notas */}
       {!editando && (
         <Seccion title="Ubicación y Notas">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <Campo label="CAPEX estimado (Ganador)" value={proyecto.capex_estimado ? fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN') : null} />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <Campo label="CAPEX estimado (Ganador)" value={effectiveCapex ? fmtCurrency(effectiveCapex, effectiveCapexMoneda) : null} />
+            <Campo label="Ahorro anual estimado (Ganador)" value={effectiveSavings ? fmtCurrency(effectiveSavings, effectiveSavingsMoneda) : null} />
             <Campo label="Estado" value={proyecto.ubicacion_estado} />
           </div>
           {proyecto.notas_adicionales ? (

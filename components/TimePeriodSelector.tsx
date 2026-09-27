@@ -105,38 +105,49 @@ export function computePipeline(prs: RawProject[]) {
 
 export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: RawFinancingOption[] = []) {
   const ids = new Set(prs.map(p => p.id))
-  const filtered = prods.filter(p => ids.has(p.proyecto_id))
-  const filteredOpts = opts.filter(o => ids.has(o.proyecto_id))
-  let fv = 0, bess = 0, savingsAnnual = 0
-  const pCapex: Record<string, number> = {}, pSavAnnual: Record<string, number> = {}
+  let totalCapex = 0
+  let savingsAnnual = 0
+  const pCapex: Record<string, number> = {}
+  const pSavAnnual: Record<string, number> = {}
 
+  for (const p of prs) {
+    const c = p.leadingCapex !== undefined ? p.leadingCapex : (p.capex_estimado || 0)
+    const s = p.leadingSavingsAnnual !== undefined ? p.leadingSavingsAnnual : 0
+    pCapex[p.id] = c
+    pSavAnnual[p.id] = s
+    totalCapex += c
+    savingsAnnual += s
+  }
+
+  // Technology capex breakdown
+  let fv = 0, bess = 0
+  const filtered = prods.filter(p => ids.has(p.proyecto_id))
   for (const prod of filtered) {
     const d = prod.datos; if (!d) continue
     const c = parseNum(d.capex as string) || 0
     if (prod.tipo === 'fv') fv += c; else if (prod.tipo === 'bess') bess += c
-    pCapex[prod.proyecto_id] = (pCapex[prod.proyecto_id]||0) + c
   }
-  for (const opt of filteredOpts) {
-    if (opt.seleccionada) {
-      const s = opt.ahorro_estimado_anual ? Number(opt.ahorro_estimado_anual) : (opt.ahorro_estimado_mensual ? Number(opt.ahorro_estimado_mensual) * 12 : 0)
-      if (s > 0) {
-        pSavAnnual[opt.proyecto_id] = (pSavAnnual[opt.proyecto_id]||0) + s
-        savingsAnnual += s
-      }
+  if (totalCapex > 0 && (fv + bess) > totalCapex) {
+    const ratio = totalCapex / (fv + bess)
+    fv = Math.round(fv * ratio)
+    bess = Math.round(bess * ratio)
+  }
+
+  const paybacks: number[] = []
+  for (const pid of Object.keys(pCapex)) {
+    if (pCapex[pid] > 0 && pSavAnnual[pid] > 0) {
+      paybacks.push(pCapex[pid] / pSavAnnual[pid])
     }
   }
-  const total = fv + bess
-  const paybacks: number[] = []
-  for (const pid of Object.keys(pCapex)) { if (pCapex[pid] > 0 && pSavAnnual[pid] > 0) paybacks.push(pCapex[pid] / pSavAnnual[pid]) }
 
   const avgPaybackYears = paybacks.length > 0 ? Math.round((paybacks.reduce((a,b)=>a+b,0)/paybacks.length)*10)/10 : null
   const avgPaybackMonths = avgPaybackYears ? Math.round(avgPaybackYears * 12) : null
 
   return {
-    totalCapex: total,
+    totalCapex,
     fvCapex: fv,
     bessCapex: bess,
-    avgCapexPerProject: prs.length > 0 ? total / prs.length : 0,
+    avgCapexPerProject: prs.length > 0 ? totalCapex / prs.length : 0,
     totalSavingsAnnual: savingsAnnual,
     totalSavingsMonthly: savingsAnnual / 12,
     avgPaybackYears,
