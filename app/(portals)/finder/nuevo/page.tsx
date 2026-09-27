@@ -764,7 +764,7 @@ export default function FinderNuevoProyectoPage() {
     }
     const tipo = isNodoBuscaSubmit ? 'FV' : (hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS')
 
-    const primerSitioId = configs[0].sitiosSeleccionados[0]
+    const primerSitioId = selectedSiteIds.length > 0 ? selectedSiteIds[0] : configs[0]?.sitiosSeleccionados?.[0]
     const ubicacion_estado = sitiosCliente.find(s => s.id === primerSitioId)?.ubicacion_estado ?? ''
 
     const firstConfigProducts = Object.values(configs[0].productosMap).flat()

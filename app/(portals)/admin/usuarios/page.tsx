@@ -80,7 +80,7 @@ export default function UsuariosReadOnlyPage() {
   }, [])
 
   const filtrados = usuarios.filter(u =>
-    (filtroRol === 'todos' || u.rol === filtroRol || (filtroRol === 'epc' && u.rol === 'epcista') || (filtroRol === 'nodo_analista' && u.rol === 'analista'))
+    (filtroRol === 'todos' || u.rol === filtroRol || (filtroRol === 'epc' && u.rol === 'epcista') || (filtroRol === 'nodo_analista' && u.rol === 'analista') || (filtroRol === 'nodo_admin' && u.rol === 'admin'))
     && (!busqueda || [u.nombre, u.empresa, u.email].some(v => v?.toLowerCase().includes(busqueda.toLowerCase())))
   )
 

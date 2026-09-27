@@ -174,7 +174,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     }
     // Load nodo users for responsable selector (admin/analista only)
     if (isAdmin || isAnalista) {
-      supabase.from('profiles').select('id, nombre, empresa').in('rol', ['nodo_admin', 'nodo_analista']).order('nombre')
+      supabase.from('profiles').select('id, nombre, empresa').in('rol', ['nodo_admin', 'nodo_analista', 'admin', 'analista']).order('nombre')
         .then(({ data }) => { if (data) setNodoUsers(data) })
     }
 

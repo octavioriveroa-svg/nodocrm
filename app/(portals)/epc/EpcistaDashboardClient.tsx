@@ -29,8 +29,8 @@ interface Props {
 }
 
 export default function EpcistaDashboardClient({ initialProyectos, initialPortafolio }: Props) {
-  const [proyectos] = useState<Proyecto[]>(initialProyectos)
-  const [portafolio] = useState<PortafolioStats | null>(initialPortafolio)
+  const proyectos = initialProyectos
+  const portafolio = initialPortafolio
 
   const total = proyectos.length
   const enAnalisis = proyectos.filter(p => p.estado === 'en_analisis').length

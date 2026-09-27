@@ -5,6 +5,8 @@ import DashboardAnalytics from '@/components/DashboardAnalytics'
 import { fetchDashboardData } from '@/lib/dashboard-data'
 import type { TipoProyecto } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 }

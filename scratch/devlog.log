@@ -1,0 +1,31 @@
+
+> nodo@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.5.0.2:3000
+- Environments: .env.local
+✓ Ready in 534ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+ GET /login 200 in 2.1s (next.js: 1843ms, proxy.ts: 65ms, application-code: 170ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 282ms (next.js: 251ms, proxy.ts: 4ms, application-code: 28ms)
+ GET /admin 200 in 1106ms (next.js: 504ms, proxy.ts: 13ms, application-code: 589ms)
+ GET /fonts/BCBarell-1973.woff2 404 in 65ms (next.js: 13ms, proxy.ts: 8ms, application-code: 44ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 63ms (next.js: 27ms, proxy.ts: 12ms, application-code: 24ms)
+ GET /admin 200 in 329ms (next.js: 7ms, proxy.ts: 9ms, application-code: 313ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 77ms (next.js: 11ms, proxy.ts: 8ms, application-code: 58ms)
+ GET /fonts/BCBarell-1973.woff2 404 in 76ms (next.js: 24ms, proxy.ts: 11ms, application-code: 41ms)
+ GET /admin/proyectos 200 in 308ms (next.js: 271ms, proxy.ts: 6ms, application-code: 31ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 35ms (next.js: 6ms, proxy.ts: 6ms, application-code: 22ms)
+ GET /admin/usuarios 200 in 268ms (next.js: 232ms, proxy.ts: 6ms, application-code: 30ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 31ms (next.js: 4ms, proxy.ts: 6ms, application-code: 21ms)
+ GET /admin/clientes 200 in 289ms (next.js: 252ms, proxy.ts: 7ms, application-code: 30ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 32ms (next.js: 5ms, proxy.ts: 6ms, application-code: 21ms)
+ GET /admin/proyectos/nuevo 200 in 346ms (next.js: 301ms, proxy.ts: 7ms, application-code: 37ms)
+ GET /fonts/BCBarell-1973.woff2 404 in 66ms (next.js: 33ms, proxy.ts: 12ms, application-code: 20ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 68ms (next.js: 14ms, proxy.ts: 8ms, application-code: 46ms)
+ GET /admin/configuracion/roles 200 in 417ms (next.js: 366ms, proxy.ts: 8ms, application-code: 43ms)
+ GET /fonts/ArticulatCF-DemiBold.woff2 404 in 33ms (next.js: 4ms, proxy.ts: 6ms, application-code: 22ms)
+ GET /brand-preview 200 in 341ms (next.js: 286ms, proxy.ts: 3ms, application-code: 52ms)
