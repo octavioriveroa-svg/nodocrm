@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import BadgeTipo from '@/components/BadgeTipo'
@@ -60,6 +61,7 @@ interface Props {
 export default function AnalistaDashboardClient({ initialProyectos, initialOfertas }: Props) {
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState<'proyectos' | 'ofertas'>('proyectos')
+  const router = useRouter()
   
   const [proyectos, setProyectos] = useState<ProyectoRow[]>(initialProyectos)
   const [ofertas, setOfertas] = useState<OfertaRow[]>(initialOfertas)
@@ -92,6 +94,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
     const { error } = await supabase.from('proyectos').update({ estado: nuevoEstado }).eq('id', id)
     if (!error) {
       setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p))
+      router.refresh()
     }
     setUpdatingId(null)
   }
@@ -101,6 +104,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
     const { error } = await supabase.from('ofertas_mem').update({ estado: nuevoEstado }).eq('id', id)
     if (!error) {
       setOfertas(prev => prev.map(o => o.id === id ? { ...o, estado: nuevoEstado } : o))
+      router.refresh()
     }
     setUpdatingId(null)
   }

@@ -4,6 +4,8 @@ import DashboardAnalytics from '@/components/DashboardAnalytics'
 import { fetchDashboardData } from '@/lib/dashboard-data'
 import type { EstadoProyecto, TipoProyecto } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 interface ProyectoRow {
   id: string
   nombre_proyecto: string

@@ -811,7 +811,7 @@ export default function NuevoProyectoPage() {
     const isNodoBusca = form.tipo_instalacion === 'nodo_busca'
     const tipo = isNodoBusca ? 'FV' : (hasFV && hasBESS ? 'FV+BESS' : hasFV ? 'FV' : 'BESS')
 
-    const primerSitioId = configs[0].sitiosSeleccionados[0]
+    const primerSitioId = selectedSiteIds.length > 0 ? selectedSiteIds[0] : configs[0]?.sitiosSeleccionados?.[0]
     const ubicacion_estado = sitiosCliente.find(s => s.id === primerSitioId)?.ubicacion_estado ?? ''
 
     const firstConfigProducts = Object.values(configs[0].productosMap).flat()

@@ -232,9 +232,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const d = prod.datos as Record<string, unknown> | null
     if (!d) continue
     if (prod.tipo === 'fv') {
-      installedKwp += ((Number(d.num_modulos) || 0) * (Number(d.potencia_modulos_w) || 0)) / 1000
+      installedKwp += ((parseNum(d.num_modulos as string) || 0) * (parseNum(d.potencia_modulos_w as string) || 0)) / 1000
     } else if (prod.tipo === 'bess') {
-      installedKwp += Number(d.potencia_kw) || 0
+      installedKwp += parseNum(d.potencia_kw as string) || 0
     }
   }
 

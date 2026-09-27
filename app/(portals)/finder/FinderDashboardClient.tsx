@@ -20,8 +20,8 @@ interface Props {
 }
 
 export default function FinderDashboardClient({ initialProyectos, initialClientesCount }: Props) {
-  const [proyectos] = useState<Proyecto[]>(initialProyectos)
-  const [clientesCount] = useState<number>(initialClientesCount)
+  const proyectos = initialProyectos
+  const clientesCount = initialClientesCount
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteSuccess, setInviteSuccess] = useState(false)
 

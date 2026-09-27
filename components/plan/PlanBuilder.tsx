@@ -45,6 +45,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
   const [saving, setSaving] = useState(false)
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
   const [totalComments, setTotalComments] = useState(0)
+  const [capexEstimado, setCapexEstimado] = useState<number | null>(null)
 
   // ── Load data ───────────────────────────────────────────────
   useEffect(() => {
@@ -53,14 +54,17 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
         { data: fasesData },
         { data: actData },
         { data: hitosData },
+        { data: projData },
       ] = await Promise.all([
         supabase.from('plan_fases').select('*').eq('proyecto_id', proyectoId).order('orden'),
         supabase.from('plan_actividades').select('*').eq('proyecto_id', proyectoId).order('orden'),
         supabase.from('hitos_financieros').select('*').eq('proyecto_id', proyectoId).order('orden'),
+        supabase.from('proyectos').select('capex_estimado').eq('id', proyectoId).single(),
       ])
       if (fasesData) setFases(fasesData as PlanFase[])
       if (actData) setActividades(actData as PlanActividad[])
       if (hitosData) setHitosFinancieros(hitosData as HitoFinanciero[])
+      if (projData) setCapexEstimado(projData.capex_estimado ? Number(projData.capex_estimado) : null)
 
       // Bulk fetch comment counts per entity
       const { data: commentData } = await supabase
@@ -474,7 +478,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
           hitos={hitosFinancieros}
           fases={fases}
           proyectoId={proyectoId}
-          capexEstimado={null}
+          capexEstimado={capexEstimado}
           readOnly={isLocked}
           isFinanciero={currentUser.rol === 'financiero'}
           currentUser={currentUser}
