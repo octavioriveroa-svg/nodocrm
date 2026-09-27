@@ -225,11 +225,11 @@ export default function AdminClienteDetallePage({ params }: { params: Promise<{ 
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div className="border p-4 mb-6 flex items-center justify-between rounded-xl" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+        <div className="border p-4 mb-6 flex items-center justify-between rounded-xl" style={{ borderColor: 'var(--color-red-600)', backgroundColor: 'var(--color-red-50)' }}>
           <p className="text-sm font-medium text-red-800">¿Eliminar este cliente y todos sus datos? Esta acción no se puede deshacer.</p>
           <div className="flex gap-2 ml-4 shrink-0">
             <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 text-sm border rounded-lg border-borde rounded-xl">Cancelar</button>
-            <button onClick={handleEliminar} className="px-4 py-2 text-sm font-bold text-white rounded-lg" style={{ backgroundColor: '#c00' }}>Eliminar cliente</button>
+            <button onClick={handleEliminar} className="px-4 py-2 text-sm font-bold text-white rounded-lg" style={{ backgroundColor: 'var(--color-red-600)' }}>Eliminar cliente</button>
           </div>
         </div>
       )}

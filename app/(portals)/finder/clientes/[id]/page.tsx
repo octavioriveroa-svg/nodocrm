@@ -178,11 +178,11 @@ export default function FinderDetalleClientePage({ params }: { params: Promise<{
       </div>
 
       {confirmDelete && (
-        <div className="border p-4 mb-4 flex items-center justify-between" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+        <div className="border p-4 mb-4 flex items-center justify-between" style={{ borderColor: 'var(--color-red-600)', backgroundColor: 'var(--color-red-50)' }}>
           <p className="text-sm font-medium">¿Eliminar este cliente? Esta acción no se puede deshacer.</p>
           <div className="flex gap-2 ml-4">
             <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border border-borde rounded-xl">Cancelar</button>
-            <button onClick={handleEliminar} className="px-3 py-1.5 text-sm font-bold text-white" style={{ backgroundColor: '#c00' }}>Eliminar</button>
+            <button onClick={handleEliminar} className="px-3 py-1.5 text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-red-600)' }}>Eliminar</button>
           </div>
         </div>
       )}
@@ -287,7 +287,7 @@ export default function FinderDetalleClientePage({ params }: { params: Promise<{
             <div className="border p-6 glass-card">
               <h3 className="font-bold text-xs uppercase tracking-wide mb-3 text-muted">Notas internas</h3>
               <p className="text-sm whitespace-pre-wrap flex gap-2">
-                <FileText size={14} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
+                <FileText size={14} style={{ color: 'var(--color-gray-400)', flexShrink: 0, marginTop: 2 }} />
                 {cliente.notas}
               </p>
             </div>
@@ -368,7 +368,7 @@ export default function FinderDetalleClientePage({ params }: { params: Promise<{
                     return true
                   })
                   .map(a => (
-                    <div key={a.id} className="flex items-start gap-4 p-4 border-b hover:bg-gray-50/50 transition-colors" style={{ borderColor: '#eee' }}>
+                    <div key={a.id} className="flex items-start gap-4 p-4 border-b hover:bg-gray-50/50 transition-colors" style={{ borderColor: 'var(--color-gray-200)' }}>
                       <div className="p-2 bg-gray-100 text-gray-500 rounded-lg mt-1">
                         <Paperclip size={18} />
                       </div>
@@ -389,7 +389,7 @@ export default function FinderDetalleClientePage({ params }: { params: Promise<{
                         {a.descripcion && (
                           <p className="text-sm mb-1 text-muted">{a.descripcion}</p>
                         )}
-                        <div className="text-xs font-medium" style={{ color: '#999' }}>
+                        <div className="text-xs font-medium" style={{ color: 'var(--color-gray-400)' }}>
                           {new Date(a.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })} · {(a.profiles as Profile | undefined)?.nombre ?? 'Usuario'}
                         </div>
                       </div>

@@ -500,14 +500,14 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
   }
 
   const inp = 'w-full border rounded-xl p-2 text-sm bg-white'
-  const borde = { borderColor: '#E5E5E5' }
+  const borde = { borderColor: 'var(--color-neutral-200)' }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl border border-borde">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-borde flex items-center justify-between bg-[#fafafa] rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-borde flex items-center justify-between bg-fondo rounded-t-2xl">
           <div>
             <h3 className="font-bold text-base text-principal">Editar Solución Técnica</h3>
             <p className="text-xs text-muted">Configura las alternativas técnicas, los sitios y los productos del proyecto.</p>
@@ -551,9 +551,9 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                       }}
                       className="px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-2"
                       style={{
-                        backgroundColor: isActive ? 'var(--color-principal)' : '#fff',
+                        backgroundColor: isActive ? 'var(--color-principal)' : 'var(--color-white)',
                         color: isActive ? 'var(--color-acento)' : 'var(--color-texto-suave)',
-                        borderColor: isActive ? 'var(--color-principal)' : '#E5E5E5',
+                        borderColor: isActive ? 'var(--color-principal)' : 'var(--color-neutral-200)',
                       }}
                     >
                       <span>{c.nombre || `Alt ${idx + 1}`}</span>
@@ -718,7 +718,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                     setAddingToSitioId(s.id)
                                     setProductTipo(null)
                                   }}
-                                  className="text-[10px] font-bold text-[#072B31] border border-dashed border-borde rounded-lg p-1.5 text-center hover:border-black transition-colors"
+                                  className="text-[10px] font-bold text-principal border border-dashed border-borde rounded-lg p-1.5 text-center hover:border-black transition-colors"
                                 >
                                   + Agregar producto
                                 </button>
@@ -869,7 +869,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-borde flex justify-end gap-3 bg-[#fafafa] rounded-b-2xl">
+        <div className="px-6 py-4 border-t border-borde flex justify-end gap-3 bg-fondo rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}

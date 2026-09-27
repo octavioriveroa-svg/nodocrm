@@ -17,13 +17,13 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
-  financiero: { bg: '#DCFCE7', color: '#15803D' },
-  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' },
+  cliente_final: { bg: 'var(--color-sky-100)', color: 'var(--color-sky-700)' },
+  financiero: { bg: 'var(--color-green-100)', color: 'var(--color-green-700)' },
+  epc: { bg: 'var(--color-gray-200)', color: 'var(--color-texto-suave)' },
   nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
-  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' },
-  suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
-  finder: { bg: '#FDE68A', color: '#92400E' },
+  nodo_admin: { bg: 'var(--color-principal)', color: 'var(--color-white)' },
+  suministrador: { bg: 'var(--color-purple-100)', color: 'var(--color-purple-700)' },
+  finder: { bg: 'var(--color-amber-200)', color: 'var(--color-amber-800)' },
 }
 
 interface LinkedUser {
@@ -202,7 +202,7 @@ export default function UsuariosCliente({ clienteId, clienteNombre, linkedUsers,
                 <span
                   className="px-2.5 py-1 text-[10px] font-bold rounded-md"
                   style={{
-                    backgroundColor: ROL_COLORS[u.rol]?.bg ?? '#E8E8E8',
+                    backgroundColor: ROL_COLORS[u.rol]?.bg ?? 'var(--color-gray-200)',
                     color: ROL_COLORS[u.rol]?.color ?? 'var(--color-texto-suave)',
                   }}
                 >

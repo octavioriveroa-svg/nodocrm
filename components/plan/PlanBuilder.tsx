@@ -19,7 +19,7 @@ const GanttView = dynamic(() => import('./GanttView'), { ssr: false, loading: ()
 ) })
 
 // ── Colors palette for new phases ─────────────────────────────
-const PHASE_COLORS = ['#2563EB', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#4F46E5', '#BE185D']
+const PHASE_COLORS = ['var(--color-blue-600)', 'var(--color-violet-600)', 'var(--color-emerald-600)', 'var(--color-red-600)', 'var(--color-amber-600)', 'var(--color-cyan-600)', 'var(--color-indigo-600)', 'var(--color-pink-700)']
 
 interface Props {
   proyectoId: string
@@ -351,7 +351,7 @@ export default function PlanBuilder({ proyectoId, currentUser, readOnly = false,
             style={{
               width: `${overallPct}%`,
               background: overallPct === 100
-                ? '#10B981'
+                ? 'var(--color-emerald-500)'
                 : 'linear-gradient(90deg, #CEDC00, #072B31)',
             }}
           />

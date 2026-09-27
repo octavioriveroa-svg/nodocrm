@@ -316,7 +316,7 @@ export default function SitiosCliente({ clienteId, epcistaId, initialSitios }: P
 
             {/* Panel Ver */}
             {viendoId === s.id && (
-              <div className="rounded-xl border border-principal px-6 py-5 bg-[#fafafa] mt-2 shadow-inner">
+              <div className="rounded-xl border border-principal px-6 py-5 bg-fondo mt-2 shadow-inner">
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                   {s.nombre_recibo && (
                     <div>

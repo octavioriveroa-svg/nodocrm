@@ -497,11 +497,11 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </div>
         
         {confirmDelete && (
-          <div className="border p-4 mt-4 flex items-center justify-between rounded-lg" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+          <div className="border p-4 mt-4 flex items-center justify-between rounded-lg" style={{ borderColor: 'var(--color-red-600)', backgroundColor: 'var(--color-red-50)' }}>
             <p className="text-sm font-medium text-red-800">¿Eliminar este proyecto? Esta acción no se puede deshacer e involucrará borrar sus datos asociados.</p>
             <div className="flex gap-2 ml-4 shrink-0">
               <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-sm border rounded-md border-borde rounded-xl">Cancelar</button>
-              <button onClick={handleEliminarProyecto} className="px-3 py-1.5 text-sm font-bold text-white rounded-md" style={{ backgroundColor: '#c00' }}>Eliminar proyecto</button>
+              <button onClick={handleEliminarProyecto} className="px-3 py-1.5 text-sm font-bold text-white rounded-md" style={{ backgroundColor: 'var(--color-red-600)' }}>Eliminar proyecto</button>
             </div>
           </div>
         )}
@@ -562,7 +562,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
           <div className="flex flex-col gap-6 mb-4">
             {/* Group 1 — Información básica */}
             {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id) || (isFinder && proyecto.finder_id === currentUser.id)) && (
-              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+              <div className="border border-borde rounded-xl p-4 bg-fondo">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 1: Información básica</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
@@ -604,7 +604,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
             {/* Group 2 — Instalación y financiamiento */}
             {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
-              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+              <div className="border border-borde rounded-xl p-4 bg-fondo">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 2: Instalación y financiamiento</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -671,7 +671,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
             {/* Group 3 — Asignaciones */}
             {(isAdmin || isAnalista || isFinder) && (
-              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+              <div className="border border-borde rounded-xl p-4 bg-fondo">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 3: Asignaciones</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {(isAdmin || isAnalista) && (
@@ -738,7 +738,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
             {/* Grupo 4 — Datos del Sitio (Requerimientos de ingeniería) */}
             {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
-              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+              <div className="border border-borde rounded-xl p-4 bg-fondo">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 4: Datos del Sitio (Requerimientos de ingeniería)</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -820,7 +820,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
 
             {/* Grupo 5 — Solución técnica */}
             {(isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id)) && (
-              <div className="border border-borde rounded-xl p-4 bg-[#fafafa]">
+              <div className="border border-borde rounded-xl p-4 bg-fondo">
                 <h4 className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-3">Grupo 5: Solución técnica</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 sm:col-span-1">
@@ -984,7 +984,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
       {/* Accesos al Portal */}
       <Seccion title="Accesos al Portal">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
+          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-fondo">
             <p className="font-bold text-sm text-principal mb-1">Portal de Cliente</p>
             {proyecto.cliente_id ? (
               <p className="text-xs font-semibold text-green-600 bg-green-100 inline-block px-2 py-1 rounded-md">Usuario vinculado</p>
@@ -1018,7 +1018,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
             )}
           </div>
 
-          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
+          <div className="border border-white/40 rounded-xl p-4 shadow-sm bg-fondo">
             <p className="font-bold text-sm text-principal mb-1">Portal Financiero</p>
             {proyecto.financiero_id ? (
               <p className="text-xs font-semibold text-green-600 bg-green-100 inline-block px-2 py-1 rounded-md">Inversionista vinculado</p>
@@ -1059,7 +1059,7 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         <Seccion title="Sitios del proyecto">
           <div className="flex flex-col gap-3">
             {sitios.map(s => (
-              <div key={s.id} className="border border-white/40 rounded-xl p-4 shadow-sm bg-[#fafafa]">
+              <div key={s.id} className="border border-white/40 rounded-xl p-4 shadow-sm bg-fondo">
                 <p className="font-bold text-sm text-principal">{s.nombre}</p>
                 {s.nombre_recibo && <p className="text-xs mt-0.5 text-gray-500">{s.nombre_recibo}</p>}
                 <div className="flex flex-wrap gap-4 mt-2 pt-2 border-t border-gray-200/60">
