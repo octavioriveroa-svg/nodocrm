@@ -17,10 +17,15 @@ export interface RawProject {
   historial_estados: Record<string, string> | null
   capex_estimado: number
   created_at: string
+  leadingCapex: number
+  leadingSavingsAnnual: number
+  leadingMoneda: string
+  leadingConfigNombre?: string
 }
 
 export interface RawProduct {
   proyecto_id: string
+  configuracion_id?: string | null
   tipo: string
   datos: Record<string, unknown> | null
 }
@@ -192,15 +197,15 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     { data: configuracionesTecnicas },
   ] = await Promise.all([
     supabase.from('proyectos').select('id, nombre_proyecto, tipo, estado, historial_estados, capex_estimado, moneda, ubicacion_estado, modalidad_financiamiento, epcista_id, created_at, updated_at').order('created_at', { ascending: false }),
-    supabase.from('proyecto_sitio_productos').select('proyecto_id, tipo, datos'),
+    supabase.from('proyecto_sitio_productos').select('proyecto_id, configuracion_id, tipo, datos'),
     supabase.from('profiles').select('id, nombre, empresa, rol, created_at'),
     supabase.from('clientes').select('id, industria, ubicacion_estado, created_at'),
     supabase.from('telemetria_egauge').select('proyecto_id, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh'),
     supabase.from('hitos_construccion').select('id, proyecto_id, estado, fecha_estimada_fin, fecha_real_fin'),
     supabase.from('archivos').select('id, created_at'),
     supabase.from('comentarios').select('id, created_at'),
-    supabase.from('opciones_financiamiento').select('proyecto_id, ahorro_estimado_anual, ahorro_estimado_mensual, moneda, seleccionada'),
-    supabase.from('configuraciones_tecnicas').select('proyecto_id, ahorro_estimado_anual, ahorro_estimado_mensual, moneda, seleccionada'),
+    supabase.from('opciones_financiamiento').select('id, proyecto_id, configuracion_id, nombre, vehiculo_inversion, ahorro_estimado_anual, ahorro_estimado_mensual, moneda, seleccionada'),
+    supabase.from('configuraciones_tecnicas').select('id, proyecto_id, nombre, inversion_total, ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, moneda, seleccionada, created_at'),
   ])
 
   const prs = (proyectos ?? []) as Record<string, unknown>[]
@@ -326,52 +331,69 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   })
 
   // ─── Financial ───
-  let fvCapex = 0, bessCapex = 0, totalSavingsMonthly = 0
+  let fvCapex = 0, bessCapex = 0
   const projectCapex: Record<string, number> = {}
   const projectSavings: Record<string, number> = {}
-  for (const prod of prods) {
-    const d = prod.datos as Record<string, unknown> | null
-    if (!d) continue
-    const pid = prod.proyecto_id as string
-    const capex = parseNum(d.capex as string) || 0
-    if (prod.tipo === 'fv') fvCapex += capex
-    else if (prod.tipo === 'bess') bessCapex += capex
-    projectCapex[pid] = (projectCapex[pid] || 0) + capex
-  }
-  
+  const projectLeadingInfo: Record<string, { moneda: string; configNombre?: string }> = {}
+
   const configs = (configuracionesTecnicas ?? []) as Record<string, unknown>[]
-  
-  // Aggregate savings per project, prioritizing config over financing option
-  const rawProjSavingsAnual: Record<string, number> = {}
-  for (const c of configs) {
-    if (c.seleccionada) {
-      const anual = c.ahorro_estimado_anual ? Number(c.ahorro_estimado_anual) : (c.ahorro_estimado_mensual ? Number(c.ahorro_estimado_mensual) * 12 : 0)
-      if (anual > 0) {
-        rawProjSavingsAnual[c.proyecto_id as string] = anual
-      }
+  const opciones = (opcionesFinanciamiento ?? []) as Record<string, unknown>[]
+
+  for (const p of prs) {
+    const pid = p.id as string
+    const projConfigs = configs.filter(c => c.proyecto_id === pid)
+    const leadingConfig = projConfigs.find(c => c.seleccionada) || projConfigs[0]
+
+    // Determine CAPEX for this project from leading config or proyecto.capex_estimado
+    const projCapex = (Number(p.capex_estimado) || (leadingConfig ? Number(leadingConfig.inversion_total) : 0)) || 0
+    projectCapex[pid] = projCapex
+
+    // Identify products belonging to this project's leading alternative
+    const projProds = prods.filter(prod => prod.proyecto_id === pid)
+    const leadingProds = leadingConfig
+      ? projProds.filter(prod => prod.configuracion_id === leadingConfig.id)
+      : projProds.filter(prod => !prod.configuracion_id)
+    const effectiveProds = leadingProds.length > 0 ? leadingProds : projProds
+
+    for (const prod of effectiveProds) {
+      const d = prod.datos as Record<string, unknown> | null
+      if (!d) continue
+      const c = parseNum(d.capex as string) || 0
+      if (prod.tipo === 'fv') fvCapex += c
+      else if (prod.tipo === 'bess') bessCapex += c
     }
-  }
-  
-  for (const opt of opcionesFinanciamiento ?? []) {
-    if (opt.seleccionada) {
-      const pid = opt.proyecto_id as string
-      if (rawProjSavingsAnual[pid] === undefined) {
-        const anual = opt.ahorro_estimado_anual ? Number(opt.ahorro_estimado_anual) : (opt.ahorro_estimado_mensual ? Number(opt.ahorro_estimado_mensual) * 12 : 0)
-        if (anual > 0) {
-          rawProjSavingsAnual[pid] = anual
-        }
-      }
+
+    // Determine Savings for this project: prioritize leading financing option's net savings, fallback to leading config's gross savings
+    const projOpts = opciones.filter(o => o.proyecto_id === pid)
+    const leadingOpt = projOpts.find(o => o.seleccionada) || projOpts[0]
+
+    const optSavings = leadingOpt
+      ? (leadingOpt.ahorro_estimado_anual != null
+          ? Number(leadingOpt.ahorro_estimado_anual)
+          : (leadingOpt.ahorro_estimado_mensual != null ? Number(leadingOpt.ahorro_estimado_mensual) * 12 : 0))
+      : 0
+
+    const configSavings = leadingConfig
+      ? (leadingConfig.ahorro_estimado_anual != null
+          ? Number(leadingConfig.ahorro_estimado_anual)
+          : (leadingConfig.ahorro_estimado_mensual != null ? Number(leadingConfig.ahorro_estimado_mensual) * 12 : 0))
+      : 0
+
+    const effectiveSavings = optSavings > 0 ? optSavings : configSavings
+    projectSavings[pid] = effectiveSavings
+    projectLeadingInfo[pid] = {
+      moneda: (leadingOpt?.moneda || leadingConfig?.moneda || p.moneda || 'MXN') as string,
+      configNombre: leadingConfig ? (leadingConfig.nombre as string) : undefined,
     }
   }
 
   let totalSavingsAnnual = 0
-  for (const pid of Object.keys(rawProjSavingsAnual)) {
-    projectSavings[pid] = rawProjSavingsAnual[pid]
-    totalSavingsAnnual += rawProjSavingsAnual[pid]
+  let totalCapex = 0
+  for (const pid of Object.keys(projectCapex)) {
+    totalCapex += projectCapex[pid]
+    totalSavingsAnnual += (projectSavings[pid] || 0)
   }
-  totalSavingsMonthly = totalSavingsAnnual / 12
-
-  const totalCapex = fvCapex + bessCapex
+  const totalSavingsMonthly = totalSavingsAnnual / 12
   const avgCapexPerProject = totalProjects > 0 ? totalCapex / totalProjects : 0
 
   // Avg payback in years
@@ -532,10 +554,15 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     historial_estados: p.historial_estados as Record<string, string> | null,
     capex_estimado: Number(p.capex_estimado) || 0,
     created_at: p.created_at as string,
+    leadingCapex: projectCapex[p.id as string] || 0,
+    leadingSavingsAnnual: projectSavings[p.id as string] || 0,
+    leadingMoneda: projectLeadingInfo[p.id as string]?.moneda || (p.moneda as string) || 'MXN',
+    leadingConfigNombre: projectLeadingInfo[p.id as string]?.configNombre,
   }))
 
   const rawProducts: RawProduct[] = prods.map(p => ({
     proyecto_id: p.proyecto_id as string,
+    configuracion_id: (p.configuracion_id as string | null) ?? null,
     tipo: p.tipo as string,
     datos: p.datos as Record<string, unknown> | null,
   }))
