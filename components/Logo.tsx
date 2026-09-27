@@ -29,7 +29,7 @@ const COLORS: Record<LogoColor, string> = {
   lima: 'var(--color-acento)',
   menta: 'var(--color-menta)',
   'verde-claro': 'var(--color-verde-claro)',
-  white: '#ffffff',
+  white: 'var(--color-white)',
 }
 
 export default function Logo({ size = 'md', color, inverted = false, className = '' }: LogoProps) {

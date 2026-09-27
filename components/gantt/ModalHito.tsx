@@ -91,8 +91,8 @@ export default function ModalHito({ hito, onClose, onUpdate }: ModalHitoProps) {
             </div>
           </div>
 
-          <div className="bg-[#fafff0] border border-[#CEDC00]/40 p-3 rounded-xl mt-4">
-            <p className="text-xs text-[#4a5e1e] font-medium leading-relaxed">
+          <div className="bg-[var(--color-fondo)] border border-acento/40 p-3 rounded-xl mt-4">
+            <p className="text-xs text-[var(--color-principal)] font-medium leading-relaxed">
               <strong>Nota:</strong> Si el hito está completado, asegúrate de subir la evidencia fotográfica correspondiente en la sección de archivos.
             </p>
           </div>

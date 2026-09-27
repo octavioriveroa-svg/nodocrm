@@ -303,7 +303,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
       <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl border border-borde">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-borde flex items-center justify-between bg-[#fafafa] rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-borde flex items-center justify-between bg-fondo rounded-t-2xl">
           <div>
             <h3 className="font-bold text-base text-principal">Editar Opciones de Financiamiento</h3>
             <p className="text-xs text-muted">Configura los vehículos de financiamiento, plazos y ahorros mensuales estimadas.</p>
@@ -459,7 +459,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-borde flex justify-end gap-3 bg-[#fafafa] rounded-b-2xl">
+        <div className="px-6 py-4 border-t border-borde flex justify-end gap-3 bg-fondo rounded-b-2xl">
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-bold border border-borde rounded-lg bg-white hover:bg-gray-50 transition-colors">
             Cancelar
           </button>

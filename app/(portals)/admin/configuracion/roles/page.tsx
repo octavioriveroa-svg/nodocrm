@@ -24,10 +24,10 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' }, nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
-  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' }, cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
-  financiero: { bg: '#DCFCE7', color: '#15803D' }, suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
-  pendiente: { bg: '#FFF3CD', color: '#856404' }, finder: { bg: '#FDE68A', color: '#92400E' },
+  epc: { bg: 'var(--color-gray-200)', color: 'var(--color-texto-suave)' }, nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
+  nodo_admin: { bg: 'var(--color-principal)', color: 'var(--color-white)' }, cliente_final: { bg: 'var(--color-sky-100)', color: 'var(--color-sky-700)' },
+  financiero: { bg: 'var(--color-green-100)', color: 'var(--color-green-700)' }, suministrador: { bg: 'var(--color-purple-100)', color: 'var(--color-purple-700)' },
+  pendiente: { bg: 'var(--color-yellow-100)', color: 'var(--color-yellow-800)' }, finder: { bg: 'var(--color-amber-200)', color: 'var(--color-amber-800)' },
 }
 
 const ROLES_ASIGNABLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
@@ -143,9 +143,9 @@ export default function RolesPage() {
       {pendientes.length > 0 && (
         <div className="mb-8">
           <div className="rounded-2xl border-2 border-amber-300 overflow-hidden">
-            <div className="px-5 py-3 flex items-center gap-2" style={{ backgroundColor: '#FFF3CD' }}>
+            <div className="px-5 py-3 flex items-center gap-2" style={{ backgroundColor: 'var(--color-yellow-100)' }}>
               <span className="text-lg">⏳</span>
-              <h2 className="font-bold text-sm" style={{ color: '#856404' }}>
+              <h2 className="font-bold text-sm" style={{ color: 'var(--color-yellow-800)' }}>
                 Solicitudes pendientes ({pendientes.length})
               </h2>
             </div>

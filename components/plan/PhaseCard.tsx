@@ -118,7 +118,7 @@ export default function PhaseCard({
               className="h-full rounded-full transition-all duration-700"
               style={{
                 width: `${pct}%`,
-                backgroundColor: pct === 100 ? '#10B981' : fase.color,
+                backgroundColor: pct === 100 ? 'var(--color-emerald-500)' : fase.color,
               }}
             />
           </div>

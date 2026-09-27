@@ -98,7 +98,7 @@ export default function ClientesPage() {
                   key={c.id}
                   href={`/epc/clientes/${c.id}`}
                   className="rounded-xl border border-borde p-5 flex flex-col justify-between hover:shadow-lg hover:border-borde border-transparent shadow-sm transition-all bg-white group h-full"
-                  style={{ border: '1px solid #E5E5E5' }}
+                  style={{ border: '1px solid var(--color-borde)' }}
                 >
                   <div>
                     <div className="flex flex-col gap-3 mb-4">

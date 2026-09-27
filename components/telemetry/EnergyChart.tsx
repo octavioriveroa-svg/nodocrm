@@ -28,39 +28,39 @@ export default function EnergyChart({ data }: EnergyChartProps) {
         <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="colorSolar" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+              <stop offset="5%" stopColor="var(--color-amber-500)" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="var(--color-amber-500)" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="colorConsumo" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+              <stop offset="5%" stopColor="var(--color-red-500)" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="var(--color-red-500)" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="colorDescarga" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+              <stop offset="5%" stopColor="var(--color-emerald-500)" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="var(--color-emerald-500)" stopOpacity={0}/>
             </linearGradient>
           </defs>
           <XAxis 
             dataKey="time" 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: '#9CA3AF', fontSize: 12 }} 
+            tick={{ fill: 'var(--color-gray-400)', fontSize: 12 }} 
             dy={10} 
           />
           <YAxis 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: '#9CA3AF', fontSize: 12 }} 
+            tick={{ fill: 'var(--color-gray-400)', fontSize: 12 }} 
           />
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-gray-200)" />
           <Tooltip 
-            contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            contentStyle={{ borderRadius: '12px', border: '1px solid var(--color-gray-200)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
           />
           <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
           <Area 
             type="monotone" 
             dataKey="Solar" 
-            stroke="#F59E0B" 
+            stroke="var(--color-amber-500)" 
             strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorSolar)" 
@@ -70,7 +70,7 @@ export default function EnergyChart({ data }: EnergyChartProps) {
             type="monotone" 
             dataKey="Descarga" 
             name="Descarga Batería"
-            stroke="#10B981" 
+            stroke="var(--color-emerald-500)" 
             strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorDescarga)" 
@@ -80,7 +80,7 @@ export default function EnergyChart({ data }: EnergyChartProps) {
             type="monotone" 
             dataKey="Consumo" 
             name="Consumo Red"
-            stroke="#EF4444" 
+            stroke="var(--color-red-500)" 
             strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorConsumo)" 

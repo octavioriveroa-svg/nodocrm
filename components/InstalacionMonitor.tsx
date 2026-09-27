@@ -431,7 +431,7 @@ export default function InstalacionMonitor({
               <div 
                 key={fase.id} 
                 className="border border-gray-150 rounded-2xl overflow-hidden bg-white shadow-sm"
-                style={{ borderLeftColor: fase.color || '#cbd5e1', borderLeftWidth: '6px' }}
+                style={{ borderLeftColor: fase.color || 'var(--color-slate-300)', borderLeftWidth: '6px' }}
               >
                 
                 {/* Phase Header */}

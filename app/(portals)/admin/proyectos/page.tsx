@@ -153,7 +153,7 @@ export default function AdminProyectosPage() {
 
       <div className="rounded-xl border border-borde overflow-hidden bg-white shadow-sm">
         <table className="w-full text-sm text-left">
-          <thead className="bg-[#fafafa] border-b border-borde text-[#444]">
+          <thead className="bg-fondo border-b border-borde text-muted">
             <tr>
               <th className="px-5 py-4 font-semibold">Proyecto</th>
               <th className="px-5 py-4 font-semibold">Cliente</th>
@@ -175,7 +175,7 @@ export default function AdminProyectosPage() {
                 <td className="px-5 py-3 font-bold text-principal">{p.nombre_proyecto}</td>
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.cliente_final_empresa || '—'}</td>
                 <td className="px-5 py-3 text-xs text-gray-500 font-medium">{p.epcista_nombre}</td>
-                <td className="px-5 py-3 text-xs font-medium" style={{ color: p.responsable_nombre !== '—' ? '#15803D' : '#aaa' }}>{p.responsable_nombre}</td>
+                <td className="px-5 py-3 text-xs font-medium" style={{ color: p.responsable_nombre !== '—' ? 'var(--color-green-700)' : 'var(--color-gray-300)' }}>{p.responsable_nombre}</td>
                 <td className="px-5 py-3 text-xs font-medium text-gray-500">{p.finder_nombre}</td>
                 <td className="px-5 py-3"><BadgeTipo tipo={p.tipo} /></td>
                 <td className="px-5 py-3"><BadgeEstado estado={p.estado} historial={p.historial_estados} /></td>

@@ -10,10 +10,10 @@ import CommentThread from './CommentThread'
 import { fmtCurrency } from '@/lib/format'
 
 const ESTADO_CONFIG: Record<EstadoHitoFinanciero, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  pendiente: { color: '#9CA3AF', bg: '#F3F4F6', icon: <Clock size={12} />, label: 'Pendiente' },
-  elegible: { color: '#3B82F6', bg: '#EFF6FF', icon: <CircleDot size={12} />, label: 'Elegible' },
-  aprobado: { color: '#F59E0B', bg: '#FFFBEB', icon: <CreditCard size={12} />, label: 'Aprobado' },
-  pagado: { color: '#10B981', bg: '#ECFDF5', icon: <CheckCircle2 size={12} />, label: 'Pagado' },
+  pendiente: { color: 'var(--color-gray-400)', bg: 'var(--color-gray-100)', icon: <Clock size={12} />, label: 'Pendiente' },
+  elegible: { color: 'var(--color-blue-500)', bg: 'var(--color-blue-50)', icon: <CircleDot size={12} />, label: 'Elegible' },
+  aprobado: { color: 'var(--color-amber-500)', bg: 'var(--color-amber-50)', icon: <CreditCard size={12} />, label: 'Aprobado' },
+  pagado: { color: 'var(--color-emerald-500)', bg: 'var(--color-emerald-50)', icon: <CheckCircle2 size={12} />, label: 'Pagado' },
 }
 
 interface Props {

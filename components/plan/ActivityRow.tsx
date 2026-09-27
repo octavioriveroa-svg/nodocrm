@@ -9,10 +9,10 @@ import TaskItem from './TaskItem'
 import CommentThread from './CommentThread'
 
 const ESTADO_COLORS: Record<EstadoPlan, string> = {
-  pendiente: '#9CA3AF',
-  en_progreso: '#F59E0B',
-  completado: '#10B981',
-  retrasado: '#EF4444',
+  pendiente: 'var(--color-gray-400)',
+  en_progreso: 'var(--color-amber-500)',
+  completado: 'var(--color-emerald-500)',
+  retrasado: 'var(--color-red-500)',
 }
 
 interface Props {

@@ -28,14 +28,14 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROL_COLORS: Record<string, { bg: string; color: string }> = {
-  epc: { bg: '#E8E8E8', color: 'var(--color-texto-suave)' },
+  epc: { bg: 'var(--color-gray-200)', color: 'var(--color-texto-suave)' },
   nodo_analista: { bg: 'var(--color-acento)', color: 'var(--color-principal)' },
-  nodo_admin: { bg: 'var(--color-principal)', color: '#fff' },
-  cliente_final: { bg: '#E0F2FE', color: '#0369A1' },
-  financiero: { bg: '#DCFCE7', color: '#15803D' },
-  suministrador: { bg: '#F3E8FF', color: '#7E22CE' },
-  pendiente: { bg: '#FFF3CD', color: '#856404' },
-  finder: { bg: '#FDE68A', color: '#92400E' },
+  nodo_admin: { bg: 'var(--color-principal)', color: 'var(--color-white)' },
+  cliente_final: { bg: 'var(--color-sky-100)', color: 'var(--color-sky-700)' },
+  financiero: { bg: 'var(--color-green-100)', color: 'var(--color-green-700)' },
+  suministrador: { bg: 'var(--color-purple-100)', color: 'var(--color-purple-700)' },
+  pendiente: { bg: 'var(--color-yellow-100)', color: 'var(--color-yellow-800)' },
+  finder: { bg: 'var(--color-amber-200)', color: 'var(--color-amber-800)' },
 }
 
 const FILTER_ROLES = ['todos', 'epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'pendiente']
@@ -120,7 +120,7 @@ export default function UsuariosReadOnlyPage() {
           <div className="text-xs text-muted mt-0.5">Activos</div>
         </div>
         <div className="glass-card p-4">
-          <div className="text-2xl font-black" style={{ color: totalPendientes > 0 ? '#856404' : undefined }}>{totalPendientes}</div>
+          <div className="text-2xl font-black" style={{ color: totalPendientes > 0 ? 'var(--color-yellow-800)' : undefined }}>{totalPendientes}</div>
           <div className="text-xs text-muted mt-0.5">Pendientes</div>
         </div>
         <div className="glass-card p-4">
@@ -149,7 +149,7 @@ export default function UsuariosReadOnlyPage() {
               className="px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap"
               style={{
                 borderColor: filtroRol === r ? 'var(--color-principal)' : 'var(--color-linea)',
-                backgroundColor: filtroRol === r ? 'var(--color-principal)' : '#fff',
+                backgroundColor: filtroRol === r ? 'var(--color-principal)' : 'var(--color-white)',
                 color: filtroRol === r ? 'var(--color-acento)' : 'var(--color-texto-suave)',
               }}
             >
@@ -165,7 +165,7 @@ export default function UsuariosReadOnlyPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: 'var(--color-principal)', color: '#fff' }}>
+              <tr style={{ backgroundColor: 'var(--color-principal)', color: 'var(--color-white)' }}>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Nombre</th>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Empresa</th>
                 <th className="text-left px-5 py-4 font-semibold whitespace-nowrap">Correo</th>

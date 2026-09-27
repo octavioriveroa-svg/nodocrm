@@ -9,10 +9,10 @@ import SubtaskChecklist from './SubtaskChecklist'
 import CommentThread from './CommentThread'
 
 const PRIORIDAD_COLORS: Record<PrioridadTarea, { bg: string; text: string; label: string }> = {
-  baja: { bg: '#f0f9ff', text: '#3b82f6', label: 'Baja' },
-  media: { bg: '#fffbeb', text: '#f59e0b', label: 'Media' },
-  alta: { bg: '#fef2f2', text: '#ef4444', label: 'Alta' },
-  critica: { bg: '#fef2f2', text: '#dc2626', label: 'Crítica' },
+  baja: { bg: 'var(--color-sky-50)', text: 'var(--color-blue-500)', label: 'Baja' },
+  media: { bg: 'var(--color-amber-50)', text: 'var(--color-amber-500)', label: 'Media' },
+  alta: { bg: 'var(--color-red-50)', text: 'var(--color-red-500)', label: 'Alta' },
+  critica: { bg: 'var(--color-red-50)', text: 'var(--color-red-600)', label: 'Crítica' },
 }
 
 const ESTADO_ICONS: Record<EstadoTarea, React.ReactNode> = {

@@ -1068,8 +1068,8 @@ export default function FinderNuevoProyectoPage() {
                       onClick={() => setF('tipo_instalacion', opt.value)}
                       className="flex items-start gap-4 rounded-xl border p-4 text-left w-full transition-all duration-200"
                       style={{
-                        borderColor: selected ? 'var(--color-principal)' : '#E5E5E5',
-                        backgroundColor: selected ? 'var(--color-principal)' : '#fff',
+                        borderColor: selected ? 'var(--color-principal)' : 'var(--color-neutral-200)',
+                        backgroundColor: selected ? 'var(--color-principal)' : 'var(--color-white)',
                         boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)'
                       }}>
                       <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -1080,7 +1080,7 @@ export default function FinderNuevoProyectoPage() {
                         <div className="font-semibold text-sm" style={{ color: selected ? 'var(--color-acento)' : 'var(--color-principal)' }}>
                           {opt.title}
                         </div>
-                        <div className="text-xs mt-1.5" style={{ color: selected ? '#aaa' : 'var(--color-texto-suave)' }}>
+                        <div className="text-xs mt-1.5" style={{ color: selected ? 'var(--color-gray-300)' : 'var(--color-texto-suave)' }}>
                           {opt.desc}
                         </div>
                       </div>
@@ -1120,8 +1120,8 @@ export default function FinderNuevoProyectoPage() {
                     <div key={s.id}>
                       {/* Fila sitio */}
                       <div className="flex items-center gap-3 border rounded-xl p-3 shadow-sm transition-all" style={{
-                        borderColor: selected ? 'var(--color-principal)' : '#E5E5E5',
-                        backgroundColor: selected ? '#fbfdf9' : '#fff',
+                        borderColor: selected ? 'var(--color-principal)' : 'var(--color-neutral-200)',
+                        backgroundColor: selected ? 'var(--color-green-50)' : 'var(--color-white)',
                       }}>
                         <input type="checkbox" id={`s-${s.id}`} checked={selected}
                           onChange={() => toggleSitio(s.id)} className="w-4 h-4 flex-shrink-0 cursor-pointer" />
@@ -1148,8 +1148,8 @@ export default function FinderNuevoProyectoPage() {
                           }}
                             className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: viendoSitioId === s.id ? 'var(--color-principal)' : '#E5E5E5',
-                              backgroundColor: viendoSitioId === s.id ? 'var(--color-principal)' : '#fff',
+                              borderColor: viendoSitioId === s.id ? 'var(--color-principal)' : 'var(--color-neutral-200)',
+                              backgroundColor: viendoSitioId === s.id ? 'var(--color-principal)' : 'var(--color-white)',
                               color: viendoSitioId === s.id ? 'var(--color-acento)' : 'var(--color-texto-suave)',
                             }}>
                             <Eye size={13} />
@@ -1157,15 +1157,15 @@ export default function FinderNuevoProyectoPage() {
                           <button type="button" onClick={() => abrirEditarSitio(s)}
                             className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
                             style={{
-                              borderColor: editandoSitioId === s.id ? 'var(--color-principal)' : '#E5E5E5',
-                              backgroundColor: editandoSitioId === s.id ? '#f0f0f0' : '#fff',
+                              borderColor: editandoSitioId === s.id ? 'var(--color-principal)' : 'var(--color-neutral-200)',
+                              backgroundColor: editandoSitioId === s.id ? 'var(--color-gray-100)' : 'var(--color-white)',
                               color: 'var(--color-texto-suave)',
                             }}>
                             <Pencil size={13} />
                           </button>
                           <button type="button" onClick={() => { setDeletingSitioId(s.id); setViendoSitioId(null); setEditandoSitioId(null) }}
                             className="p-1.5 border rounded-lg transition-colors hover:shadow-sm"
-                            style={{ borderColor: '#E5E5E5', color: '#dc2626' }}>
+                            style={{ borderColor: 'var(--color-neutral-200)', color: 'var(--color-red-600)' }}>
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -1173,20 +1173,20 @@ export default function FinderNuevoProyectoPage() {
 
                       {/* Confirmación eliminar */}
                       {deletingSitioId === s.id && (
-                        <div className="border border-t-0 px-4 py-3 flex items-center justify-between" style={{ borderColor: '#c00', backgroundColor: '#fff5f5' }}>
+                        <div className="border border-t-0 px-4 py-3 flex items-center justify-between" style={{ borderColor: 'var(--color-red-600)', backgroundColor: 'var(--color-red-50)' }}>
                           <p className="text-sm">¿Eliminar <strong>{s.nombre}</strong>?</p>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setDeletingSitioId(null)}
                               className="px-3 py-1 text-xs border border-borde rounded-xl">Cancelar</button>
                             <button type="button" onClick={() => eliminarSitio(s.id)}
-                              className="px-3 py-1 text-xs font-bold text-white" style={{ backgroundColor: '#c00' }}>Eliminar</button>
+                              className="px-3 py-1 text-xs font-bold text-white" style={{ backgroundColor: 'var(--color-red-600)' }}>Eliminar</button>
                           </div>
                         </div>
                       )}
 
                       {/* Panel Ver */}
                       {viendoSitioId === s.id && (
-                        <div className="border border-t-0 px-4 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fafafa' }}>
+                        <div className="border border-t-0 px-4 py-3" style={{ borderColor: 'var(--color-principal)', backgroundColor: 'var(--color-neutral-50)' }}>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                             {s.nombre_recibo && <div><span className="text-muted">Nombre en recibo: </span><span className="font-medium">{s.nombre_recibo}</span></div>}
                             {(s.ciudad || s.ubicacion_estado) && <div><span className="text-muted">Ubicación: </span><span className="font-medium">{[s.ciudad, s.ubicacion_estado].filter(Boolean).join(', ')}</span></div>}
@@ -1374,9 +1374,9 @@ export default function FinderNuevoProyectoPage() {
                   }}
                   className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all flex items-center gap-2"
                   style={{
-                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#fff',
+                    backgroundColor: activeConfigId === c.tempId ? 'var(--color-principal)' : 'var(--color-white)',
                     color: activeConfigId === c.tempId ? 'var(--color-acento)' : 'var(--color-texto-suave)',
-                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : '#E5E5E5',
+                    borderColor: activeConfigId === c.tempId ? 'var(--color-principal)' : 'var(--color-neutral-200)',
                   }}
                 >
                   <span>{c.nombre || `Alternativa ${idx + 1}`}</span>
@@ -1559,7 +1559,7 @@ export default function FinderNuevoProyectoPage() {
                           {productos.length === 0 ? 'Agregar primer producto (FV o BESS) / Add product' : 'Agregar otro producto / Add another product'}
                         </button>
                       ) : (
-                        <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-principal)', backgroundColor: '#fff' }}>
+                        <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-principal)', backgroundColor: 'var(--color-white)' }}>
                           {/* Selector de tipo */}
                           {!productTipo ? (
                             <div>
@@ -1802,7 +1802,7 @@ export default function FinderNuevoProyectoPage() {
             </div>
 
             {anyHighDemanda && (
-              <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-acento)', backgroundColor: '#fffff0' }}>
+              <div className="border p-4 rounded-xl" style={{ borderColor: 'var(--color-acento)', backgroundColor: 'var(--color-yellow-50)' }}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.incluye_mem}
                     onChange={e => setF('incluye_mem', e.target.checked)}
@@ -1832,8 +1832,8 @@ export default function FinderNuevoProyectoPage() {
                       onClick={() => toggleVehiculo(v.id, v.nombreEs, v.nombreEn)}
                       className="border rounded-xl p-3.5 text-left transition-all flex items-start gap-3"
                       style={{
-                        borderColor: isSelected ? 'var(--color-principal)' : '#E5E5E5',
-                        backgroundColor: isSelected ? '#f8fbf5' : '#fff',
+                        borderColor: isSelected ? 'var(--color-principal)' : 'var(--color-neutral-200)',
+                        backgroundColor: isSelected ? 'var(--color-green-50)' : 'var(--color-white)',
                       }}
                     >
                       <div className={`w-5 h-5 rounded flex items-center justify-center mt-0.5 shrink-0 border font-bold text-xs ${isSelected ? 'bg-principal text-acento border-principal' : 'border-gray-300'}`}>

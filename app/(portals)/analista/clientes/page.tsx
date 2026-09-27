@@ -78,7 +78,7 @@ export default function AnalistaClientesPage() {
 
       <div className="rounded-xl border border-borde overflow-hidden bg-white shadow-sm">
         <table className="w-full text-sm text-left">
-          <thead className="bg-[#fafafa] border-b border-borde text-[#444]">
+          <thead className="bg-fondo border-b border-borde text-muted">
             <tr>
               <th className="px-5 py-4 font-semibold">Razón social</th>
               <th className="px-5 py-4 font-semibold">RFC</th>

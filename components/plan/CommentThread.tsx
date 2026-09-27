@@ -13,14 +13,14 @@ import {
 // ── Role badge colors ─────────────────────────────────────────
 const ROLE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   epc:            { bg: 'var(--color-acento)', text: 'var(--color-principal)', label: 'EPC' },
-  nodo_admin:     { bg: '#1a1a2e', text: '#fff', label: 'Admin' },
-  nodo_analista:  { bg: '#4F46E5', text: '#fff', label: 'Analista' },
-  financiero:     { bg: '#059669', text: '#fff', label: 'Financiero' },
-  cliente_final:  { bg: '#0891B2', text: '#fff', label: 'Cliente' },
+  nodo_admin:     { bg: 'var(--color-slate-900)', text: 'var(--color-white)', label: 'Admin' },
+  nodo_analista:  { bg: 'var(--color-indigo-600)', text: 'var(--color-white)', label: 'Analista' },
+  financiero:     { bg: 'var(--color-emerald-600)', text: 'var(--color-white)', label: 'Financiero' },
+  cliente_final:  { bg: 'var(--color-cyan-600)', text: 'var(--color-white)', label: 'Cliente' },
 }
 
 function roleBadge(rol: string) {
-  const cfg = ROLE_COLORS[rol] || { bg: '#9CA3AF', text: '#fff', label: rol }
+  const cfg = ROLE_COLORS[rol] || { bg: 'var(--color-gray-400)', text: 'var(--color-white)', label: rol }
   return cfg
 }
 
@@ -450,7 +450,7 @@ function CommentBubble({
           <span className="text-[11px] font-bold text-gray-800 truncate">{autor?.nombre || 'Usuario'}</span>
           <span
             className="text-[9px] font-bold px-1 py-0.5 rounded"
-            style={{ backgroundColor: badge.bg + '20', color: badge.text === '#fff' ? badge.bg : badge.text }}
+            style={{ backgroundColor: badge.bg + '20', color: badge.text === 'var(--color-white)' ? badge.bg : badge.text }}
           >
             {badge.label}
           </span>
