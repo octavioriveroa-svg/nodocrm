@@ -18,11 +18,20 @@ export default async function ClienteInstalacionesListPage() {
 
   if (!profile || profile.rol !== 'cliente_final') redirect('/login')
 
+  if (!profile.cliente_crm_id) {
+    return (
+      <InstalacionesListClient
+        portalPrefix="/cliente"
+        initialProyectos={[]}
+      />
+    )
+  }
+
   // Cliente sees only their own projects
   const { data: proyectos } = await supabase
     .from('proyectos')
     .select('*')
-    .eq('cliente_id', session.user.id)
+    .eq('cliente_id', profile.cliente_crm_id)
     .in('estado', QUALIFYING)
     .order('updated_at', { ascending: false })
 

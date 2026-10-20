@@ -1,5 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { parseNum } from '@/lib/format'
+import {
+  STAGE_ORDER,
+  ESTADO_LABELS,
+  TERMINAL_STAGES,
+  MODALIDAD_LABELS,
+} from '@/lib/domains/proyectos/lifecycle'
+import type { EstadoProyecto } from '@/lib/types'
+
+export { STAGE_ORDER, ESTADO_LABELS, TERMINAL_STAGES, MODALIDAD_LABELS }
+export const STAGE_LABELS = ESTADO_LABELS
+
+export function getModalidadLabel(modalidad: string): string {
+  return (MODALIDAD_LABELS as Record<string, string>)[modalidad] || modalidad
+}
 
 // ─── Types ───────────────────────────────────────────
 export interface RawFinancingOption {
@@ -138,27 +152,71 @@ export interface RecentProject {
   epcista_nombre: string
 }
 
-// ─── Stage config ───────────────────────────────────
-const STAGE_ORDER = [
-  'recibido', 'en_analisis', 'propuesta_lista', 'enviada',
-  'cliente_interesado', 'negociacion', 'aprobado',
-  'en_construccion', 'operativo', 'completado'
-]
-
-const STAGE_LABELS: Record<string, string> = {
-  recibido: 'Lead',
-  en_analisis: 'En análisis',
-  propuesta_lista: 'Propuesta lista',
-  enviada: 'Propuesta enviada',
-  cliente_interesado: 'Cliente interesado',
-  negociacion: 'Negociación',
-  aprobado: 'Cierre',
-  en_construccion: 'En construcción',
-  operativo: 'Operativo',
-  completado: 'Completado',
+// ─── Telemetry Queries ───────────────────────────────
+export interface TelemetryQueryOptions {
+  proyectoId?: string
+  days?: number
+  limit?: number
 }
 
-const TERMINAL_STAGES = ['aprobado', 'en_construccion', 'operativo', 'completado']
+export async function getTelemetryStats(
+  supabaseClient?: Awaited<ReturnType<typeof createClient>>,
+  options?: TelemetryQueryOptions
+) {
+  const supabase = supabaseClient || (await createClient())
+  const days = options?.days ?? 90
+  const limit = options?.limit ?? 10000
+  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+  let query = supabase
+    .from('telemetria_egauge')
+    .select('proyecto_id, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh, timestamp')
+    .gte('timestamp', startDate)
+    .order('timestamp', { ascending: false })
+    .limit(limit)
+
+  if (options?.proyectoId) {
+    query = query.eq('proyecto_id', options.proyectoId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching telemetry stats:', error)
+    return []
+  }
+  return data ?? []
+}
+
+export async function getTelemetryHistorical(
+  supabaseClient?: Awaited<ReturnType<typeof createClient>>,
+  options?: TelemetryQueryOptions
+) {
+  const supabase = supabaseClient || (await createClient())
+  const days = options?.days ?? 90
+  const limit = options?.limit ?? 10000
+  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+  let query = supabase
+    .from('telemetria_egauge')
+    .select(
+      'id, proyecto_id, timestamp, generacion_kwh, consumo_kwh, potencia_kw, bateria_soc_pct, bateria_estado, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh, bateria_porcentaje'
+    )
+    .gte('timestamp', startDate)
+    .order('timestamp', { ascending: true })
+    .limit(limit)
+
+  if (options?.proyectoId) {
+    query = query.eq('proyecto_id', options.proyectoId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching historical telemetry:', error)
+    return []
+  }
+  return data ?? []
+}
+
 
 // ─── Helpers ──────────────────────────────────────────
 function daysBetween(a: string, b: string): number {
@@ -182,8 +240,9 @@ function endOfLastMonth(): string {
 // ─── Main fetcher ─────────────────────────────────────
 export async function fetchDashboardData(): Promise<DashboardData> {
   const supabase = await createClient()
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
-    // Parallel fetches
+  // Parallel fetches
   const [
     { data: proyectos },
     { data: productos },
@@ -200,7 +259,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     supabase.from('proyecto_sitio_productos').select('proyecto_id, configuracion_id, tipo, datos'),
     supabase.from('profiles').select('id, nombre, empresa, rol, created_at'),
     supabase.from('clientes').select('id, industria, ubicacion_estado, created_at'),
-    supabase.from('telemetria_egauge').select('proyecto_id, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh'),
+    supabase
+      .from('telemetria_egauge')
+      .select('proyecto_id, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh')
+      .gte('timestamp', ninetyDaysAgo)
+      .order('timestamp', { ascending: false })
+      .limit(10000),
     supabase.from('hitos_construccion').select('id, proyecto_id, estado, fecha_estimada_fin, fecha_real_fin'),
     supabase.from('archivos').select('id, created_at'),
     supabase.from('comentarios').select('id, created_at'),
@@ -244,7 +308,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   }
 
   // Win rate: projects that reached 'aprobado' or beyond ÷ total
-  const closedCount = prs.filter(p => TERMINAL_STAGES.includes(p.estado as string)).length
+  const closedCount = prs.filter(p => (TERMINAL_STAGES as readonly string[]).includes(p.estado as string)).length
   const winRate = totalProjects > 0 ? (closedCount / totalProjects) * 100 : 0
 
   // Avg days to close (Lead → Cierre)
@@ -278,7 +342,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const h = p.historial_estados as Record<string, string> | null
     if (!h) {
       // If no historial, they at least reached their current stage and all before it
-      const idx = STAGE_ORDER.indexOf(p.estado as string)
+      const idx = STAGE_ORDER.indexOf(p.estado as EstadoProyecto)
       for (let i = 0; i <= idx; i++) reachedStage[STAGE_ORDER[i]]++
       continue
     }
@@ -286,7 +350,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       if (h[stage]) reachedStage[stage]++
     }
     // Also count current stage even if not in historial
-    const curIdx = STAGE_ORDER.indexOf(p.estado as string)
+    const curIdx = STAGE_ORDER.indexOf(p.estado as EstadoProyecto)
     for (let i = 0; i <= curIdx; i++) {
       if (!h[STAGE_ORDER[i]]) reachedStage[STAGE_ORDER[i]]++
     }
@@ -294,13 +358,13 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   const funnelPercents = STAGE_ORDER.map(stage => ({
     stage,
-    label: STAGE_LABELS[stage],
+    label: ESTADO_LABELS[stage] || stage,
     pct: totalProjects > 0 ? Math.round((reachedStage[stage] / totalProjects) * 100) : 0,
     count: reachedStage[stage],
   }))
 
   // ─── Velocity ───
-  const transitions = [
+  const transitions: { from: EstadoProyecto; to: EstadoProyecto }[] = [
     { from: 'recibido', to: 'en_analisis' },
     { from: 'en_analisis', to: 'propuesta_lista' },
     { from: 'propuesta_lista', to: 'enviada' },
@@ -323,8 +387,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     return {
       from,
       to,
-      fromLabel: STAGE_LABELS[from],
-      toLabel: STAGE_LABELS[to],
+      fromLabel: ESTADO_LABELS[from] || from,
+      toLabel: ESTADO_LABELS[to] || to,
       avgDays: deltas.length > 0 ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length) : null,
       count: deltas.length,
     }
@@ -458,7 +522,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const epId = ep.id as string
     const epProjects = prs.filter(p => p.epcista_id === epId)
     const totalEpCapex = epProjects.reduce((s, p) => s + (Number(p.capex_estimado) || 0), 0)
-    const closed = epProjects.filter(p => TERMINAL_STAGES.includes(p.estado as string)).length
+    const closed = epProjects.filter(p => (TERMINAL_STAGES as readonly string[]).includes(p.estado as string)).length
     return {
       id: epId,
       nombre: ep.nombre as string,
@@ -475,7 +539,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const finderId = f.id as string
     const finderProjects = prs.filter(p => p.finder_id === finderId)
     const totalFinderCapex = finderProjects.reduce((s, p) => s + (Number(p.capex_estimado) || 0), 0)
-    const closed = finderProjects.filter(p => TERMINAL_STAGES.includes(p.estado as string)).length
+    const closed = finderProjects.filter(p => (TERMINAL_STAGES as readonly string[]).includes(p.estado as string)).length
     return {
       id: finderId,
       nombre: f.nombre as string,
@@ -501,7 +565,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       id: p.id as string,
       nombre: p.nombre_proyecto as string,
       estado,
-      estadoLabel: STAGE_LABELS[estado] || estado,
+      estadoLabel: (ESTADO_LABELS as Record<string, string>)[estado] || estado,
       daysInStage: days,
       epcistaNombre: epInfo?.nombre || '—',
       lastTransition: lastDate,

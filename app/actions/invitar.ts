@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { executeInviteUser } from '@/lib/domains/auth/user-provisioning'
+import type { Profile } from '@/lib/types'
 
 export type InvitarUsuarioResult = {
   success?: boolean
@@ -23,111 +24,20 @@ export async function invitarUsuario(data: {
     }
 
     const supabase = await createClient()
-  
-    // 1. Validate permissions (EPC, Admin, Analyst, or Finder can invite)
+
+    // 1. Validate permissions
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) return { error: 'No autenticado' }
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('rol')
+      .select('id, nombre, empresa, rol, calendario_url, cliente_crm_id, created_at')
       .eq('id', user.id)
       .single()
-  
-    if (!profile || !['epc', 'nodo_admin', 'nodo_analista', 'finder'].includes(profile.rol)) {
-      return { error: 'No autorizado para enviar invitaciones' }
-    }
 
-    // Defense-in-depth: Analysts cannot invite admin accounts
-    if (profile.rol === 'nodo_analista' && (data.rol as string) === 'nodo_admin') {
-      return { error: 'No autorizado: solo los administradores pueden invitar cuentas de administrador.' }
-    }
+    if (!profile) return { error: 'No se encontró tu perfil.' }
 
-    // Defense-in-depth: Non-admins cannot invite admin accounts
-    if ((data.rol as string) === 'nodo_admin' && profile.rol !== 'nodo_admin') {
-      return { error: 'No autorizado: solo los administradores pueden invitar cuentas de administrador.' }
-    }
-
-    // 2. EPC can only invite cliente_final or financiero
-    if (profile.rol === 'epc' && !['cliente_final', 'financiero'].includes(data.rol)) {
-      return { error: 'No autorizado para invitar este tipo de usuario' }
-    }
-
-    // Finder can only invite epc users
-    if (profile.rol === 'finder' && data.rol !== 'epc') {
-      return { error: 'No autorizado para invitar este tipo de usuario' }
-    }
-
-    // 3. If EPC, verify the client belongs to them
-    if (profile.rol === 'epc' && data.cliente_crm_id) {
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('id')
-        .eq('id', data.cliente_crm_id)
-        .eq('epcista_id', user.id)
-        .single()
-    
-      if (!clienteData) {
-        return { error: 'No autorizado: este cliente no te pertenece' }
-      }
-    }
-
-  // 4. Init Admin Client
-  const adminAuthClient = createAdminClient()
-
-  // 5. Invite the user
-  const { data: authData, error: authError } = await adminAuthClient.auth.admin.inviteUserByEmail(data.email, {
-    data: {
-      nombre: data.nombre,
-      empresa: data.empresa,
-      rol: data.rol
-    }
-  })
-
-  if (authError) {
-    console.error('Error inviting user:', authError)
-    return { error: 'Error al enviar invitación: ' + authError.message }
-  }
-
-  const userId = authData.user.id
-
-  // 6. Ensure profile exists with cliente_crm_id
-  const profilePayload: Record<string, unknown> = {
-    id: userId,
-    nombre: data.nombre,
-    empresa: data.empresa,
-    rol: data.rol,
-  }
-  if (data.cliente_crm_id) {
-    profilePayload.cliente_crm_id = data.cliente_crm_id
-  }
-
-  const { error: profileError } = await adminAuthClient
-    .from('profiles')
-    .upsert(profilePayload)
-
-  if (profileError) {
-    console.error('Error updating profile:', profileError)
-    return { error: 'Error al configurar el perfil del usuario.' }
-  }
-
-  // 7. Link the user to a specific project (optional, legacy support)
-  if (data.proyecto_id) {
-    const column = data.rol === 'cliente_final' ? 'cliente_id' : 'financiero_id'
-    const value = data.rol === 'cliente_final' && data.cliente_crm_id ? data.cliente_crm_id : userId
-    
-    const { error: projectError } = await adminAuthClient
-      .from('proyectos')
-      .update({ [column]: value })
-      .eq('id', data.proyecto_id)
-    
-    if (projectError) {
-      console.error('Error linking project:', projectError)
-      // Non-fatal: the user was still created
-    }
-  }
-
-    return { success: true, userId }
+    return await executeInviteUser(user, profile as Profile, data, supabase)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('invitarUsuario error:', message)

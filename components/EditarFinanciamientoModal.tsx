@@ -1,11 +1,11 @@
-/* eslint-disable */
 'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Plus, Trash2, AlertCircle } from 'lucide-react'
 import type { Proyecto, ConfiguracionTecnica, OpcionFinanciamiento, ConfigFinanciamiento, ModalidadFinanciamiento, Moneda } from '@/lib/types'
-import { parseNum, formatNumberInput, fmtCurrency } from '@/lib/format'
+import { formatNumberInput } from '@/lib/format'
+import { parseNum } from '@/lib/domains/proyectos/schemas'
 
 interface CreationFinancingOption {
   id?: string
@@ -27,14 +27,6 @@ interface Props {
   opcionesFinanciamiento: OpcionFinanciamiento[]
   configFinanciamientoLinks: ConfigFinanciamiento[]
   onSave: () => void
-}
-
-const MODALIDAD_LABELS: Record<string, string> = {
-  credito: 'Crédito',
-  arrendamiento: 'Arrendamiento',
-  ensaas: 'EnSaaS',
-  mem: 'Mercado Eléctrico Mayorista',
-  no_sabe: 'Analista define modalidad',
 }
 
 export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, configuraciones, opcionesFinanciamiento, configFinanciamientoLinks, onSave }: Props) {
@@ -65,7 +57,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
             vehiculo_inversion: o.vehiculo_inversion,
             ahorro_estimado_anual: rawAhorroAnual !== null ? formatNumberInput(String(rawAhorroAnual)) : '',
             ahorro_moneda: (o.moneda as Moneda) || 'MXN',
-            plazo_meses: o.plazo_meses !== null ? String(o.plazo_meses) : '',
+            plazo_meses: o.plazo_meses !== null && o.plazo_meses !== undefined ? String(o.plazo_meses) : '',
             notas: o.notas || '',
             linkedConfigIds
           }
@@ -209,14 +201,14 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
             ahorro_estimado_anual: ahorroAnual,
             ahorro_estimado_mensual: ahorroMensual,
             moneda: o.ahorro_moneda || 'MXN',
-            plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
+            plazo_meses: parseNum(o.plazo_meses) || null,
             notas: o.notas || null
           }).eq('id', o.id!)
           if (updErr) throw updErr
         }
 
         // C. Insert new options
-        let insertedOpts: any[] = []
+        let insertedOpts: OpcionFinanciamiento[] = []
         if (newOpts.length > 0) {
           const payload = newOpts.map((o) => {
             const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
@@ -228,14 +220,14 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
               ahorro_estimado_anual: ahorroAnual,
               ahorro_estimado_mensual: ahorroMensual,
               moneda: o.ahorro_moneda || 'MXN',
-              plazo_meses: o.plazo_meses ? Number(o.plazo_meses) : null,
+              plazo_meses: parseNum(o.plazo_meses) || null,
               notas: o.notas || null,
               seleccionada: false // will preserve or let them select later
             }
           })
           const { data, error: insErr } = await supabase.from('opciones_financiamiento').insert(payload).select('*')
           if (insErr) throw insErr
-          insertedOpts = data || []
+          insertedOpts = (data as OpcionFinanciamiento[]) || []
         }
 
         // D. Create map of tempId -> DB UUID
@@ -354,7 +346,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           )}
 
           {/* Toggle Nodo Recomienda */}
-          <div className="flex items-center gap-2 bg-[#fafff0] border border-[#e0f0c0] rounded-xl p-4">
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
             <input
               type="checkbox"
               id="no_sabe_edit"
@@ -362,7 +354,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
               onChange={e => setIsRecomendacionNodo(e.target.checked)}
               className="w-4 h-4 text-principal focus:ring-acento rounded border-gray-300"
             />
-            <label htmlFor="no_sabe_edit" className="text-xs font-bold text-[#4a5e1e] cursor-pointer">
+            <label htmlFor="no_sabe_edit" className="text-xs font-bold text-emerald-800 cursor-pointer">
               No sé / Recomendar opciones (Nodo definirá las mejores alternativas de financiamiento)
             </label>
           </div>
@@ -409,7 +401,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                         <option value="mem">Mercado Eléctrico Mayorista</option>
                       </select>
                     </div>
-                                        <div>
+                    <div>
                       <label className="block text-xs font-medium mb-1">Ahorro neto anual (post-financiamiento)</label>
                       <div className="flex gap-2">
                         <div className="flex-1">
@@ -424,7 +416,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
                         <div className="w-24">
                           <select
                             value={opt.ahorro_moneda || 'MXN'}
-                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_moneda: e.target.value as Moneda })}
+                            onChange={e => handleUpdateOption(opt.tempId, { ahorro_moneda: (e.target.value as Moneda) })}
                             className={inp}
                           >
                             <option value="MXN">MXN</option>
