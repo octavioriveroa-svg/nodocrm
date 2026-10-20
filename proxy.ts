@@ -43,7 +43,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // ── 2. Refresh session (with timeout guard) ───────────────────
-  const { user, authError, supabaseResponse } = await updateSession(request)
+  const { supabase, user, authError, supabaseResponse } = await updateSession(request)
 
   // ── 3. Check if request is for a protected portal ─────────────
   const isProtectedPath = PORTAL_PREFIXES.some(p => path.startsWith(p))
@@ -51,25 +51,29 @@ export async function proxy(request: NextRequest) {
   // ── 4. No authenticated user → redirect to login ──────────────
   if (!user || authError) {
     if (isProtectedPath) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('returnUrl', path)
+      return NextResponse.redirect(loginUrl)
     }
-    // For non-protected, non-public paths (e.g., "/"), just continue
     return supabaseResponse
   }
 
-  // ── 5. Determine user role ────────────────────────────────────
-  // Primary: read from JWT custom claim (set by Custom Access Token Hook).
-  // Fallback: read from user_metadata (legacy, for users who haven't
-  //           refreshed their token since the hook was deployed).
-  const jwtRole = user.app_metadata?.user_role as string | undefined
-  const metadataRole = user.user_metadata?.rol as string | undefined
-  const rol = jwtRole || metadataRole
+  // ── 5. Determine authoritative user role from public.profiles ──
+  // Never trust client-editable user.user_metadata.rol
+  let rol = user.app_metadata?.user_role as string | undefined
+  const { data: profileRow } = await supabase
+    .from('profiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
+
+  if (profileRow?.rol) {
+    rol = profileRow.rol
+  }
 
   const targetPath = rol ? ROLE_TO_PATH[rol] : undefined
 
   // ── 6. Cross-portal access prevention ─────────────────────────
-  // If a user with role 'epc' tries to access '/admin', redirect them
-  // to their own portal.
   if (isProtectedPath && targetPath && !path.startsWith(`/${targetPath}`)) {
     return NextResponse.redirect(new URL(`/${targetPath}`, request.url))
   }

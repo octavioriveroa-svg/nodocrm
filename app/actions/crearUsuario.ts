@@ -3,6 +3,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export type CrearUsuarioResult = {
+  success?: boolean
+  userId?: string
+  method?: 'created' | 'invited'
+  error?: string
+}
+
 export async function crearUsuarioAdmin(data: {
   email: string
   nombre: string
@@ -10,39 +17,54 @@ export async function crearUsuarioAdmin(data: {
   rol: string
   password?: string
   cliente_crm_id?: string
-}) {
+}): Promise<CrearUsuarioResult> {
   try {
-  const supabase = await createClient()
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return { error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor.' }
+    }
+
+    const supabase = await createClient()
   
-  // 1. Validate caller permissions
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) return { error: 'No autenticado' }
+    // 1. Validate caller permissions
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) return { error: 'No autenticado' }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', user.id)
-    .single()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
   
-  if (!profile) return { error: 'No se encontró tu perfil.' }
+    if (!profile) return { error: 'No se encontró tu perfil.' }
 
-  // Permission matrix:
-  // - nodo_admin: can create any role
-  // - nodo_analista: can create any role
-  // - epc: can only create cliente_final or financiero (for their own clients)
-  const isNodo = ['nodo_admin', 'nodo_analista'].includes(profile.rol)
-  const isEpc = profile.rol === 'epc'
-  const isFinder = profile.rol === 'finder'
+    // Permission matrix:
+    // - nodo_admin: can create any role
+    // - nodo_analista: can create any role EXCEPT nodo_admin
+    // - epc: can only create cliente_final or financiero (for their own clients)
+    // - finder: can only create epc
+    const isNodo = ['nodo_admin', 'nodo_analista'].includes(profile.rol)
+    const isEpc = profile.rol === 'epc'
+    const isFinder = profile.rol === 'finder'
 
-  if (!isNodo && !isEpc && !isFinder) {
-    return { error: 'No autorizado para crear usuarios.' }
-  }
+    if (!isNodo && !isEpc && !isFinder) {
+      return { error: 'No autorizado para crear usuarios.' }
+    }
 
-  // 2. Validate role
-  const VALID_ROLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
-  if (!VALID_ROLES.includes(data.rol)) {
-    return { error: 'Rol inválido: ' + data.rol }
-  }
+    // 2. Validate role
+    const VALID_ROLES = ['epc', 'nodo_analista', 'nodo_admin', 'cliente_final', 'financiero', 'suministrador', 'finder']
+    if (!VALID_ROLES.includes(data.rol)) {
+      return { error: 'Rol inválido: ' + data.rol }
+    }
+
+    // Analysts cannot escalate privileges to admin
+    if (profile.rol === 'nodo_analista' && data.rol === 'nodo_admin') {
+      return { error: 'No autorizado: solo los administradores pueden crear cuentas de administrador.' }
+    }
+
+    // Defense-in-depth: non-admins cannot create admin accounts
+    if (data.rol === 'nodo_admin' && profile.rol !== 'nodo_admin') {
+      return { error: 'No autorizado: solo los administradores pueden crear cuentas de administrador.' }
+    }
 
   // EPC can only create client-facing roles
   if (isEpc && !['cliente_final', 'financiero'].includes(data.rol)) {

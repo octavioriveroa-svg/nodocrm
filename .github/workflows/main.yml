@@ -1,4 +1,4 @@
-name: CI — Lint & Build
+name: CI — Lint, Typecheck, Build & Test
 
 on:
   push:
@@ -9,6 +9,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://nlqrdxwyxmgdwawedweh.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-anon-key-for-ci-build' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'dummy-service-role-for-ci-build' }}
 
     steps:
       - name: Checkout code
@@ -23,6 +28,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Run linter
         run: npm run lint
 
+      - name: Run unit & boundary test suites
+        run: |
+          node tests/w3-atomic-writes.test.mjs
+          node tests/w4-cfe-calculator-and-routes.test.mjs
+          node tests/challenger-sprint1.test.mjs
+
+      - name: Run live Supabase acceptance test suite
+        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        env:
+          QA_USER_ADMIN_EMAIL: ${{ secrets.QA_USER_ADMIN_EMAIL }}
+          QA_USER_ADMIN_PASSWORD: ${{ secrets.QA_USER_ADMIN_PASSWORD }}
+        run: npm test
+
+      - name: Build Next.js application
+        run: npm run build

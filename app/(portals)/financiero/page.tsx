@@ -6,6 +6,7 @@ import { TrendingUp, Activity, DollarSign, Briefcase, ChevronRight } from 'lucid
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import Link from 'next/link'
 import { fmtNum, fmtCurrency, fmtUnit } from '@/lib/format'
+import { calculateProjectSavingsMxn, calculateBatteryCycles } from '@/lib/tariffs/cfe-calculator'
 
 interface PortfolioMetrics {
   activeProjectsCount: number
@@ -36,12 +37,14 @@ export default function FinancieroDashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // 1. Fetch all projects assigned to this financier
+      // 1. Fetch all projects assigned to this financier with their technical configurations
       const { data: projs, error: pErr } = await supabase
         .from('proyectos')
-        .select('id, nombre_proyecto, cliente_final_empresa, capex_estimado, estado')
+        .select(
+          'id, nombre_proyecto, cliente_final_empresa, capex_estimado, capacidad_mwh, estado, configuraciones_tecnicas(ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, seleccionada)'
+        )
         .eq('financiero_id', session.user.id)
-      
+
       if (pErr) {
         console.error(pErr)
         setLoading(false)
@@ -55,57 +58,38 @@ export default function FinancieroDashboard() {
       }
 
       const projectIds = projs.map(p => p.id)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-      // 2. Fetch all telemetry for these projects to aggregate
+      // 2. Fetch bounded telemetry (last 30 days) for these projects
       const { data: teleData, error: tErr } = await supabase
         .from('telemetria_egauge')
-        .select('*')
+        .select('proyecto_id, timestamp, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh, bateria_porcentaje')
         .in('proyecto_id', projectIds)
+        .gte('timestamp', thirtyDaysAgo)
         .order('timestamp', { ascending: true })
+        .limit(5000)
 
       if (tErr) console.error(tErr)
 
       const totalGenerated = teleData ? teleData.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0) : 0
-      
-      setMetrics({
-        activeProjectsCount: projs.length,
-        totalGeneratedKwh: totalGenerated,
-        estimatedSavingsMxn: totalGenerated * 3.9, // Aggregate estimated savings
-        batteryCycles: Math.floor(totalGenerated / 100) // Rough estimation of cycles based on energy
-      })
+      const totalDischarged = teleData ? teleData.reduce((acc, row) => acc + (row.bateria_descarga_kwh || 0), 0) : 0
+      const totalCapacityKwh = projs.reduce((acc, p) => acc + ((p.capacidad_mwh ?? 0) * 1000), 0)
 
-      // Aggregate chart data by timestamp across portfolio
-      const timeMap = new Map<string, { solarProductionKwh: number, gridConsumptionKwh: number, batteryDischargeKwh: number, batteryChargePctSum: number, count: number }>()
-
-      if (teleData) {
-        teleData.forEach(t => {
-          const key = t.timestamp
-          const exist = timeMap.get(key) || { solarProductionKwh: 0, gridConsumptionKwh: 0, batteryDischargeKwh: 0, batteryChargePctSum: 0, count: 0 }
-          
-          exist.solarProductionKwh += t.solar_produccion_kwh || 0
-          exist.gridConsumptionKwh += t.consumo_red_kwh || 0
-          exist.batteryDischargeKwh += t.bateria_descarga_kwh || 0
-          exist.batteryChargePctSum += t.bateria_porcentaje || 0
-          exist.count += 1
-          
-          timeMap.set(key, exist)
-        })
-      }
-
-      const cData = Array.from(timeMap.entries()).map(([timestamp, data]) => ({
-        timestamp,
-        solarProductionKwh: data.solarProductionKwh,
-        gridConsumptionKwh: data.gridConsumptionKwh,
-        batteryDischargeKwh: data.batteryDischargeKwh,
-        batteryChargePct: data.count > 0 ? Math.round(data.batteryChargePctSum / data.count) : 0
-      })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      
-      setChartData(cData)
-
-      // Calculate project breakdown
+      // Calculate project breakdown using real configuration savings or CFE tariff
       const pMetrics = projs.map(p => {
         const pTele = teleData?.filter(t => t.proyecto_id === p.id) || []
         const pGen = pTele.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0)
+        const configs = (p.configuraciones_tecnicas ?? []) as {
+          ahorro_estimado_anual?: number | null
+          ahorro_estimado_mensual: number | null
+          ahorro_moneda: string
+          seleccionada: boolean
+        }[]
+        const selectedConfig = configs.find(c => c.seleccionada) ?? configs[0] ?? null
+        const pSavings = calculateProjectSavingsMxn({
+          totalGeneratedKwh: pGen,
+          selectedConfig,
+        })
         return {
           id: p.id,
           nombre_proyecto: p.nombre_proyecto,
@@ -113,10 +97,45 @@ export default function FinancieroDashboard() {
           capex_estimado: p.capex_estimado,
           estado: p.estado,
           totalGeneratedKwh: pGen,
-          estimatedSavingsMxn: pGen * 3.9
+          estimatedSavingsMxn: pSavings,
         }
       })
 
+      const portfolioSavings = pMetrics.reduce((acc, pm) => acc + pm.estimatedSavingsMxn, 0)
+
+      setMetrics({
+        activeProjectsCount: projs.length,
+        totalGeneratedKwh: totalGenerated,
+        estimatedSavingsMxn: portfolioSavings,
+        batteryCycles: calculateBatteryCycles(totalDischarged, totalCapacityKwh || null),
+      })
+
+      const timeMap = new Map<string, { solarProductionKwh: number; gridConsumptionKwh: number; batteryDischargeKwh: number; batteryChargePctSum: number; count: number }>()
+
+      if (teleData) {
+        teleData.forEach(t => {
+          const key = t.timestamp
+          const exist = timeMap.get(key) || { solarProductionKwh: 0, gridConsumptionKwh: 0, batteryDischargeKwh: 0, batteryChargePctSum: 0, count: 0 }
+          exist.solarProductionKwh += t.solar_produccion_kwh || 0
+          exist.gridConsumptionKwh += t.consumo_red_kwh || 0
+          exist.batteryDischargeKwh += t.bateria_descarga_kwh || 0
+          exist.batteryChargePctSum += t.bateria_porcentaje || 0
+          exist.count += 1
+          timeMap.set(key, exist)
+        })
+      }
+
+      const cData = Array.from(timeMap.entries())
+        .map(([timestamp, data]) => ({
+          timestamp,
+          solarProductionKwh: data.solarProductionKwh,
+          gridConsumptionKwh: data.gridConsumptionKwh,
+          batteryDischargeKwh: data.batteryDischargeKwh,
+          batteryChargePct: data.count > 0 ? Math.round(data.batteryChargePctSum / data.count) : 0,
+        }))
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+      setChartData(cData)
       setProjectMetrics(pMetrics)
       setLoading(false)
     }

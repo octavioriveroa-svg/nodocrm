@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Zap, MapPin, Building, ChevronRight, CheckCircle2, DollarSign } from 'lucide-react'
+import { resolveCfeTariffLabel } from '@/lib/tariffs/cfe-calculator'
 
 interface ProyectoMEM {
   id: string
@@ -33,14 +34,26 @@ export default function OfertasBoard({ suministradorId }: OfertasBoardProps) {
 
   useEffect(() => {
     async function loadProyectos() {
-      // In a real app we'd filter by estado = 'en_analisis' and tipo in ('MEM', 'BESS+MEM')
-      // For testing, we fetch any project that needs MEM
-      const { data } = await supabase
+      // Fetch any project that needs MEM
+      const { data, error } = await supabase
         .from('proyectos')
-        .select('id, nombre_proyecto, cliente_final_empresa, consumo_anual_gwh, tarifa_actual_cfe, codigo_postal, estado')
+        .select('id, nombre_proyecto, cliente_final_empresa, demanda_kw, volumen_energia_mwh_anual, ubicacion_estado, estado')
         .in('tipo', ['MEM', 'BESS+MEM'])
-      
-      if (data) setProyectos(data)
+
+      if (error) {
+        console.error('Error fetching proyectos MEM:', error)
+      } else if (data) {
+        const mapped: ProyectoMEM[] = data.map((p) => ({
+          id: p.id,
+          nombre_proyecto: p.nombre_proyecto,
+          cliente_final_empresa: p.cliente_final_empresa,
+          consumo_anual_gwh: p.volumen_energia_mwh_anual ? +(Number(p.volumen_energia_mwh_anual) / 1000).toFixed(2) : 0,
+          tarifa_actual_cfe: resolveCfeTariffLabel(p.demanda_kw, p.volumen_energia_mwh_anual),
+          codigo_postal: p.ubicacion_estado || 'No especificada',
+          estado: p.estado,
+        }))
+        setProyectos(mapped)
+      }
       setLoading(false)
     }
     loadProyectos()
@@ -112,7 +125,7 @@ export default function OfertasBoard({ suministradorId }: OfertasBoardProps) {
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin size={16} className="text-gray-400" />
-                    <span>CP: {proyecto.codigo_postal || 'No especificado'}</span>
+                    <span>{proyecto.codigo_postal || 'Ubicación no especificada'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Zap size={16} className="text-yellow-500" />

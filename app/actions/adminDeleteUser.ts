@@ -3,8 +3,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function adminDeleteUser(targetId: string) {
+export type AdminDeleteUserResult = {
+  success?: boolean
+  error?: string
+}
+
+export async function adminDeleteUser(targetId: string): Promise<AdminDeleteUserResult> {
   try {
+    if (!targetId || typeof targetId !== 'string') {
+      return { error: 'ID de usuario inválido.' }
+    }
+
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return { error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor.' }
     }
@@ -20,8 +29,8 @@ export async function adminDeleteUser(targetId: string) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['nodo_admin', 'nodo_analista'].includes(profile.rol)) {
-      return { error: 'No autorizado. Solo usuarios Nodo pueden eliminar cuentas.' }
+    if (!profile || profile.rol !== 'nodo_admin') {
+      return { error: 'No autorizado. Solo administradores pueden eliminar cuentas.' }
     }
 
     // Prevent self-deletion

@@ -17,6 +17,7 @@ export default function ConfiguracionAdminPage() {
       const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
 
       const profile: Profile = {
+        ...(profileRow as Partial<Profile>),
         id: session.user.id,
         nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',

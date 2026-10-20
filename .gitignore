@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local scratch, agent logs & supabase temp
+/scratch/
+/.agents/
+/supabase/.temp/
+eslint_results*.txt
+lint_results.txt
