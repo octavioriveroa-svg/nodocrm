@@ -204,14 +204,47 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
     if (configId === 'legacy') return
     setSeleccionandoConfig(true)
     setErrorEstado(null)
+    const prevSelectedId = configsList.find(c => c.seleccionada)?.id
+
     try {
+      // First attempt transactional RPC
+      const { error: rpcErr } = await supabase.rpc('seleccionar_configuracion_tecnica', {
+        p_proyecto_id: proyecto.id,
+        p_config_id: configId,
+      })
+
+      if (!rpcErr) {
+        const updatedList = configsList.map(c => ({ ...c, seleccionada: c.id === configId }))
+        setConfigsList(updatedList)
+        const targetConfig = updatedList.find(c => c.id === configId)
+        if (targetConfig) {
+          setProyecto(prev => ({
+            ...prev,
+            capex_estimado: targetConfig.inversion_total,
+            moneda: (targetConfig.moneda || 'MXN') as Moneda,
+          }))
+        }
+        return
+      }
+
+      // If RPC failed with non-missing function error, throw it
+      if (!rpcErr.message.includes('seleccionar_configuracion_tecnica')) {
+        throw rpcErr
+      }
+
+      // Fallback: sequential update with compensating restore
       // 1. Reset all to false
       const { error: err1 } = await supabase.from('configuraciones_tecnicas').update({ seleccionada: false }).eq('proyecto_id', proyecto.id)
       if (err1) throw err1
       
       // 2. Set target to true
       const { error: err2 } = await supabase.from('configuraciones_tecnicas').update({ seleccionada: true }).eq('id', configId)
-      if (err2) throw err2
+      if (err2) {
+        if (prevSelectedId) {
+          await supabase.from('configuraciones_tecnicas').update({ seleccionada: true }).eq('id', prevSelectedId)
+        }
+        throw err2
+      }
 
       // 3. Update local state
       const updatedList = configsList.map(c => ({ ...c, seleccionada: c.id === configId }))
@@ -239,14 +272,46 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
   async function handleSelectFinancing(optionId: string) {
     setSeleccionandoFinancing(true)
     setErrorEstado(null)
+    const prevSelectedOptionId = opcionesFin.find(o => o.seleccionada)?.id
+
     try {
+      // First attempt transactional RPC
+      const { error: rpcErr } = await supabase.rpc('seleccionar_opcion_financiamiento', {
+        p_proyecto_id: proyecto.id,
+        p_opcion_id: optionId,
+      })
+
+      if (!rpcErr) {
+        const updatedList = opcionesFin.map(o => ({ ...o, seleccionada: o.id === optionId }))
+        setOpcionesFin(updatedList)
+        const targetOption = updatedList.find(o => o.id === optionId)
+        if (targetOption) {
+          setProyecto(prev => ({
+            ...prev,
+            modalidad_financiamiento: [targetOption.vehiculo_inversion as ModalidadFinanciamiento],
+          }))
+        }
+        return
+      }
+
+      // If RPC failed with non-missing function error, throw it
+      if (!rpcErr.message.includes('seleccionar_opcion_financiamiento')) {
+        throw rpcErr
+      }
+
+      // Fallback: sequential update with compensating restore
       // 1. Reset all to false
       const { error: err1 } = await supabase.from('opciones_financiamiento').update({ seleccionada: false }).eq('proyecto_id', proyecto.id)
       if (err1) throw err1
       
       // 2. Set target to true
       const { error: err2 } = await supabase.from('opciones_financiamiento').update({ seleccionada: true }).eq('id', optionId)
-      if (err2) throw err2
+      if (err2) {
+        if (prevSelectedOptionId) {
+          await supabase.from('opciones_financiamiento').update({ seleccionada: true }).eq('id', prevSelectedOptionId)
+        }
+        throw err2
+      }
 
       // 3. Update local state
       const updatedList = opcionesFin.map(o => ({ ...o, seleccionada: o.id === optionId }))
@@ -1788,23 +1853,35 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
         </Seccion>
       )}
 
-      {/* Plan EPC — new project management tool */}
-      <Seccion title="Plan de Proyecto EPC">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">
-              Plan detallado de ingeniería, procurement y construcción con fases, actividades, tareas y hitos financieros.
-            </p>
+      {/* Plan de Proyecto EPC — new project management tool */}
+      {currentUser.rol !== 'cliente_final' && (
+        <Seccion title="Plan de Proyecto EPC">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">
+                Plan detallado de ingeniería, procurement y construcción con fases, actividades, tareas y hitos financieros.
+              </p>
+            </div>
+            <Link
+              href={`${
+                isEpcista
+                  ? '/epc'
+                  : isAdmin
+                    ? '/admin'
+                    : isAnalista
+                      ? '/analista'
+                      : isFinder
+                        ? '/finder'
+                        : '/financiero'
+              }/proyectos/${proyecto.id}/plan`}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-principal text-acento whitespace-nowrap"
+            >
+              <CalendarDays size={16} />
+              {isEpcista ? 'Gestionar Plan' : 'Ver Plan'}
+            </Link>
           </div>
-          <Link
-            href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : isAnalista ? '/analista' : '/financiero'}/proyectos/${proyecto.id}/plan`}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-principal text-acento whitespace-nowrap"
-          >
-            <CalendarDays size={16} />
-            {isEpcista ? 'Gestionar Plan' : 'Ver Plan'}
-          </Link>
-        </div>
-      </Seccion>
+        </Seccion>
+      )}
 
       {/* Monitor de Instalación — only visible after project approval */}
       {['aprobado', 'en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
@@ -1816,7 +1893,19 @@ export default function DetalleProyecto({ proyecto: initial, comentarios: initia
               </p>
             </div>
             <Link
-              href={`${isEpcista ? '/epc' : isAdmin ? '/admin' : isAnalista ? '/analista' : isFinder ? '/finder' : '/financiero'}/proyectos/${proyecto.id}/instalaciones`}
+              href={`${
+                isEpcista
+                  ? '/epc'
+                  : isAdmin
+                    ? '/admin'
+                    : isAnalista
+                      ? '/analista'
+                      : isFinder
+                        ? '/finder'
+                        : currentUser.rol === 'cliente_final'
+                          ? '/cliente'
+                          : '/financiero'
+              }/proyectos/${proyecto.id}/instalaciones`}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md bg-green-600 hover:bg-green-700 text-white whitespace-nowrap"
             >
               <Wrench size={16} />

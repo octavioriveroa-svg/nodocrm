@@ -18,12 +18,13 @@ export default async function ClienteInstalacionesPage({ params }: { params: Pro
 
   if (!profile || profile.rol !== 'cliente_final') redirect('/login')
 
-  // Verify access: project must belong to this client (user id or client_crm_id)
+  if (!profile.cliente_crm_id) redirect('/cliente')
+
   const { data: proyecto } = await supabase
     .from('proyectos')
     .select('id, nombre_proyecto')
     .eq('id', id)
-    .or(`cliente_id.eq.${session.user.id},cliente_id.eq.${profile.cliente_crm_id || '00000000-0000-0000-0000-000000000000'}`)
+    .eq('cliente_id', profile.cliente_crm_id)
     .single()
 
   if (!proyecto) redirect('/cliente')

@@ -17,10 +17,11 @@ export default function ConfiguracionFinderPage() {
       const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
 
       const profile: Profile = {
+        ...(profileRow as Partial<Profile>),
         id: session.user.id,
         nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
-        rol: profileRow?.rol ?? session.user.user_metadata?.rol ?? 'finder',
+        rol: profileRow?.rol ?? 'finder',
         calendario_url: profileRow?.calendario_url ?? null,
         cliente_crm_id: profileRow?.cliente_crm_id ?? null,
         created_at: profileRow?.created_at ?? session.user.created_at,

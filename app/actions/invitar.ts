@@ -3,6 +3,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export type InvitarUsuarioResult = {
+  success?: boolean
+  userId?: string
+  error?: string
+}
+
 export async function invitarUsuario(data: {
   email: string
   nombre: string
@@ -10,46 +16,61 @@ export async function invitarUsuario(data: {
   rol: 'cliente_final' | 'financiero' | 'epc'
   proyecto_id?: string
   cliente_crm_id?: string
-}) {
-  const supabase = await createClient()
-  
-  // 1. Validate permissions (EPC, Admin, Analyst, or Finder can invite)
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return { error: 'No autenticado' }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', session.user.id)
-    .single()
-  
-  if (!profile || !['epc', 'nodo_admin', 'nodo_analista', 'finder'].includes(profile.rol)) {
-    return { error: 'No autorizado para enviar invitaciones' }
-  }
-
-  // 2. EPC can only invite cliente_final or financiero
-  if (profile.rol === 'epc' && !['cliente_final', 'financiero'].includes(data.rol)) {
-    return { error: 'No autorizado para invitar este tipo de usuario' }
-  }
-
-  // Finder can only invite epc users
-  if (profile.rol === 'finder' && data.rol !== 'epc') {
-    return { error: 'No autorizado para invitar este tipo de usuario' }
-  }
-
-  // 3. If EPC, verify the client belongs to them
-  if (profile.rol === 'epc' && data.cliente_crm_id) {
-    const { data: clienteData } = await supabase
-      .from('clientes')
-      .select('id')
-      .eq('id', data.cliente_crm_id)
-      .eq('epcista_id', session.user.id)
-      .single()
-    
-    if (!clienteData) {
-      return { error: 'No autorizado: este cliente no te pertenece' }
+}): Promise<InvitarUsuarioResult> {
+  try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return { error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor.' }
     }
-  }
+
+    const supabase = await createClient()
+  
+    // 1. Validate permissions (EPC, Admin, Analyst, or Finder can invite)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) return { error: 'No autenticado' }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+  
+    if (!profile || !['epc', 'nodo_admin', 'nodo_analista', 'finder'].includes(profile.rol)) {
+      return { error: 'No autorizado para enviar invitaciones' }
+    }
+
+    // Defense-in-depth: Analysts cannot invite admin accounts
+    if (profile.rol === 'nodo_analista' && (data.rol as string) === 'nodo_admin') {
+      return { error: 'No autorizado: solo los administradores pueden invitar cuentas de administrador.' }
+    }
+
+    // Defense-in-depth: Non-admins cannot invite admin accounts
+    if ((data.rol as string) === 'nodo_admin' && profile.rol !== 'nodo_admin') {
+      return { error: 'No autorizado: solo los administradores pueden invitar cuentas de administrador.' }
+    }
+
+    // 2. EPC can only invite cliente_final or financiero
+    if (profile.rol === 'epc' && !['cliente_final', 'financiero'].includes(data.rol)) {
+      return { error: 'No autorizado para invitar este tipo de usuario' }
+    }
+
+    // Finder can only invite epc users
+    if (profile.rol === 'finder' && data.rol !== 'epc') {
+      return { error: 'No autorizado para invitar este tipo de usuario' }
+    }
+
+    // 3. If EPC, verify the client belongs to them
+    if (profile.rol === 'epc' && data.cliente_crm_id) {
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('id', data.cliente_crm_id)
+        .eq('epcista_id', user.id)
+        .single()
+    
+      if (!clienteData) {
+        return { error: 'No autorizado: este cliente no te pertenece' }
+      }
+    }
 
   // 4. Init Admin Client
   const adminAuthClient = createAdminClient()
@@ -106,5 +127,10 @@ export async function invitarUsuario(data: {
     }
   }
 
-  return { success: true, userId }
+    return { success: true, userId }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('invitarUsuario error:', message)
+    return { error: 'Error del servidor: ' + message }
+  }
 }

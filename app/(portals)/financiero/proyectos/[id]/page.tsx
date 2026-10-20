@@ -9,6 +9,7 @@ import { ChevronLeft, Zap, MapPin, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto } from '@/lib/types'
 import { fmtNum, fmtCurrency } from '@/lib/format'
+import { calculateProjectSavingsMxn } from '@/lib/tariffs/cfe-calculator'
 
 interface TelemetriaDB {
   timestamp: string
@@ -63,7 +64,8 @@ export default function FinancieroProyectoDetalle() {
       if (teleData && teleData.length > 0) {
         setTelemetry(teleData)
         const totalGenerated = teleData.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0)
-        setMetrics({ totalGenerated, savingsMxn: totalGenerated * 3.9 })
+        const savingsMxn = calculateProjectSavingsMxn({ totalGeneratedKwh: totalGenerated })
+        setMetrics({ totalGenerated, savingsMxn })
       }
 
       setLoading(false)

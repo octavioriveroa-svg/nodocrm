@@ -1,11 +1,11 @@
 /* eslint-disable */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays, Users } from 'lucide-react'
-import type { Profile } from '@/lib/types'
+import type { Profile, Moneda } from '@/lib/types'
 
 const ESTADOS_MX = [
   'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
@@ -61,51 +61,25 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
   const [calendarioUrl, setCalendarioUrl] = useState(initialProfile.calendario_url ?? '')
   const isNodoUser = ['nodo_admin', 'nodo_analista'].includes(initialProfile.rol)
 
-  // Mi Empresa
+  // Mi Empresa (backed by public.profiles columns)
   const [empresa, setEmpresa] = useState(initialProfile.empresa)
-  const [rfc, setRfc] = useState('')
-  const [industria, setIndustria] = useState('')
-  const [empresaEstado, setEmpresaEstado] = useState('')
-  const [website, setWebsite] = useState('')
+  const [rfc, setRfc] = useState(initialProfile.rfc ?? '')
+  const [industria, setIndustria] = useState(initialProfile.industria ?? '')
+  const [empresaEstado, setEmpresaEstado] = useState(initialProfile.ubicacion_estado ?? '')
+  const [website, setWebsite] = useState(initialProfile.website ?? '')
 
-  // General
-  const [moneda, setMoneda] = useState('MXN')
-  const [timezone, setTimezone] = useState('America/Mexico_City')
+  // General (backed by public.profiles columns)
+  const [moneda, setMoneda] = useState(initialProfile.moneda_preferida ?? 'MXN')
+  const [timezone, setTimezone] = useState(initialProfile.timezone ?? 'America/Mexico_City')
 
-  // Notificaciones
-  const [notifNuevoProyecto, setNotifNuevoProyecto] = useState(true)
-  const [notifCambioEstado, setNotifCambioEstado] = useState(true)
-  const [notifComentario, setNotifComentario] = useState(false)
+  // Notificaciones (backed by public.profiles columns)
+  const [notifNuevoProyecto, setNotifNuevoProyecto] = useState(initialProfile.notif_nuevo_proyecto ?? true)
+  const [notifCambioEstado, setNotifCambioEstado] = useState(initialProfile.notif_cambio_estado ?? true)
+  const [notifComentario, setNotifComentario] = useState(initialProfile.notif_comentarios ?? false)
 
   // Seguridad
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-
-  useEffect(() => {
-    try {
-      const ep = localStorage.getItem(`nodo-empresa-${initialProfile.id}`)
-      if (ep) {
-        const p = JSON.parse(ep)
-        setRfc(p.rfc ?? '')
-        setIndustria(p.industria ?? '')
-        setEmpresaEstado(p.estado ?? '')
-        setWebsite(p.website ?? '')
-      }
-      const gp = localStorage.getItem(`nodo-general-${initialProfile.id}`)
-      if (gp) {
-        const p = JSON.parse(gp)
-        setMoneda(p.moneda ?? 'MXN')
-        setTimezone(p.timezone ?? 'America/Mexico_City')
-      }
-      const np = localStorage.getItem(`nodo-notif-${initialProfile.id}`)
-      if (np) {
-        const p = JSON.parse(np)
-        setNotifNuevoProyecto(p.nuevoProyecto ?? true)
-        setNotifCambioEstado(p.cambioEstado ?? true)
-        setNotifComentario(p.comentario ?? false)
-      }
-    } catch {}
-  }, [initialProfile.id])
 
   function showSaved(msg = 'Cambios guardados') {
     setSavedMsg(msg)
@@ -138,27 +112,48 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
 
   async function guardarEmpresa() {
     setLoading(true)
-    const { error } = await supabase.from('profiles').update({ empresa }).eq('id', initialProfile.id)
-    if (!error) {
-      localStorage.setItem(`nodo-empresa-${initialProfile.id}`, JSON.stringify({ rfc, industria, estado: empresaEstado, website }))
-    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        empresa,
+        rfc: rfc || null,
+        industria: industria || null,
+        ubicacion_estado: empresaEstado || null,
+        website: website || null,
+      })
+      .eq('id', initialProfile.id)
     setLoading(false)
     if (error) showError('Error al guardar: ' + error.message)
     else showSaved()
   }
 
-  function guardarGeneral() {
-    localStorage.setItem(`nodo-general-${initialProfile.id}`, JSON.stringify({ moneda, timezone }))
-    showSaved()
+  async function guardarGeneral() {
+    setLoading(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        moneda_preferida: moneda,
+        timezone,
+      })
+      .eq('id', initialProfile.id)
+    setLoading(false)
+    if (error) showError('Error al guardar: ' + error.message)
+    else showSaved()
   }
 
-  function guardarNotificaciones() {
-    localStorage.setItem(`nodo-notif-${initialProfile.id}`, JSON.stringify({
-      nuevoProyecto: notifNuevoProyecto,
-      cambioEstado: notifCambioEstado,
-      comentario: notifComentario,
-    }))
-    showSaved('Preferencias guardadas')
+  async function guardarNotificaciones() {
+    setLoading(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        notif_nuevo_proyecto: notifNuevoProyecto,
+        notif_cambio_estado: notifCambioEstado,
+        notif_comentarios: notifComentario,
+      })
+      .eq('id', initialProfile.id)
+    setLoading(false)
+    if (error) showError('Error al guardar: ' + error.message)
+    else showSaved('Preferencias guardadas')
   }
 
   async function cambiarPassword() {
@@ -357,7 +352,7 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
               <div className="flex flex-col gap-5 max-w-md">
                 <div>
                   <label className="block text-sm font-medium mb-1">Moneda preferida</label>
-                  <select value={moneda} onChange={e => setMoneda(e.target.value)}
+                  <select value={moneda} onChange={e => setMoneda(e.target.value as Moneda)}
                     className={inp}>
                     <option value="MXN">MXN — Peso mexicano</option>
                     <option value="USD">USD — Dólar estadounidense</option>

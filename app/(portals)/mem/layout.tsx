@@ -22,7 +22,7 @@ export default function SuministradorLayout({ children }: { children: React.Reac
       const { data: profileRow } = await supabase
         .from('profiles').select('*').eq('id', session.user.id).single()
 
-      const rol = profileRow?.rol ?? session.user.user_metadata?.rol
+      const rol = profileRow?.rol
       if (!rol) { router.replace('/login'); return }
       if (rol === 'pendiente') { router.replace('/pendiente'); return }
       if (rol !== 'suministrador') { 
@@ -34,10 +34,11 @@ export default function SuministradorLayout({ children }: { children: React.Reac
         id: session.user.id,
         nombre: profileRow?.nombre ?? session.user.user_metadata?.nombre ?? session.user.email ?? '',
         empresa: profileRow?.empresa ?? session.user.user_metadata?.empresa ?? '',
-        rol: profileRow?.rol ?? session.user.user_metadata?.rol,
+        rol,
         calendario_url: profileRow?.calendario_url ?? null,
         cliente_crm_id: profileRow?.cliente_crm_id ?? null,
         created_at: profileRow?.created_at ?? session.user.created_at,
+        ...profileRow,
       })
       setLoading(false)
     }

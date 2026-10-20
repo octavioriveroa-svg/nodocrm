@@ -1,7 +1,13 @@
 'use client'
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { TelemetryDataPoint } from '@/lib/egauge'
+export interface TelemetryDataPoint {
+  timestamp: string
+  solarProductionKwh: number
+  gridConsumptionKwh: number
+  batteryChargePct: number
+  batteryDischargeKwh: number
+}
 
 interface EnergyChartProps {
   data: TelemetryDataPoint[]

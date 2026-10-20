@@ -12,23 +12,32 @@ export default function PendientePage() {
     window.location.href = '/login'
   }
 
-  // Si el rol ya fue actualizado, redirigir
   useEffect(() => {
-    const interval = setInterval(async () => {
+    async function checkApproval() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
-      const { data: p } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single()
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('rol')
+        .eq('id', session.user.id)
+        .single()
       if (p?.rol && p.rol !== 'pendiente') {
-        clearInterval(interval)
+        await supabase.auth.refreshSession()
         const rolPaths: Record<string, string> = {
-          nodo_admin: '/admin', nodo_analista: '/analista', epc: '/epc',
-          cliente_final: '/cliente', financiero: '/financiero', suministrador: '/mem',
+          nodo_admin: '/admin',
+          nodo_analista: '/analista',
+          epc: '/epc',
+          cliente_final: '/cliente',
+          financiero: '/financiero',
+          suministrador: '/mem',
           finder: '/finder',
         }
         const dest = rolPaths[p.rol] || '/epc'
         window.location.href = dest
       }
-    }, 10000) // revisa cada 10 segundos
+    }
+    checkApproval()
+    const interval = setInterval(checkApproval, 10000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -15,6 +15,15 @@ export interface Profile {
   calendario_url: string | null
   cliente_crm_id: string | null
   created_at: string
+  rfc?: string | null
+  industria?: string | null
+  ubicacion_estado?: string | null
+  website?: string | null
+  moneda_preferida?: Moneda | null
+  timezone?: string | null
+  notif_nuevo_proyecto?: boolean | null
+  notif_cambio_estado?: boolean | null
+  notif_comentarios?: boolean | null
 }
  
 export interface Proyecto {

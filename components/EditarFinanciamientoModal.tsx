@@ -152,48 +152,53 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
 
       // 2. Perform DB Updates
       if (isRecomendacionNodo) {
-        // A. Delete existing options
-        const { error: delErr } = await supabase.from('opciones_financiamiento').delete().eq('proyecto_id', proyecto.id)
-        if (delErr) throw delErr
+        const previousOptionIds = (opcionesFinanciamiento ?? []).map(o => o.id)
 
-        // B. Insert single no_sabe option
-        const { data: insertedOpt, error: insErr } = await supabase.from('opciones_financiamiento').insert({
-          proyecto_id: proyecto.id,
-          nombre: 'Recomendación de Nodo',
-          vehiculo_inversion: 'no_sabe',
-          seleccionada: true
-        }).select('id').single()
+        // A. Insert new single 'no_sabe' option FIRST so data is never lost if insert fails
+        const { data: insertedOpt, error: insErr } = await supabase
+          .from('opciones_financiamiento')
+          .insert({
+            proyecto_id: proyecto.id,
+            nombre: 'Recomendación de Nodo',
+            vehiculo_inversion: 'no_sabe',
+            seleccionada: true,
+          })
+          .select('id')
+          .single()
         if (insErr) throw insErr
 
-        // C. Link to all configurations in junction table
+        // B. Link to all configurations in junction table
         if (insertedOpt && configuraciones.length > 0) {
           const junctionRows = configuraciones.map(c => ({
             configuracion_id: c.id,
-            opcion_financiamiento_id: insertedOpt.id
+            opcion_financiamiento_id: insertedOpt.id,
           }))
           const { error: jErr } = await supabase.from('config_financiamiento').insert(junctionRows)
           if (jErr) throw jErr
         }
 
-        // D. Update project level modalidad_financiamiento
-        await supabase.from('proyectos').update({
-          modalidad_financiamiento: ['no_sabe']
-        }).eq('id', proyecto.id)
-
-      } else {
-        // A. Identify existing, new and removed options
-        const newOpts = options.filter(o => o.tempId.startsWith('fin-') || o.tempId === 'default')
-        const existingOpts = options.filter(o => !o.tempId.startsWith('fin-') && o.tempId !== 'default')
-
-        // Delete removed ones
-        const keptIds = options.map(o => o.id).filter(Boolean) as string[]
-        const toDelete = (opcionesFinanciamiento ?? []).filter(o => !keptIds.includes(o.id))
-        if (toDelete.length > 0) {
-          const { error: delErr } = await supabase.from('opciones_financiamiento').delete().in('id', toDelete.map(o => o.id))
+        // C. Only AFTER new option and links succeeded, delete previous options
+        if (previousOptionIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from('opciones_financiamiento')
+            .delete()
+            .in('id', previousOptionIds)
           if (delErr) throw delErr
         }
 
-                // B. Update existing ones
+        // D. Update project level modalidad_financiamiento
+        const { error: projUpdErr } = await supabase
+          .from('proyectos')
+          .update({ modalidad_financiamiento: ['no_sabe'] })
+          .eq('id', proyecto.id)
+        if (projUpdErr) throw projUpdErr
+
+      } else {
+        // A. Identify existing and new options
+        const newOpts = options.filter(o => o.tempId.startsWith('fin-') || o.tempId === 'default')
+        const existingOpts = options.filter(o => !o.tempId.startsWith('fin-') && o.tempId !== 'default')
+
+        // B. Update existing options FIRST
         for (const o of existingOpts) {
           const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
           const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
@@ -210,10 +215,10 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           if (updErr) throw updErr
         }
 
-        // C. Insert new ones
+        // C. Insert new options
         let insertedOpts: any[] = []
         if (newOpts.length > 0) {
-          const payload = newOpts.map((o, idx) => {
+          const payload = newOpts.map((o) => {
             const ahorroAnual = o.ahorro_estimado_anual ? parseNum(o.ahorro_estimado_anual) : null
             const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
             return {
@@ -241,14 +246,7 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           if (dbOpt) idMap[o.tempId] = dbOpt.id
         })
 
-        // E. Sync Junction table config_financiamiento
-        // Delete all old links for this project's configurations
-        if (configuraciones.length > 0) {
-          const { error: delLinksErr } = await supabase.from('config_financiamiento').delete().in('configuracion_id', configuraciones.map(c => c.id))
-          if (delLinksErr) throw delLinksErr
-        }
-
-        // Insert current links
+        // E. Sync Junction table config_financiamiento: Upsert new links BEFORE deleting stale links
         const junctionRows: { configuracion_id: string; opcion_financiamiento_id: string }[] = []
         options.forEach(o => {
           const dbOptId = idMap[o.tempId]
@@ -262,11 +260,43 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
         })
 
         if (junctionRows.length > 0) {
-          const { error: insLinksErr } = await supabase.from('config_financiamiento').insert(junctionRows)
+          const { error: insLinksErr } = await supabase
+            .from('config_financiamiento')
+            .upsert(junctionRows, { onConflict: 'configuracion_id,opcion_financiamiento_id', ignoreDuplicates: true })
           if (insLinksErr) throw insLinksErr
         }
 
-        // F. Sync project level unique list of investment vehicles
+        // F. Delete removed options AFTER new options and links are safely persisted
+        const keptIds = options.map(o => o.id).filter(Boolean) as string[]
+        const toDelete = (opcionesFinanciamiento ?? []).filter(o => !keptIds.includes(o.id))
+        if (toDelete.length > 0) {
+          const { error: delErr } = await supabase.from('opciones_financiamiento').delete().in('id', toDelete.map(o => o.id))
+          if (delErr) throw delErr
+        }
+
+        // Clean up stale links in config_financiamiento for this project's configurations
+        if (configuraciones.length > 0) {
+          const configIds = configuraciones.map(c => c.id)
+          const { data: existingLinks } = await supabase
+            .from('config_financiamiento')
+            .select('configuracion_id, opcion_financiamiento_id')
+            .in('configuracion_id', configIds)
+          
+          if (existingLinks && existingLinks.length > 0) {
+            const staleLinks = existingLinks.filter(el =>
+              !junctionRows.some(jr => jr.configuracion_id === el.configuracion_id && jr.opcion_financiamiento_id === el.opcion_financiamiento_id)
+            )
+            for (const sl of staleLinks) {
+              await supabase
+                .from('config_financiamiento')
+                .delete()
+                .eq('configuracion_id', sl.configuracion_id)
+                .eq('opcion_financiamiento_id', sl.opcion_financiamiento_id)
+            }
+          }
+        }
+
+        // G. Sync project level unique list of investment vehicles
         const vehiclesArray = Array.from(new Set(options.map(o => o.vehiculo_inversion)))
         
         // Ensure there is at least one option selected as winner. If not, select first
@@ -281,9 +311,10 @@ export default function EditarFinanciamientoModal({ isOpen, onClose, proyecto, c
           }
         }
 
-        await supabase.from('proyectos').update({
+        const { error: projUpdErr } = await supabase.from('proyectos').update({
           modalidad_financiamiento: vehiclesArray as ModalidadFinanciamiento[]
         }).eq('id', proyecto.id)
+        if (projUpdErr) throw projUpdErr
       }
 
       onSave()

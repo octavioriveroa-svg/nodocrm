@@ -39,7 +39,7 @@ export default function LoginPage() {
       return
     }
 
-    const rol = profileRow?.rol ?? newSession?.user?.user_metadata?.rol
+    const rol = profileRow?.rol
     if (!rol) {
       setError('El usuario no tiene un rol asignado.')
       setLoading(false)
@@ -57,6 +57,7 @@ export default function LoginPage() {
     else if (rol === 'cliente_final') sub = 'cliente'
     else if (rol === 'financiero') sub = 'financiero'
     else if (rol === 'suministrador') sub = 'mem'
+    else if (rol === 'finder') sub = 'finder'
 
     window.location.href = `/${sub}`
   }

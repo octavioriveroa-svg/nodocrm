@@ -20,6 +20,24 @@ interface ProyectoConEpcista extends Proyecto {
   finder_empresa: string
 }
 
+interface JoinedProfile {
+  id?: string
+  nombre?: string | null
+  empresa?: string | null
+}
+
+interface RawProyecto extends Proyecto {
+  epc?: JoinedProfile | JoinedProfile[] | null
+  responsable?: JoinedProfile | JoinedProfile[] | null
+  finder?: JoinedProfile | JoinedProfile[] | null
+}
+
+function extractProfile(val: JoinedProfile | JoinedProfile[] | null | undefined): JoinedProfile | null {
+  if (!val) return null
+  if (Array.isArray(val)) return val[0] ?? null
+  return val
+}
+
 export default function AdminProyectosPage() {
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<ProyectoConEpcista[]>([])
@@ -47,34 +65,70 @@ export default function AdminProyectosPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: prs } = await supabase
+      // PERF-01 / PERF-03: Single relational join query for project stakeholder profiles
+      const { data: joinedData, error: joinError } = await supabase
         .from('proyectos')
-        .select('*')
+        .select(`
+          *,
+          epc:profiles!proyectos_epcista_id_fkey(id, nombre, empresa),
+          responsable:profiles!proyectos_responsable_nodo_id_fkey(id, nombre, empresa),
+          finder:profiles!proyectos_finder_id_fkey(id, nombre, empresa)
+        `)
         .order('created_at', { ascending: false })
 
-      if (!prs || prs.length === 0) { setLoading(false); return }
+      let prs: RawProyecto[] | null = null
 
-      // Collect all profile IDs we need to resolve (epcista + responsable + finder)
-      const allIds = [...new Set([
-        ...prs.map((p: { epcista_id: string }) => p.epcista_id),
-        ...prs.map((p: { responsable_nodo_id?: string | null }) => p.responsable_nodo_id).filter(Boolean) as string[],
-        ...prs.map((p: { finder_id?: string | null }) => p.finder_id).filter(Boolean) as string[],
-      ])]
-      const { data: perfiles } = await supabase.from('profiles').select('id, nombre, empresa').in('id', allIds)
-      const nameMap: Record<string, { nombre: string; empresa: string }> = {}
-      for (const pf of perfiles ?? []) {
-        const p = pf as { id: string; nombre: string; empresa: string }
-        nameMap[p.id] = { nombre: p.nombre, empresa: p.empresa }
+      // Resilient fallback: If PostgREST schema cache hasn't reloaded foreign keys, fallback to basic select
+      if (joinError) {
+        console.warn('PostgREST join query failed, falling back to manual resolution:', joinError.message)
+        const { data: fallbackData } = await supabase
+          .from('proyectos')
+          .select('*')
+          .order('created_at', { ascending: false })
+        prs = (fallbackData as RawProyecto[]) || null
+      } else {
+        prs = (joinedData as unknown as RawProyecto[]) || null
       }
 
-      setProyectos(prs.map((p: Proyecto) => ({
-        ...p,
-        epcista_nombre: p.epcista_id ? nameMap[p.epcista_id]?.nombre ?? '—' : '—',
-        epcista_empresa: p.epcista_id ? nameMap[p.epcista_id]?.empresa ?? '—' : '—',
-        responsable_nombre: p.responsable_nodo_id ? nameMap[p.responsable_nodo_id]?.nombre ?? '—' : '—',
-        finder_nombre: p.finder_id ? nameMap[p.finder_id]?.nombre ?? '—' : '—',
-        finder_empresa: p.finder_id ? nameMap[p.finder_id]?.empresa ?? '—' : '—',
-      })))
+      if (!prs || prs.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      // Check if joined relations were populated
+      const hasJoinedRelations = !joinError && prs.some(p => p.epc || p.responsable || p.finder)
+
+      const nameMap: Record<string, { nombre: string; empresa: string }> = {}
+      if (!hasJoinedRelations) {
+        // Collect all profile IDs we need to resolve (epcista + responsable + finder)
+        const allIds = [...new Set([
+          ...prs.map(p => p.epcista_id),
+          ...prs.map(p => p.responsable_nodo_id).filter(Boolean) as string[],
+          ...prs.map(p => p.finder_id).filter(Boolean) as string[],
+        ])]
+        if (allIds.length > 0) {
+          const { data: perfiles } = await supabase.from('profiles').select('id, nombre, empresa').in('id', allIds)
+          for (const pf of perfiles ?? []) {
+            const p = pf as { id: string; nombre: string; empresa: string }
+            nameMap[p.id] = { nombre: p.nombre, empresa: p.empresa }
+          }
+        }
+      }
+
+      setProyectos(prs.map((p) => {
+        const epc = extractProfile(p.epc)
+        const resp = extractProfile(p.responsable)
+        const fnd = extractProfile(p.finder)
+
+        return {
+          ...p,
+          epcista_nombre: epc?.nombre || (p.epcista_id ? nameMap[p.epcista_id]?.nombre ?? '—' : '—'),
+          epcista_empresa: epc?.empresa || (p.epcista_id ? nameMap[p.epcista_id]?.empresa ?? '—' : '—'),
+          responsable_nombre: resp?.nombre || (p.responsable_nodo_id ? nameMap[p.responsable_nodo_id]?.nombre ?? '—' : '—'),
+          finder_nombre: fnd?.nombre || (p.finder_id ? nameMap[p.finder_id]?.nombre ?? '—' : '—'),
+          finder_empresa: fnd?.empresa || (p.finder_id ? nameMap[p.finder_id]?.empresa ?? '—' : '—'),
+        }
+      }))
       setLoading(false)
     }
     load()
@@ -137,7 +191,12 @@ export default function AdminProyectosPage() {
           <option value="recibido">Recibido</option>
           <option value="en_analisis">En análisis</option>
           <option value="propuesta_lista">Propuesta lista</option>
-          <option value="enviada">Enviada</option>
+          <option value="enviada">Propuesta enviada</option>
+          <option value="negociacion">Negociación</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="en_construccion">En construcción</option>
+          <option value="operativo">Operativo</option>
+          <option value="completado">Completado</option>
           <option value="cliente_interesado">Cliente interesado</option>
         </select>
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoProyecto | 'todos')}
@@ -149,6 +208,14 @@ export default function AdminProyectosPage() {
           <option value="MEM">MEM</option>
           <option value="BESS+MEM">BESS+MEM</option>
         </select>
+        {(busqueda || filtroEstado !== 'todos' || filtroTipo !== 'todos') && (
+          <button
+            onClick={() => { setBusqueda(''); setFiltroEstado('todos'); setFiltroTipo('todos') }}
+            className="text-xs font-semibold px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div className="rounded-xl border border-borde overflow-hidden bg-white shadow-sm">
@@ -168,7 +235,24 @@ export default function AdminProyectosPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {lista.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-muted">Sin proyectos.</td></tr>
+              <tr>
+                <td colSpan={9} className="px-6 py-12 text-center">
+                  <p className="text-sm font-semibold text-gray-700">No se encontraron proyectos con los filtros actuales.</p>
+                  <p className="text-xs text-gray-400 mt-1 mb-4">
+                    {busqueda && `Búsqueda: "${busqueda}" `}
+                    {filtroEstado !== 'todos' && `• Estado: "${filtroEstado}" `}
+                    {filtroTipo !== 'todos' && `• Tipo: "${filtroTipo}"`}
+                  </p>
+                  {(busqueda || filtroEstado !== 'todos' || filtroTipo !== 'todos') && (
+                    <button
+                      onClick={() => { setBusqueda(''); setFiltroEstado('todos'); setFiltroTipo('todos') }}
+                      className="px-4 py-2 text-xs font-bold rounded-lg bg-acento text-principal hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                    >
+                      Restablecer todos los filtros
+                    </button>
+                  )}
+                </td>
+              </tr>
             )}
             {lista.map(p => (
               <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">

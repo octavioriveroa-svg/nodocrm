@@ -379,15 +379,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         if (insertedConfigs[idx]) idMap[c.tempId] = insertedConfigs[idx].id
       })
 
-      // C. Delete removed configurations
-      const configIdsToKeep = configs.map(c => c.id).filter(id => id && id !== 'legacy') as string[]
-      const configsToDelete = (configuraciones ?? []).filter(c => c.id && c.id !== 'legacy' && !configIdsToKeep.includes(c.id))
-      if (configsToDelete.length > 0) {
-        const { error: err } = await supabase.from('configuraciones_tecnicas').delete().in('id', configsToDelete.map(c => c.id))
-        if (err) throw err
-      }
-
-      // 3. Sync products (proyecto_sitio_productos) first before altering sites
+      // 3. Sync products (proyecto_sitio_productos) first before altering sites or deleting configs
       const activeProductsList: any[] = []
       configs.forEach(c => {
         const configDbId = idMap[c.tempId]
@@ -405,15 +397,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         })
       })
 
-      // Delete removed products
-      const activeProductIds = activeProductsList.map(p => p.id).filter(Boolean) as string[]
-      const productsToDelete = (productos ?? []).map(p => p.id).filter(id => !activeProductIds.includes(id))
-      if (productsToDelete.length > 0) {
-        const { error: err } = await supabase.from('proyecto_sitio_productos').delete().in('id', productsToDelete)
-        if (err) throw err
-      }
-
-      // Update existing and insert new products
+      // Update existing and insert new products FIRST
       const prodsToUpdate = activeProductsList.filter(p => p.id && !p.id.startsWith('prod-'))
       const prodsToInsert = activeProductsList.filter(p => !p.id || p.id.startsWith('prod-'))
 
@@ -437,6 +421,22 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
             datos: p.datos
           }))
         )
+        if (err) throw err
+      }
+
+      // Delete removed products AFTER new products are safely saved
+      const activeProductIds = activeProductsList.map(p => p.id).filter(Boolean) as string[]
+      const productsToDelete = (productos ?? []).map(p => p.id).filter(id => !activeProductIds.includes(id))
+      if (productsToDelete.length > 0) {
+        const { error: err } = await supabase.from('proyecto_sitio_productos').delete().in('id', productsToDelete)
+        if (err) throw err
+      }
+
+      // Delete removed configurations AFTER products and configs are saved
+      const configIdsToKeep = configs.map(c => c.id).filter(id => id && id !== 'legacy') as string[]
+      const configsToDelete = (configuraciones ?? []).filter(c => c.id && c.id !== 'legacy' && !configIdsToKeep.includes(c.id))
+      if (configsToDelete.length > 0) {
+        const { error: err } = await supabase.from('configuraciones_tecnicas').delete().in('id', configsToDelete.map(c => c.id))
         if (err) throw err
       }
 
@@ -466,6 +466,21 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         if (err) throw err
       }
 
+      // Ensure configs[0] is marked seleccionada: true if no configuration remains selected
+      const hasSelectedConfig = (configuraciones ?? []).some(
+        c => c.seleccionada && configIdsToKeep.includes(c.id)
+      )
+      if (!hasSelectedConfig && configs.length > 0) {
+        const firstDbId = idMap[configs[0].tempId]
+        if (firstDbId) {
+          const { error: selErr } = await supabase
+            .from('configuraciones_tecnicas')
+            .update({ seleccionada: true })
+            .eq('id', firstDbId)
+          if (selErr) throw selErr
+        }
+      }
+
       // 5. Update summary fields on the project using the selected config (or first config)
       const selectedConfig = configs.find(c => {
         if (c.id && c.id !== 'legacy') {
@@ -481,10 +496,11 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       const currencies = selectedProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
       const winningMoneda = (currencies.length > 0 ? currencies[0] : (proyecto.moneda || 'MXN')) as Moneda
 
-      await supabase.from('proyectos').update({
+      const { error: projErr } = await supabase.from('proyectos').update({
         capex_estimado: winningInversion,
         moneda: winningMoneda
       }).eq('id', proyecto.id)
+      if (projErr) throw projErr
 
       onSave()
     } catch (err: unknown) {

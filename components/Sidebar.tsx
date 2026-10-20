@@ -58,9 +58,10 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
   const navAnalista: NavSection[] = [
     { label: 'Visión general', items: [
-      { href: '/analista', label: 'Proyectos', icon: Folder },
+      { href: '/analista', label: 'Dashboard', icon: LayoutDashboard },
     ]},
     { label: 'Operaciones', items: [
+      { href: '/analista/proyectos', label: 'Proyectos', icon: Folder },
       { href: '/analista/instalaciones', label: 'Instalaciones', icon: Wrench },
       { href: '/analista/clientes', label: 'Clientes', icon: Building2 },
     ]},
@@ -136,6 +137,17 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
     .toUpperCase()
     .slice(0, 2)
 
+  const ROLE_PORTAL_PREFIX: Record<Rol, string> = {
+    epc: 'epc',
+    nodo_analista: 'analista',
+    nodo_admin: 'admin',
+    cliente_final: 'cliente',
+    financiero: 'financiero',
+    suministrador: 'mem',
+    finder: 'finder',
+    pendiente: 'pendiente',
+  }
+
   return (
     <>
       {/* Mobile Toggle Button */}
@@ -180,7 +192,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
               {section.items.map(({ href, label, icon: Icon }) => {
                 const portalRoots = ['/epc', '/analista', '/admin', '/cliente', '/financiero', '/mem', '/finder']
                 const isRoot = portalRoots.includes(href)
-                const active = pathname === href || (!isRoot && pathname.startsWith(href))
+                const active = pathname === href || (!isRoot && pathname.startsWith(`${href}/`))
                 const showBadge = label === 'Usuarios' && pendingCount > 0
                 return (
                   <Link
@@ -216,7 +228,7 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
             </div>
           </div>
           <Link
-            href={`/${rol.replace('nodo_analista', 'analista').replace('nodo_admin', 'admin')}/configuracion`}
+            href={`/${ROLE_PORTAL_PREFIX[rol] ?? 'epc'}/configuracion`}
             onClick={() => setIsOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all ${pathname.includes('/configuracion') ? 'text-acento bg-acento/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
           >
