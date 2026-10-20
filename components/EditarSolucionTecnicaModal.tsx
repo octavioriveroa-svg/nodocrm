@@ -1,40 +1,23 @@
-/* eslint-disable */
 'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Plus, Zap, Battery, Trash2, Edit2, AlertCircle, Check } from 'lucide-react'
-import type { Proyecto, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, ModalidadFinanciamiento, Moneda } from '@/lib/types'
-import { parseNum, formatNumberInput, fmtNum, fmtCurrency } from '@/lib/format'
+import type { Proyecto, Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda } from '@/lib/types'
+import type { FVForm, BESSForm, Producto } from '@/components/proyectos/wizard/types'
+import { formatNumberInput, fmtNum, fmtCurrency } from '@/lib/format'
+import {
+  parseNum,
+  validarFvForm,
+  validarBessForm,
+  sanitizeFvDatos,
+  sanitizeBessDatos,
+  hydrateFvForm,
+  hydrateBessForm,
+} from '@/lib/domains/proyectos/schemas'
 
-interface FVForm {
-  num_modulos: string
-  potencia_modulos_w: string
-  marca_modulos: string
-  num_inversores: string
-  potencia_inversores_kw: string
-  marca_inversores: string
-  generacion_anual_kwh: string
-  capex: string
-  capex_moneda: string
-}
-
-interface BESSForm {
-  potencia_kw: string
-  capacidad_kwh: string
-  marca: string
-  uso: string
-  capex: string
-  capex_moneda: string
-  inversores_hibridos: boolean
-}
-
-interface Producto {
+interface ModalProducto extends Producto {
   id?: string
-  tempId: string
-  tipo: 'fv' | 'bess'
-  fv?: FVForm
-  bess?: BESSForm
 }
 
 interface CreationConfig {
@@ -43,9 +26,9 @@ interface CreationConfig {
   nombre: string
   descripcion: string
   sitiosSeleccionados: string[]
-  productosMap: Record<string, Producto[]>
+  productosMap: Record<string, ModalProducto[]>
   ahorro_estimado_anual: string
-  ahorro_moneda: string
+  ahorro_moneda: Moneda
 }
 
 interface Props {
@@ -57,14 +40,6 @@ interface Props {
   sitios: Sitio[] // current project sites
   onSave: () => void
 }
-
-const ESTADOS_MX = [
-  'Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua',
-  'Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero',
-  'Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro',
-  'Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala',
-  'Veracruz','Yucatán','Zacatecas',
-]
 
 const emptyFv: FVForm = {
   num_modulos: '',
@@ -99,7 +74,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
   // Product form states
   const [addingToSitioId, setAddingToSitioId] = useState<string | null>(null)
   const [productTipo, setProductTipo] = useState<'fv' | 'bess' | null>(null)
-  const [editingProduct, setEditingProduct] = useState<Producto | null>(null)
+  const [editingProduct, setEditingProduct] = useState<ModalProducto | null>(null)
   const [fvForm, setFvForm] = useState<FVForm>(emptyFv)
   const [bessForm, setBessForm] = useState<BESSForm>(emptyBess)
 
@@ -111,7 +86,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           if (data) setSitiosCliente(data as Sitio[])
         })
     }
-  }, [proyecto.cliente_id, isOpen])
+  }, [proyecto.cliente_id, isOpen, supabase])
 
   // Load and map configurations and products on open
   useEffect(() => {
@@ -124,38 +99,20 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           ? productSites
           : (sitios ?? []).map(s => s.id)
 
-        const productosMap: Record<string, Producto[]> = {}
+        const productosMap: Record<string, ModalProducto[]> = {}
         for (const p of configProducts) {
           if (!productosMap[p.sitio_id]) productosMap[p.sitio_id] = []
-          const d = p.datos as any
+          const d = (p.datos ?? {}) as Record<string, unknown>
           productosMap[p.sitio_id].push({
             id: p.id,
             tempId: p.id,
             tipo: p.tipo,
-                        fv: p.tipo === 'fv' ? {
-              num_modulos: formatNumberInput(String(d.num_modulos ?? '')),
-              potencia_modulos_w: formatNumberInput(String(d.potencia_modulos_w ?? '')),
-              marca_modulos: String(d.marca_modulos ?? ''),
-              num_inversores: formatNumberInput(String(d.num_inversores ?? '')),
-              potencia_inversores_kw: formatNumberInput(String(d.potencia_inversores_kw ?? '')),
-              marca_inversores: String(d.marca_inversores ?? ''),
-              generacion_anual_kwh: formatNumberInput(String(d.generacion_anual_kwh ?? '')),
-              capex: formatNumberInput(String(d.capex ?? '')),
-              capex_moneda: String(d.capex_moneda ?? 'USD'),
-            } : undefined,
-            bess: p.tipo === 'bess' ? {
-              potencia_kw: formatNumberInput(String(d.potencia_kw ?? '')),
-              capacidad_kwh: formatNumberInput(String(d.capacidad_kwh ?? '')),
-              marca: String(d.marca ?? ''),
-              uso: String(d.uso ?? 'load_shifting'),
-              capex: formatNumberInput(String(d.capex ?? '')),
-              capex_moneda: String(d.capex_moneda ?? 'USD'),
-              inversores_hibridos: d.inversores_hibridos ?? false,
-            } : undefined
+            fv: p.tipo === 'fv' ? hydrateFvForm(d) : undefined,
+            bess: p.tipo === 'bess' ? hydrateBessForm(d) : undefined
           })
         }
 
-        const rawAhorroAnual = (c as any).ahorro_estimado_anual ?? ((c as any).ahorro_estimado_mensual != null ? (c as any).ahorro_estimado_mensual * 12 : null)
+        const rawAhorroAnual = c.ahorro_estimado_anual ?? (c.ahorro_estimado_mensual != null ? c.ahorro_estimado_mensual * 12 : null)
 
         return {
           id: c.id,
@@ -165,7 +122,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           sitiosSeleccionados,
           productosMap,
           ahorro_estimado_anual: rawAhorroAnual !== null && rawAhorroAnual !== undefined ? formatNumberInput(String(rawAhorroAnual)) : '',
-          ahorro_moneda: (c as any).ahorro_moneda || 'MXN'
+          ahorro_moneda: (c.ahorro_moneda as Moneda) || 'MXN'
         }
       })
 
@@ -184,7 +141,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       setConfigs(mapped)
       setActiveConfigId(mapped[0].tempId)
     }
-  }, [isOpen, configuraciones, productos])
+  }, [isOpen, configuraciones, productos, sitios])
 
   if (!isOpen) return null
 
@@ -214,23 +171,31 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       : null
   }
 
+  // Check if current site has hybrid BESS
+  const currentSiteProducts = addingToSitioId ? (activeConfig.productosMap[addingToSitioId] ?? []) : []
+  const hasHybridBess = currentSiteProducts.some(
+    p => p.tipo === 'bess' && (p.bess?.inversores_hibridos || Boolean((p as unknown as { datos?: { inversores_hibridos?: boolean } }).datos?.inversores_hibridos))
+  )
+
   function handleSaveProduct() {
     if (!addingToSitioId) return
     setError(null)
 
     if (productTipo === 'fv') {
-      if (!fvForm.num_modulos || !fvForm.potencia_modulos_w || !fvForm.marca_modulos.trim() || !fvForm.num_inversores || !fvForm.potencia_inversores_kw || !fvForm.marca_inversores.trim() || !fvForm.generacion_anual_kwh || !fvForm.capex) {
-        setError('Completa todos los campos obligatorios del Fotovoltaico.')
+      const validationError = validarFvForm(fvForm, addingToSitioId, activeConfig.productosMap)
+      if (validationError) {
+        setError(validationError)
         return
       }
-    } else {
-      if (!bessForm.potencia_kw || !bessForm.capacidad_kwh || !bessForm.marca.trim() || !bessForm.capex) {
-        setError('Completa todos los campos obligatorios de BESS.')
+    } else if (productTipo === 'bess') {
+      const validationError = validarBessForm(bessForm)
+      if (validationError) {
+        setError(validationError)
         return
       }
     }
 
-    const newProd: Producto = {
+    const newProd: ModalProducto = {
       tempId: editingProduct?.tempId || `prod-${Date.now()}`,
       id: editingProduct?.id,
       tipo: productTipo!,
@@ -263,7 +228,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
     setBessForm(emptyBess)
   }
 
-  function handleEditProduct(sitioId: string, p: Producto) {
+  function handleEditProduct(sitioId: string, p: ModalProducto) {
     setAddingToSitioId(sitioId)
     setProductTipo(p.tipo)
     setEditingProduct(p)
@@ -324,7 +289,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const inversion_total = configProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
         const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
-        const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
+        const configMoneda: Moneda = currencies.length > 0 ? (currencies[0] as Moneda) : 'USD'
 
         const ahorroAnual = parseNum(c.ahorro_estimado_anual) || null
         const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
@@ -347,7 +312,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         const inversion_total = configProducts.reduce((sum, p) => sum + (p.tipo === 'fv' ? parseNum(p.fv?.capex) : parseNum(p.bess?.capex)), 0)
 
         const currencies = configProducts.map(p => p.tipo === 'fv' ? p.fv?.capex_moneda : p.bess?.capex_moneda).filter(Boolean)
-        const configMoneda = currencies.length > 0 ? currencies[0] : 'USD'
+        const configMoneda: Moneda = currencies.length > 0 ? (currencies[0] as Moneda) : 'USD'
 
         const ahorroAnual = parseNum(c.ahorro_estimado_anual) || null
         const ahorroMensual = ahorroAnual ? Math.round((ahorroAnual / 12) * 100) / 100 : null
@@ -365,11 +330,11 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         }
       })
 
-      let insertedConfigs: any[] = []
+      let insertedConfigs: ConfiguracionTecnica[] = []
       if (newConfigsPayload.length > 0) {
         const { data, error: err } = await supabase.from('configuraciones_tecnicas').insert(newConfigsPayload).select('*')
         if (err) throw err
-        insertedConfigs = data || []
+        insertedConfigs = (data as ConfiguracionTecnica[]) || []
       }
 
       // Map tempId to DB UUID (using index mapping to avoid collisions)
@@ -380,7 +345,15 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
       })
 
       // 3. Sync products (proyecto_sitio_productos) first before altering sites or deleting configs
-      const activeProductsList: any[] = []
+      const activeProductsList: Array<{
+        id?: string
+        proyecto_id: string
+        sitio_id: string
+        configuracion_id: string
+        tipo: 'fv' | 'bess'
+        datos: Record<string, unknown>
+      }> = []
+
       configs.forEach(c => {
         const configDbId = idMap[c.tempId]
         Object.entries(c.productosMap).forEach(([siteId, prods]) => {
@@ -391,7 +364,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
               sitio_id: siteId,
               configuracion_id: configDbId,
               tipo: p.tipo,
-              datos: p.tipo === 'fv' ? p.fv : p.bess
+              datos: p.tipo === 'fv' ? sanitizeFvDatos(p.fv || {}) : sanitizeBessDatos(p.bess || {})
             })
           })
         })
@@ -407,7 +380,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
           configuracion_id: p.configuracion_id,
           tipo: p.tipo,
           datos: p.datos
-        }).eq('id', p.id)
+        }).eq('id', p.id as string)
         if (err) throw err
       }
 
@@ -449,7 +422,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
         .eq('proyecto_id', proyecto.id)
       if (linksErr) throw linksErr
 
-      const currentDbSiteIds = (dbLinks ?? []).map(r => r.sitio_id)
+      const currentDbSiteIds = ((dbLinks ?? []) as { sitio_id: string }[]).map(r => r.sitio_id)
 
       const sitesToInsert = activeSitesUnion.filter(id => !currentDbSiteIds.includes(id))
       if (sitesToInsert.length > 0) {
@@ -516,7 +489,6 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
   }
 
   const inp = 'w-full border rounded-xl p-2 text-sm bg-white'
-  const borde = { borderColor: 'var(--color-neutral-200)' }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -565,12 +537,11 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                         setAddingToSitioId(null)
                         setProductTipo(null)
                       }}
-                      className="px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-2"
-                      style={{
-                        backgroundColor: isActive ? 'var(--color-principal)' : 'var(--color-white)',
-                        color: isActive ? 'var(--color-acento)' : 'var(--color-texto-suave)',
-                        borderColor: isActive ? 'var(--color-principal)' : 'var(--color-neutral-200)',
-                      }}
+                      className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-2 ${
+                        isActive
+                          ? 'bg-principal text-acento border-principal'
+                          : 'bg-white text-muted border-neutral-200 hover:border-principal/30'
+                      }`}
                     >
                       <span>{c.nombre || `Alt ${idx + 1}`}</span>
                       {configs.length > 1 && (
@@ -659,7 +630,7 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                     </div>
                     <div className='w-24'>
                       <select value={activeConfig.ahorro_moneda}
-                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: e.target.value } : c))}
+                        onChange={e => setConfigs(prev => prev.map(c => c.tempId === activeConfigId ? { ...c, ahorro_moneda: (e.target.value as Moneda) } : c))}
                         className={inp}>
                         <option value='MXN'>MXN</option>
                         <option value='USD'>USD</option>
@@ -764,6 +735,13 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                         <button type="button" onClick={() => setProductTipo(null)} className="text-[10px] text-muted hover:underline">Cambiar</button>
                                       </div>
 
+                                      {hasHybridBess && (
+                                        <div className="bg-sky-50 border border-sky-200 text-sky-800 p-2.5 rounded-lg text-[10px] flex items-center gap-1.5 leading-snug">
+                                          <Check size={13} className="text-sky-600 shrink-0" />
+                                          <span>Inversores incluidos en el BESS híbrido de este sitio (opcionales).</span>
+                                        </div>
+                                      )}
+
                                       <div>
                                         <label className="block text-[10px] font-medium mb-0.5">No. Módulos *</label>
                                         <input type="text" value={fvForm.num_modulos} onChange={e => setFvForm(f => ({ ...f, num_modulos: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
@@ -777,26 +755,32 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                         <input type="text" value={fvForm.marca_modulos} onChange={e => setFvForm(f => ({ ...f, marca_modulos: e.target.value }))} className="w-full border rounded p-1 text-xs" placeholder="Jinko, Longi..." />
                                       </div>
                                       <div>
-                                        <label className="block text-[10px] font-medium mb-0.5">No. Inversores *</label>
+                                        <label className="block text-[10px] font-medium mb-0.5">
+                                          {hasHybridBess ? 'No. Inversores (opcional)' : 'No. Inversores *'}
+                                        </label>
                                         <input type="text" value={fvForm.num_inversores} onChange={e => setFvForm(f => ({ ...f, num_inversores: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
                                       </div>
                                       <div>
-                                        <label className="block text-[10px] font-medium mb-0.5">Potencia Inversores (kW) *</label>
+                                        <label className="block text-[10px] font-medium mb-0.5">
+                                          {hasHybridBess ? 'Potencia Inversores (kW) (opcional)' : 'Potencia Inversores (kW) *'}
+                                        </label>
                                         <input type="text" value={fvForm.potencia_inversores_kw} onChange={e => setFvForm(f => ({ ...f, potencia_inversores_kw: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
                                       </div>
                                       <div>
-                                        <label className="block text-[10px] font-medium mb-0.5">Marca Inversores *</label>
+                                        <label className="block text-[10px] font-medium mb-0.5">
+                                          {hasHybridBess ? 'Marca Inversores (opcional)' : 'Marca Inversores *'}
+                                        </label>
                                         <input type="text" value={fvForm.marca_inversores} onChange={e => setFvForm(f => ({ ...f, marca_inversores: e.target.value }))} className="w-full border rounded p-1 text-xs" placeholder="Solis, SMA..." />
                                       </div>
                                       <div>
                                         <label className="block text-[10px] font-medium mb-0.5">Generación anual (kWh) *</label>
                                         <input type="text" value={fvForm.generacion_anual_kwh} onChange={e => setFvForm(f => ({ ...f, generacion_anual_kwh: formatNumberInput(e.target.value) }))} className="w-full border rounded p-1 text-xs" />
                                       </div>
-                                                                            <div>
+                                      <div>
                                         <label className="block text-[10px] font-medium mb-0.5">CAPEX *</label>
                                         <div className="flex gap-1">
                                           <input type="text" value={fvForm.capex} onChange={e => setFvForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="flex-1 border rounded p-1 text-xs" />
-                                          <select value={fvForm.capex_moneda || 'USD'} onChange={e => setFvForm(f => ({ ...f, capex_moneda: e.target.value }))} className="w-16 border rounded p-1 text-xs bg-white">
+                                          <select value={fvForm.capex_moneda || 'USD'} onChange={e => setFvForm(f => ({ ...f, capex_moneda: (e.target.value as Moneda) }))} className="w-16 border rounded p-1 text-xs bg-white">
                                             <option value="USD">USD</option>
                                             <option value="MXN">MXN</option>
                                           </select>
@@ -848,11 +832,11 @@ export default function EditarSolucionTecnicaModal({ isOpen, onClose, proyecto, 
                                           className='w-4 h-4' />
                                         <span className='text-[10px] font-medium'>Inversores híbridos (también manejan FV)</span>
                                       </label>
-                                                                            <div>
+                                      <div>
                                         <label className="block text-[10px] font-medium mb-0.5">CAPEX *</label>
                                         <div className="flex gap-1">
                                           <input type="text" value={bessForm.capex} onChange={e => setBessForm(f => ({ ...f, capex: formatNumberInput(e.target.value) }))} className="flex-1 border rounded p-1 text-xs" />
-                                          <select value={bessForm.capex_moneda || 'USD'} onChange={e => setBessForm(f => ({ ...f, capex_moneda: e.target.value }))} className="w-16 border rounded p-1 text-xs bg-white">
+                                          <select value={bessForm.capex_moneda || 'USD'} onChange={e => setBessForm(f => ({ ...f, capex_moneda: (e.target.value as Moneda) }))} className="w-16 border rounded p-1 text-xs bg-white">
                                             <option value="USD">USD</option>
                                             <option value="MXN">MXN</option>
                                           </select>

@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { Plus, Zap, Sun, Calendar, ArrowRight } from 'lucide-react'
 import BadgeEstado from '@/components/BadgeEstado'

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { resolveCrossPortalDeepLink } from '@/lib/domains/auth/routing'
 
 // ─── Route classification ───────────────────────────────────────
 // Public routes: accessible without any authentication.
@@ -73,9 +74,10 @@ export async function proxy(request: NextRequest) {
 
   const targetPath = rol ? ROLE_TO_PATH[rol] : undefined
 
-  // ── 6. Cross-portal access prevention ─────────────────────────
+  // ── 6. Cross-portal access prevention & smart deep linking ──────
   if (isProtectedPath && targetPath && !path.startsWith(`/${targetPath}`)) {
-    return NextResponse.redirect(new URL(`/${targetPath}`, request.url))
+    const resolvedUrl = resolveCrossPortalDeepLink(path, targetPath, request.nextUrl.search)
+    return NextResponse.redirect(new URL(resolvedUrl, request.url))
   }
 
   // ── 7. Redirect authenticated users away from root ────────────

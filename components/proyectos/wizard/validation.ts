@@ -4,10 +4,8 @@ import type {
   ManualClienteForm,
   CreationConfig,
   CreationFinancingOption,
-  FVForm,
-  BESSForm,
-  Producto,
 } from './types'
+
 
 export function validarPaso0(
   form: WizardFormData,
@@ -103,54 +101,5 @@ export function validarPaso3(
   return ''
 }
 
-export function validarFvForm(
-  fvForm: FVForm,
-  addingToSitioId: string | null,
-  productosMap: Record<string, Producto[]>
-): string {
-  if (!fvForm.num_modulos || !fvForm.potencia_modulos_w) {
-    return 'Ingresa número y potencia de módulos.'
-  }
-  if (!fvForm.marca_modulos.trim()) {
-    return 'Ingresa la marca de los módulos.'
-  }
+export { validarFvForm, validarBessForm } from '@/lib/domains/proyectos/schemas'
 
-  const siteProducts = addingToSitioId ? (productosMap[addingToSitioId] ?? []) : []
-  const hasHybrid = siteProducts.some(p => p.tipo === 'bess' && p.bess?.inversores_hibridos)
-
-  if (!hasHybrid) {
-    if (!fvForm.num_inversores || !fvForm.potencia_inversores_kw) {
-      return 'Ingresa número y potencia de inversores.'
-    }
-    if (!fvForm.marca_inversores.trim()) {
-      return 'Ingresa la marca de los inversores.'
-    }
-  }
-
-  if (!fvForm.generacion_anual_kwh) {
-    return 'Ingresa la generación anual estimada.'
-  }
-  if (!fvForm.capex) {
-    return 'Ingresa el CAPEX del sistema FV.'
-  }
-  return ''
-}
-
-export function validarBessForm(bessForm: BESSForm): string {
-  if (!bessForm.potencia_kw) {
-    return 'Ingresa la potencia del BESS.'
-  }
-  if (!bessForm.capacidad_kwh) {
-    return 'Ingresa la capacidad del BESS.'
-  }
-  if (!bessForm.marca.trim()) {
-    return 'Ingresa la marca del BESS.'
-  }
-  if (!bessForm.uso) {
-    return 'Selecciona el uso del BESS.'
-  }
-  if (!bessForm.capex) {
-    return 'Ingresa el CAPEX del BESS.'
-  }
-  return ''
-}

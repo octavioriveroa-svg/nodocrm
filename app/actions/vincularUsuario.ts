@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { executeLinkUserCliente } from '@/lib/domains/auth/user-provisioning'
+import type { Profile } from '@/lib/types'
 
 /**
  * Link or unlink a user profile to/from a client CRM card.
@@ -10,7 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  */
 export async function vincularUsuarioCliente(data: {
   userId: string
-  clienteId: string | null  // null = unlink
+  clienteId: string | null // null = unlink
 }) {
   try {
     const supabase = await createClient()
@@ -20,46 +21,13 @@ export async function vincularUsuarioCliente(data: {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('rol')
+      .select('id, nombre, empresa, rol, calendario_url, cliente_crm_id, created_at')
       .eq('id', user.id)
       .single()
 
     if (!profile) return { error: 'No se encontró tu perfil.' }
 
-    const isNodo = ['nodo_admin', 'nodo_analista'].includes(profile.rol)
-    const isEpc = profile.rol === 'epc'
-
-    if (!isNodo && !isEpc) {
-      return { error: 'No autorizado.' }
-    }
-
-    // If EPC, verify the client belongs to them
-    if (isEpc && data.clienteId) {
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('id')
-        .eq('id', data.clienteId)
-        .eq('epcista_id', user.id)
-        .single()
-
-      if (!clienteData) {
-        return { error: 'No autorizado: este cliente no te pertenece.' }
-      }
-    }
-
-    const adminClient = createAdminClient()
-
-    const { error: updateError } = await adminClient
-      .from('profiles')
-      .update({ cliente_crm_id: data.clienteId })
-      .eq('id', data.userId)
-
-    if (updateError) {
-      console.error('Error linking user:', updateError)
-      return { error: 'Error al vincular usuario: ' + updateError.message }
-    }
-
-    return { success: true }
+    return await executeLinkUserCliente(user, profile as Profile, data, supabase)
   } catch (err) {
     console.error('vincularUsuarioCliente unexpected error:', err)
     return { error: 'Error inesperado.' }

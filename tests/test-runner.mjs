@@ -4,9 +4,16 @@ import { tier2Suite } from './tier2-boundary-corner-cases.test.mjs'
 import { tier3Suite } from './tier3-cross-feature.test.mjs'
 import { tier4Suite } from './tier4-real-world-scenarios.test.mjs'
 
+import { domainAuthSuite } from './domain-auth.test.mjs'
+import { domainProyectosSuite } from './domain-proyectos.test.mjs'
+import { modalValidationSuite } from './modal-validation.test.mjs'
+import { epcScopingSuite } from './epc-scoping.test.mjs'
+import { proxyDeeplinksSuite } from './proxy-deeplinks.test.mjs'
+
 // Parse CLI arguments
 const args = process.argv.slice(2)
 let selectedTier = null
+let selectedSuite = null
 let verbose = true
 
 for (let i = 0; i < args.length; i++) {
@@ -15,16 +22,29 @@ for (let i = 0; i < args.length; i++) {
     i++
   } else if (args[i].startsWith('--tier=')) {
     selectedTier = parseInt(args[i].split('=')[1], 10)
+  } else if (args[i] === '--suite' && args[i + 1]) {
+    selectedSuite = args[i + 1]
+    i++
+  } else if (args[i].startsWith('--suite=')) {
+    selectedSuite = args[i].split('=')[1]
   } else if (args[i] === '--quiet') {
     verbose = false
   }
 }
 
 const suites = [
-  { tier: 1, suite: tier1Suite },
-  { tier: 2, suite: tier2Suite },
-  { tier: 3, suite: tier3Suite },
-  { tier: 4, suite: tier4Suite },
+  // Acceptance Tiers 1 - 4
+  { id: 'tier1', tier: 1, suite: tier1Suite },
+  { id: 'tier2', tier: 2, suite: tier2Suite },
+  { id: 'tier3', tier: 3, suite: tier3Suite },
+  { id: 'tier4', tier: 4, suite: tier4Suite },
+
+  // Architecture & Domain Refactoring Suites (R1 - R4)
+  { id: 'domain-auth', suite: domainAuthSuite },
+  { id: 'domain-proyectos', suite: domainProyectosSuite },
+  { id: 'modal-validation', suite: modalValidationSuite },
+  { id: 'epc-scoping', suite: epcScopingSuite },
+  { id: 'proxy-deeplinks', suite: proxyDeeplinksSuite },
 ]
 
 async function runAll() {
@@ -32,13 +52,19 @@ async function runAll() {
   console.log('\x1b[1m\x1b[35m  NODO CRM PLATFORM REFACTORING & HARDENING — ACCEPTANCE TEST RUNNER    \x1b[0m')
   console.log('\x1b[1m\x1b[35m════════════════════════════════════════════════════════════════════════\x1b[0m\n')
 
-  const suitesToRun = selectedTier
-    ? suites.filter((s) => s.tier === selectedTier)
-    : suites
-
-  if (suitesToRun.length === 0) {
-    console.error(`\x1b[31mError: Tier ${selectedTier} not recognized. Choose 1, 2, 3, or 4.\x1b[0m`)
-    process.exit(1)
+  let suitesToRun = suites
+  if (selectedTier) {
+    suitesToRun = suites.filter((s) => s.tier === selectedTier)
+    if (suitesToRun.length === 0) {
+      console.error(`\x1b[31mError: Tier ${selectedTier} not recognized. Choose 1, 2, 3, or 4.\x1b[0m`)
+      process.exit(1)
+    }
+  } else if (selectedSuite) {
+    suitesToRun = suites.filter((s) => s.id === selectedSuite || s.suite.name.toLowerCase().includes(selectedSuite.toLowerCase()))
+    if (suitesToRun.length === 0) {
+      console.error(`\x1b[31mError: Suite "${selectedSuite}" not recognized.\x1b[0m`)
+      process.exit(1)
+    }
   }
 
   const overallStart = performance.now()

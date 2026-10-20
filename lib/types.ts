@@ -1,4 +1,5 @@
 export type Rol = 'epc' | 'nodo_analista' | 'nodo_admin' | 'cliente_final' | 'financiero' | 'suministrador' | 'pendiente' | 'finder'
+export type RolUsuario = Rol
 export type TipoProyecto = 'BESS' | 'MEM' | 'BESS+MEM' | 'FV' | 'FV+BESS'
 export type TipoInstalacion = 'nodo_busca' | 'epcista_instala'
 export type EstadoProyecto = 'recibido' | 'en_analisis' | 'propuesta_lista' | 'enviada' | 'negociacion' | 'aprobado' | 'en_construccion' | 'operativo' | 'completado' | 'cliente_interesado'
@@ -57,6 +58,7 @@ export interface Proyecto {
   created_at: string
   updated_at: string
   historial_estados?: Record<string, string>
+  plan_bloqueado?: boolean
   profiles?: Profile
 }
  

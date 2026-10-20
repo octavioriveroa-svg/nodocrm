@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { executeDeleteUser } from '@/lib/domains/auth/user-provisioning'
+import type { Profile } from '@/lib/types'
 
 export type AdminDeleteUserResult = {
   success?: boolean
@@ -25,29 +26,11 @@ export async function adminDeleteUser(targetId: string): Promise<AdminDeleteUser
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('rol')
+      .select('id, nombre, empresa, rol, calendario_url, cliente_crm_id, created_at')
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.rol !== 'nodo_admin') {
-      return { error: 'No autorizado. Solo administradores pueden eliminar cuentas.' }
-    }
-
-    // Prevent self-deletion
-    if (targetId === user.id) {
-      return { error: 'No puedes eliminar tu propia cuenta.' }
-    }
-
-    const adminClient = createAdminClient()
-
-    // Delete the auth user (cascades to profile via FK)
-    const { error: authError } = await adminClient.auth.admin.deleteUser(targetId)
-
-    if (authError) {
-      return { error: 'Error al eliminar usuario: ' + authError.message }
-    }
-
-    return { success: true }
+    return await executeDeleteUser(user, profile as Profile, targetId)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('adminDeleteUser error:', message)
