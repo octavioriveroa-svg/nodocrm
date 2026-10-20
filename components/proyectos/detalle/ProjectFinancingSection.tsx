@@ -69,6 +69,11 @@ export default function ProjectFinancingSection({
         </p>
       ) : (
         <div className="flex flex-col gap-4">
+          <p className="text-xs text-gray-500">
+            Las opciones de financiamiento representan escenarios alternativos independientes. Solo la opción seleccionada como{' '}
+            <strong className="text-emerald-700">Ganadora</strong> se refleja en el ahorro neto y retorno oficial del proyecto.
+          </p>
+
           {/* Warning if no financing selected and state is negociacion or beyond */}
           {!opcionesFin.some((o) => o.seleccionada) &&
             ['negociacion', 'aprobado', 'en_construccion', 'operativo', 'completado'].includes(

@@ -10,6 +10,8 @@ import type {
   Sitio,
   Archivo,
   HitoConstruccion,
+  ConfiguracionTecnica,
+  OpcionFinanciamiento,
 } from '@/lib/types'
 import { fmtCurrency, fmtUnit } from '@/lib/format'
 import GanttChart from '@/components/gantt/GanttChart'
@@ -26,6 +28,8 @@ interface Props {
   onGenerarCronograma: () => Promise<void>
   onSelectHito: (hito: HitoConstruccion) => void
   hasProducts: boolean
+  configsList?: ConfiguracionTecnica[]
+  opcionesFin?: OpcionFinanciamiento[]
 }
 
 export default function ProjectOverviewSections({
@@ -39,9 +43,42 @@ export default function ProjectOverviewSections({
   onGenerarCronograma,
   onSelectHito,
   hasProducts,
+  configsList = [],
+  opcionesFin = [],
 }: Props) {
   const isAdmin = currentUser.rol === 'nodo_admin'
   const isEpcista = currentUser.rol === 'epc'
+
+  const leadingConfig = configsList.find((c) => c.seleccionada) || configsList[0]
+  const leadingOpt = opcionesFin.find((o) => o.seleccionada) || opcionesFin[0]
+
+  const leadingNetSavings = leadingOpt
+    ? leadingOpt.ahorro_estimado_anual != null
+      ? Number(leadingOpt.ahorro_estimado_anual)
+      : leadingOpt.ahorro_estimado_mensual != null
+        ? Number(leadingOpt.ahorro_estimado_mensual) * 12
+        : null
+    : null
+
+  const leadingGrossSavings = leadingConfig
+    ? leadingConfig.ahorro_estimado_anual != null
+      ? Number(leadingConfig.ahorro_estimado_anual)
+      : leadingConfig.ahorro_estimado_mensual != null
+        ? Number(leadingConfig.ahorro_estimado_mensual) * 12
+        : null
+    : null
+
+  const effectiveSavings =
+    leadingNetSavings != null && leadingNetSavings > 0
+      ? leadingNetSavings
+      : leadingGrossSavings || null
+  const isNetSavings = leadingNetSavings != null && leadingNetSavings > 0
+  const effectiveSavingsMoneda = isNetSavings
+    ? leadingOpt?.moneda || 'MXN'
+    : leadingConfig?.ahorro_moneda || leadingConfig?.moneda || proyecto.moneda || 'MXN'
+
+  const effectiveCapex = proyecto.capex_estimado || leadingConfig?.inversion_total || 0
+  const effectiveCapexMoneda = proyecto.moneda || leadingConfig?.moneda || 'MXN'
 
   const hasEngineeringSpecs =
     proyecto.demanda_kw != null ||
@@ -161,10 +198,14 @@ export default function ProjectOverviewSections({
 
       {/* Ubicación y Notas */}
       <Seccion title="Ubicación y Notas">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <Campo
             label="CAPEX estimado (Ganador)"
-            value={proyecto.capex_estimado ? fmtCurrency(proyecto.capex_estimado, proyecto.moneda || 'MXN') : null}
+            value={effectiveCapex ? fmtCurrency(effectiveCapex, effectiveCapexMoneda) : null}
+          />
+          <Campo
+            label="Ahorro anual estimado (Ganador)"
+            value={effectiveSavings ? fmtCurrency(effectiveSavings, effectiveSavingsMoneda) : null}
           />
           <Campo label="Estado" value={proyecto.ubicacion_estado} />
         </div>

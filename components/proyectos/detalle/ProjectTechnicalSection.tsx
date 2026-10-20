@@ -135,6 +135,149 @@ export default function ProjectTechnicalSection({
           </div>
         )}
 
+      {/* Comparativa de Alternativas Técnicas */}
+      {configsToUse.length > 1 && (
+        <div className="mb-6 bg-white border border-borde rounded-xl p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-principal">
+                Comparativa de Alternativas Técnicas
+              </h4>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                Las configuraciones son alternativas mutuamente excluyentes. Solo la alternativa marcada como{' '}
+                <strong className="text-emerald-700">Ganadora</strong> se computa en el CAPEX y ahorros oficiales del proyecto y portafolio.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                  <th className="py-2.5 px-3">Alternativa</th>
+                  <th className="py-2.5 px-3">Inversión (CAPEX)</th>
+                  <th className="py-2.5 px-3">Ahorro Bruto Anual</th>
+                  <th className="py-2.5 px-3">Payback Estimado</th>
+                  <th className="py-2.5 px-3">Capacidad</th>
+                  <th className="py-2.5 px-3 text-center">Estado</th>
+                  <th className="py-2.5 px-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {configsToUse.map((c) => {
+                  const isWin = !!c.seleccionada
+                  const isActive = activeConfig.id === c.id
+                  const confProds = productos.filter(
+                    (p) => p.configuracion_id === c.id || (c.id === 'legacy' && !p.configuracion_id)
+                  )
+                  let confKwp = 0
+                  let confKwh = 0
+                  for (const prod of confProds) {
+                    const d = (prod.datos ?? {}) as Record<string, unknown>
+                    if (prod.tipo === 'fv') {
+                      const nm = parseNum(d.num_modulos)
+                      const pw = parseNum(d.potencia_modulos_w)
+                      confKwp += nm > 0 && pw > 0 ? (nm * pw) / 1000 : 0
+                    } else if (prod.tipo === 'bess') {
+                      confKwh += parseNum(d.capacidad_kwh)
+                    }
+                  }
+                  const cAhorroAnual =
+                    c.ahorro_estimado_anual != null
+                      ? Number(c.ahorro_estimado_anual)
+                      : c.ahorro_estimado_mensual != null
+                        ? Number(c.ahorro_estimado_mensual) * 12
+                        : null
+                  const cPayback =
+                    c.inversion_total && cAhorroAnual && cAhorroAnual > 0
+                      ? Number(c.inversion_total) / cAhorroAnual
+                      : null
+
+                  return (
+                    <tr
+                      key={c.id}
+                      className={`transition-colors ${
+                        isActive ? 'bg-amber-50/30' : 'hover:bg-gray-50/50'
+                      }`}
+                    >
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-principal flex items-center gap-1.5">
+                          {c.nombre}
+                          {isActive && (
+                            <span className="text-[9px] bg-principal/10 text-principal px-1.5 py-0.5 rounded font-medium">
+                              Viendo
+                            </span>
+                          )}
+                        </div>
+                        {c.descripcion && (
+                          <div className="text-[10px] text-gray-400 truncate max-w-xs">
+                            {c.descripcion}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-principal">
+                        {c.inversion_total ? fmtCurrency(c.inversion_total, c.moneda) : '—'}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-emerald-600">
+                        {cAhorroAnual && cAhorroAnual > 0
+                          ? fmtCurrency(cAhorroAnual, c.ahorro_moneda || c.moneda || 'MXN')
+                          : '—'}
+                      </td>
+                      <td className="py-3 px-3 text-gray-600">
+                        {cPayback ? `${fmtNum(cPayback, 1)} años` : '—'}
+                      </td>
+                      <td className="py-3 px-3 text-gray-500">
+                        {[
+                          confKwp > 0 ? `${fmtNum(confKwp, 1)} kWp FV` : null,
+                          confKwh > 0 ? `${fmtNum(confKwh, 1)} kWh BESS` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' + ') || '—'}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {isWin ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            ✓ Ganadora
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                            Alternativa
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {!isActive && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedConfigId(c.id)}
+                              className="px-2 py-1 text-[11px] font-semibold text-gray-600 hover:text-principal underline"
+                            >
+                              Ver desglose
+                            </button>
+                          )}
+                          {canSelectConfig && !isWin && c.id !== 'legacy' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={seleccionandoConfig}
+                              onClick={() => onSelectConfig(c.id)}
+                              className="text-[11px] py-1 px-2.5 h-auto"
+                            >
+                              {seleccionandoConfig ? '...' : 'Elegir ganadora'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Config Tabs */}
       {configsToUse.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4 border-b border-borde pb-3">

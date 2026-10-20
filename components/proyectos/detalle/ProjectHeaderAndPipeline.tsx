@@ -4,10 +4,24 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Trash2, CalendarDays, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
-import type { Proyecto, Profile, EstadoProyecto } from '@/lib/types'
-import { SALES_CYCLE, STAGE_ORDER, isStageApprovalOrBeyond } from '@/lib/domains/proyectos/lifecycle'
+import type {
+  Proyecto,
+  Profile,
+  EstadoProyecto,
+  ConfiguracionTecnica,
+  OpcionFinanciamiento,
+  ModalidadFinanciamiento,
+} from '@/lib/types'
+import { fmtNum, fmtCurrency } from '@/lib/format'
+import {
+  SALES_CYCLE,
+  STAGE_ORDER,
+  MODALIDAD_LABELS,
+  isStageApprovalOrBeyond,
+} from '@/lib/domains/proyectos/lifecycle'
 import { canChangeProjectStage, canDeleteProject } from '@/lib/domains/auth/permissions'
 
 interface Props {
@@ -22,6 +36,8 @@ interface Props {
   onEliminarProyecto: () => Promise<void>
   onCambiarEstado: (estado: EstadoProyecto) => Promise<void>
   errorEstado: string | null
+  configsList?: ConfiguracionTecnica[]
+  opcionesFin?: OpcionFinanciamiento[]
 }
 
 export default function ProjectHeaderAndPipeline({
@@ -36,6 +52,8 @@ export default function ProjectHeaderAndPipeline({
   onEliminarProyecto,
   onCambiarEstado,
   errorEstado,
+  configsList = [],
+  opcionesFin = [],
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [eliminando, setEliminando] = useState(false)
@@ -47,12 +65,64 @@ export default function ProjectHeaderAndPipeline({
   const isFinder = currentUser.rol === 'finder'
 
   const userCanDelete = canDeleteProject(currentUser, proyecto)
-
-
   const userCanChangeStage = canChangeProjectStage(currentUser.rol)
-  const userCanEdit = isAdmin || isAnalista || (isEpcista && proyecto.epcista_id === currentUser.id) || (isFinder && proyecto.finder_id === currentUser.id)
+  const userCanEdit =
+    isAdmin ||
+    isAnalista ||
+    (isEpcista && proyecto.epcista_id === currentUser.id) ||
+    (isFinder && proyecto.finder_id === currentUser.id)
 
   const currentStageIndex = STAGE_ORDER.indexOf(proyecto.estado)
+
+  // Derived Leading Alternative and Official Project Financials
+  const leadingConfig = configsList.find((c) => c.seleccionada) || configsList[0]
+  const leadingOpt = opcionesFin.find((o) => o.seleccionada) || opcionesFin[0]
+
+  const leadingNetSavings = leadingOpt
+    ? leadingOpt.ahorro_estimado_anual != null
+      ? Number(leadingOpt.ahorro_estimado_anual)
+      : leadingOpt.ahorro_estimado_mensual != null
+        ? Number(leadingOpt.ahorro_estimado_mensual) * 12
+        : null
+    : null
+
+  const leadingGrossSavings = leadingConfig
+    ? leadingConfig.ahorro_estimado_anual != null
+      ? Number(leadingConfig.ahorro_estimado_anual)
+      : leadingConfig.ahorro_estimado_mensual != null
+        ? Number(leadingConfig.ahorro_estimado_mensual) * 12
+        : null
+    : null
+
+  const effectiveSavings =
+    leadingNetSavings != null && leadingNetSavings > 0
+      ? leadingNetSavings
+      : leadingGrossSavings || null
+  const isNetSavings = leadingNetSavings != null && leadingNetSavings > 0
+  const effectiveSavingsMoneda = isNetSavings
+    ? leadingOpt?.moneda || 'MXN'
+    : leadingConfig?.ahorro_moneda || leadingConfig?.moneda || proyecto.moneda || 'MXN'
+
+  const effectiveCapex = proyecto.capex_estimado || leadingConfig?.inversion_total || 0
+  const effectiveCapexMoneda = proyecto.moneda || leadingConfig?.moneda || 'MXN'
+  const effectivePaybackYears =
+    effectiveCapex > 0 && effectiveSavings && effectiveSavings > 0
+      ? effectiveCapex / effectiveSavings
+      : null
+
+  const leadingVehiculoLabel = leadingOpt
+    ? MODALIDAD_LABELS[leadingOpt.vehiculo_inversion as ModalidadFinanciamiento] ||
+      leadingOpt.vehiculo_inversion
+    : Array.isArray(proyecto.modalidad_financiamiento)
+      ? proyecto.modalidad_financiamiento.length > 0
+        ? proyecto.modalidad_financiamiento
+            .map((m) => MODALIDAD_LABELS[m as ModalidadFinanciamiento] || m)
+            .join(', ')
+        : 'Sin definir'
+      : proyecto.modalidad_financiamiento
+        ? MODALIDAD_LABELS[proyecto.modalidad_financiamiento as ModalidadFinanciamiento] ||
+          String(proyecto.modalidad_financiamiento)
+        : 'Sin definir'
 
   async function handleStageChange(targetStage: EstadoProyecto) {
     if (targetStage === proyecto.estado) return
@@ -85,7 +155,13 @@ export default function ProjectHeaderAndPipeline({
           <p className="text-xs text-muted mt-1">
             ID: <span className="font-mono text-gray-500">{proyecto.id}</span>
             {proyecto.cliente_final_empresa && (
-              <> • Empresa: <span className="font-semibold text-principal">{proyecto.cliente_final_empresa}</span></>
+              <>
+                {' '}
+                • Empresa:{' '}
+                <span className="font-semibold text-principal">
+                  {proyecto.cliente_final_empresa}
+                </span>
+              </>
             )}
           </p>
         </div>
@@ -224,10 +300,10 @@ export default function ProjectHeaderAndPipeline({
                       isCurrent
                         ? 'bg-principal text-acento ring-4 ring-principal/20 scale-110 shadow-md'
                         : isPassed
-                        ? 'bg-green-600 text-white'
-                        : isTerminal
-                        ? 'bg-white border-2 border-dashed border-neutral-300 text-neutral-400'
-                        : 'bg-white border-2 border-neutral-300 text-neutral-400 group-hover:border-principal/50'
+                          ? 'bg-green-600 text-white'
+                          : isTerminal
+                            ? 'bg-white border-2 border-dashed border-neutral-300 text-neutral-400'
+                            : 'bg-white border-2 border-neutral-300 text-neutral-400 group-hover:border-principal/50'
                     }`}
                   >
                     {isPassed ? <CheckCircle size={12} /> : idx + 1}
@@ -237,8 +313,8 @@ export default function ProjectHeaderAndPipeline({
                       isCurrent
                         ? 'text-principal font-bold'
                         : isPassed
-                        ? 'text-green-700 font-semibold'
-                        : 'text-neutral-400'
+                          ? 'text-green-700 font-semibold'
+                          : 'text-neutral-400'
                     }`}
                   >
                     {stage.label}
@@ -249,6 +325,122 @@ export default function ProjectHeaderAndPipeline({
           </div>
         </div>
       </div>
+
+      {/* Resumen Financiero del Proyecto — Alternativa Ganadora */}
+      {!editando && (
+        <Card className="bg-gradient-to-br from-white to-gray-50/50 border border-borde shadow-sm overflow-hidden">
+          <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-principal">
+                  Resumen Financiero Oficial
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                  Alternativa Ganadora
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Cifras oficiales basadas en la alternativa seleccionada. Las alternativas técnicas y de financiamiento son mutuamente excluyentes.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {leadingConfig && (
+                <span
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 border border-gray-200"
+                  title="Configuración técnica considerada"
+                >
+                  ⚙️ {leadingConfig.nombre}
+                </span>
+              )}
+              {leadingOpt && (
+                <span
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 border border-gray-200"
+                  title="Opción de financiamiento considerada"
+                >
+                  💳 {leadingOpt.nombre}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Inversión Total (CAPEX)
+              </span>
+              <div className="text-xl font-black text-principal">
+                {effectiveCapex > 0 ? fmtCurrency(effectiveCapex, effectiveCapexMoneda) : '—'}
+              </div>
+              <p
+                className="text-[11px] text-gray-500 mt-1 truncate"
+                title={leadingConfig ? leadingConfig.nombre : 'Estimación del proyecto'}
+              >
+                {leadingConfig ? leadingConfig.nombre : 'Estimación del proyecto'}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Ahorro Anual Estimado
+              </span>
+              <div className="text-xl font-black text-emerald-600">
+                {effectiveSavings && effectiveSavings > 0
+                  ? fmtCurrency(effectiveSavings, effectiveSavingsMoneda)
+                  : '—'}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1 truncate">
+                {isNetSavings
+                  ? 'Ahorro neto (Financiamiento)'
+                  : effectiveSavings
+                    ? 'Ahorro bruto (Solución técnica)'
+                    : 'Sin ahorro registrado'}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Retorno Simple (Payback)
+              </span>
+              <div className="text-xl font-black text-principal">
+                {effectivePaybackYears ? `${fmtNum(effectivePaybackYears, 1)} años` : '—'}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                {effectivePaybackYears
+                  ? `~${Math.round(effectivePaybackYears * 12)} meses de retorno`
+                  : 'Requiere CAPEX y ahorro'}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                Vehículo Financiero
+              </span>
+              <div
+                className="text-sm font-bold text-principal truncate mt-1.5"
+                title={leadingVehiculoLabel}
+              >
+                {leadingVehiculoLabel}
+              </div>
+              <p
+                className="text-[11px] text-gray-500 mt-1 truncate"
+                title={
+                  leadingOpt?.plazo_meses
+                    ? `Plazo: ${leadingOpt.plazo_meses} meses`
+                    : leadingOpt
+                      ? leadingOpt.nombre
+                      : 'Modalidad inicial'
+                }
+              >
+                {leadingOpt?.plazo_meses
+                  ? `Plazo: ${leadingOpt.plazo_meses} meses`
+                  : leadingOpt
+                    ? leadingOpt.nombre
+                    : 'Modalidad inicial'}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

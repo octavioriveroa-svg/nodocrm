@@ -177,7 +177,7 @@ export default function DetalleProyecto({
         generandoCronograma={generandoCronograma} onGenerarCronograma={generarCronograma} editando={editando}
         onToggleEdit={() => setEditando(!editando)}
         onEliminarProyecto={async () => { await supabase.from('proyectos').delete().eq('id', proyecto.id); router.push(backHref) }}
-        onCambiarEstado={cambiarEstado} errorEstado={errorEstado}
+        onCambiarEstado={cambiarEstado} errorEstado={errorEstado} configsList={configsList} opcionesFin={opcionesFin}
       />
 
       {editando ? (
@@ -217,7 +217,7 @@ export default function DetalleProyecto({
           <ProjectOverviewSections
             proyecto={proyecto} currentUser={currentUser} sitios={sitios} archivos={archivos} setArchivos={setArchivos}
             hitosLocales={hitosLocales} generandoCronograma={generandoCronograma} onGenerarCronograma={generarCronograma}
-            onSelectHito={(h) => setHitoSeleccionado(h)} hasProducts={productos.length > 0}
+            onSelectHito={(h) => setHitoSeleccionado(h)} hasProducts={productos.length > 0} configsList={configsList} opcionesFin={opcionesFin}
           />
 
           {/* Plan EPC — new project management tool */}
