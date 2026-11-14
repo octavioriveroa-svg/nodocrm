@@ -55,6 +55,7 @@ export interface Proyecto {
   tipo_instalacion: TipoInstalacion | null
   incluye_mem: boolean
   demanda_kw: number | null
+  tarifa_actual_cfe?: string | null
   created_at: string
   updated_at: string
   historial_estados?: Record<string, string>

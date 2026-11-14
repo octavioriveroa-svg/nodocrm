@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
+import { resolveCrossPortalDeepLink } from '@/lib/domains/auth/routing'
+import { getPortalPrefix } from '@/lib/domains/auth/permissions'
 
-export default function LoginPage() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const router = useRouter()
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl')
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
@@ -21,17 +23,19 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError) {
+    if (authError || !authData?.user) {
       setError('Correo o contraseña incorrectos.')
       setLoading(false)
       return
     }
 
-    const { data: { session: newSession } } = await supabase.auth.getSession()
     const { data: profileRow, error: profileError } = await supabase
-      .from('profiles').select('rol').eq('id', newSession?.user?.id ?? '').single()
+      .from('profiles')
+      .select('rol')
+      .eq('id', authData.user.id)
+      .single()
 
     if (profileError) {
       setError('Error obteniendo el perfil del usuario. Verifica la base de datos o contacta soporte.')
@@ -45,21 +49,29 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    
+
     if (rol === 'pendiente') {
       window.location.href = '/pendiente'
       return
     }
 
-    let sub = 'epc'
-    if (rol === 'nodo_admin') sub = 'admin'
-    else if (rol === 'nodo_analista') sub = 'analista'
-    else if (rol === 'cliente_final') sub = 'cliente'
-    else if (rol === 'financiero') sub = 'financiero'
-    else if (rol === 'suministrador') sub = 'mem'
-    else if (rol === 'finder') sub = 'finder'
+    const sub = getPortalPrefix(rol)
 
-    window.location.href = `/${sub}`
+    // Validate returnUrl: only allow safe relative paths (block protocol-relative or backslash open redirects)
+    const isSafeRelative =
+      Boolean(returnUrl) &&
+      returnUrl!.startsWith('/') &&
+      !returnUrl!.startsWith('//') &&
+      !returnUrl!.startsWith('/\\')
+
+    if (isSafeRelative && returnUrl) {
+      const [pathPart, ...queryParts] = returnUrl.split('?')
+      const searchPart = queryParts.length > 0 ? `?${queryParts.join('?')}` : ''
+      const destination = resolveCrossPortalDeepLink(pathPart, sub, searchPart)
+      window.location.href = destination
+    } else {
+      window.location.href = `/${sub}`
+    }
   }
 
   return (
@@ -72,9 +84,7 @@ export default function LoginPage() {
           <Logo size="lg" />
         </div>
 
-        <div
-          className="glass-card p-8"
-        >
+        <div className="glass-card p-8">
           <div className="mb-8 flex flex-col items-center">
             <h1 className="text-xl font-bold text-center tracking-tight">Bienvenido a Nodo</h1>
             <p className="text-sm text-gray-400 mt-1">Inicia sesión en tu cuenta</p>
@@ -127,5 +137,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-principal">Cargando...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

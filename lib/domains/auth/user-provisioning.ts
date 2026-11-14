@@ -95,6 +95,9 @@ export async function executeCreateUserAdmin(
         email: input.email,
         password: input.password,
         email_confirm: true,
+        app_metadata: {
+          user_role: input.rol,
+        },
         user_metadata: {
           nombre: input.nombre,
           empresa: input.empresa,
@@ -134,6 +137,13 @@ export async function executeCreateUserAdmin(
       }
 
       const userId = authData.user.id
+
+      const { error: claimError } = await adminClient.auth.admin.updateUserById(userId, {
+        app_metadata: { user_role: input.rol },
+      })
+      if (claimError) {
+        console.error('Error syncing app_metadata user_role on invite:', claimError)
+      }
 
       const { error: profileError } = await adminClient
         .from('profiles')
@@ -191,6 +201,13 @@ export async function executeInviteUser(
     }
 
     const userId = authData.user.id
+
+    const { error: claimError } = await adminAuthClient.auth.admin.updateUserById(userId, {
+      app_metadata: { user_role: input.rol },
+    })
+    if (claimError) {
+      console.error('Error syncing app_metadata user_role on invite:', claimError)
+    }
 
     const profilePayload: Record<string, unknown> = {
       id: userId,

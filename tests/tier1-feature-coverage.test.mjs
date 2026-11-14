@@ -7,6 +7,7 @@ import {
   setActiveSessionCookies,
   clearActiveSessionCookies,
   getAnonClient,
+  getServiceRoleClient,
 } from './test-utils.mjs'
 
 import { getWizardCapabilities } from '../components/proyectos/wizard/capabilities.ts'
@@ -16,9 +17,7 @@ import {
   validarPaso2,
   validarPaso3,
   validarFvForm,
-  validarBessForm,
 } from '../components/proyectos/wizard/validation.ts'
-import { calcFV, calcBESS } from '../components/proyectos/wizard/calculations.ts'
 
 export const tier1Suite = new TestSuite('Tier 1: Feature Coverage (R1 - R4)')
 
@@ -357,4 +356,66 @@ tier1Suite.test('R4.1: OfertasBoard queries existing columns safely without Post
   assertEqual(mapped.consumo_anual_gwh, 12.5, '12500 MWh correctly converted to 12.50 GWh')
   assertEqual(mapped.tarifa_actual_cfe, 'GDMTH', 'Default tariff correctly assigned')
   assertEqual(mapped.codigo_postal, 'Guanajuato', 'Location correctly mapped')
+})
+
+// ── R5. Telemetry Schema Alignment (TASK-001) ────────────────────────────────
+tier1Suite.test('TASK-001: getTelemetryHistorical queries live telemetria_egauge without 42703 column error', async () => {
+  const { getTelemetryHistorical } = await import('../lib/dashboard-data.ts')
+  const supabaseAdmin = getServiceRoleClient()
+  const loggedErrors = []
+  const origError = console.error
+  console.error = (...args) => {
+    loggedErrors.push(args.map((a) => String(a)).join(' '))
+  }
+  try {
+    const result = await getTelemetryHistorical(supabaseAdmin, { days: 30, limit: 10 })
+    assert(Array.isArray(result), 'Expected an array of telemetry rows')
+    assertEqual(loggedErrors.length, 0, `getTelemetryHistorical logged errors: ${loggedErrors.join('; ')}`)
+    if (result.length > 0) {
+      const sample = result[0]
+      assertEqual(typeof sample.solarProductionKwh, 'number', 'solarProductionKwh alias must be a number')
+      assertEqual(typeof sample.gridConsumptionKwh, 'number', 'gridConsumptionKwh alias must be a number')
+      assertEqual(typeof sample.batteryDischargeKwh, 'number', 'batteryDischargeKwh alias must be a number')
+      assertEqual(typeof sample.batteryChargePct, 'number', 'batteryChargePct alias must be a number')
+    }
+  } finally {
+    console.error = origError
+  }
+})
+
+// ── R6. Notifications Migration & Recipient Resolution (TASK-002) ─────────────
+tier1Suite.test('TASK-002: notificaciones migration & cliente_crm_id recipient resolution', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const root = process.cwd()
+
+  const migPath = path.join(root, 'supabase', 'migrations', '20261112000001_create_notificaciones.sql')
+  assert(fs.existsSync(migPath), '20261112000001_create_notificaciones.sql must exist')
+  const sql = fs.readFileSync(migPath, 'utf8')
+  assertIncludes(sql, 'CREATE TABLE IF NOT EXISTS public.notificaciones', 'Migration defines public.notificaciones')
+  assertIncludes(sql, "'evidencia'", 'Migration allows evidencia notification type')
+  assertIncludes(sql, 'leido', 'Migration defines leido column')
+  assertIncludes(sql, 'enlace', 'Migration defines enlace column')
+  assertIncludes(sql, 'comentario_id', 'Migration defines comentario_id column')
+  assertIncludes(sql, 'ENABLE ROW LEVEL SECURITY', 'Migration enables RLS')
+
+  const monitorSrc = fs.readFileSync(path.join(root, 'components', 'InstalacionMonitor.tsx'), 'utf8')
+  assertIncludes(monitorSrc, ".eq('cliente_crm_id', proyecto.cliente_id)", 'InstalacionMonitor resolves client profiles via cliente_crm_id')
+  assert(!monitorSrc.includes('recipientIds.add(proyecto.cliente_id)'), 'InstalacionMonitor must never push proyecto.cliente_id directly into recipientIds')
+
+  const threadSrc = fs.readFileSync(path.join(root, 'components', 'plan', 'CommentThread.tsx'), 'utf8')
+  assertIncludes(threadSrc, ".eq('cliente_crm_id', proyecto.cliente_id)", 'CommentThread resolves client profiles via cliente_crm_id')
+  assert(!threadSrc.includes('recipientIds.add(proyecto.cliente_id)'), 'CommentThread must never push proyecto.cliente_id directly into recipientIds')
+
+  const topBarSrc = fs.readFileSync(path.join(root, 'components', 'TopBar.tsx'), 'utf8')
+  assertIncludes(topBarSrc, 'if (error) return', 'TopBar loadNotifs guards against query errors')
+
+  // Live check: profiles.cliente_crm_id lookup executes cleanly
+  const admin = getServiceRoleClient()
+  const { data: sampleClientProf, error: profErr } = await admin
+    .from('profiles')
+    .select('id, cliente_crm_id')
+    .limit(5)
+  assertEqual(profErr, null, 'profiles.cliente_crm_id column query must succeed')
+  assert(Array.isArray(sampleClientProf), 'Expected profiles array')
 })

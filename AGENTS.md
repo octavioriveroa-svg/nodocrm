@@ -6,5 +6,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Project Context & Baseline References
 - **Platform**: Nodo CRM (`Next.js 16.2.3` App Router + `proxy.ts` + Supabase PostgreSQL `nlqrdxwyxmgdwawedweh`).
-- **Context & Handoff**: Read `nodo_crm_handoff.md` for full portal, RBAC, data model, CFE tariff calculator, and transactional RPC documentation.
-- **Verification Gates**: Always run `npx tsc --noEmit`, `npm run lint`, `npm test` (`npx tsx tests/test-runner.mjs`), and `npm run build` before finalizing changes.
+- **Context & Handoff**: Read `nodo_crm_handoff.md`, `PROJECT.md`, and `docs/architecture/EXECUTION_ROADMAP.md` for full portal, RBAC, data model, CFE tariff calculator, UI primitive, and transactional RPC documentation.
+- **Verification Gates**: Always run `npx tsc --noEmit`, `npm run lint` (`npx eslint . --max-warnings=0`), `npm test` (`npx tsx tests/test-runner.mjs`), `npx tsx tests/adversarial-m3-empirical.test.mjs`, and `npm run build` before finalizing changes.

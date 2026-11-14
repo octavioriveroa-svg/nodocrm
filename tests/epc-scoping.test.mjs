@@ -7,6 +7,7 @@ import {
 } from './test-utils.mjs'
 
 import { fetchClienteDetalleCompleto } from '../lib/domains/clientes/queries.ts'
+import { fetchProyectosDirectory } from '../lib/domains/proyectos/queries.ts'
 
 export const epcScopingSuite = new TestSuite('Security: EPC Client Detail Document & Project Scoping')
 
@@ -239,6 +240,54 @@ epcScopingSuite.test('Scoping.3: Live Supabase read queries verify strict scopin
       .single()
     assertEqual(dbProj?.cliente_id, targetClient.id, 'Project must belong to target client')
     assertEqual(dbProj?.epcista_id, epcAuth.user.id, 'EPC must only see projects assigned to them')
+  }
+})
+
+// ── 4. Client Portal Directory Resolution via cliente_crm_id (TASK-003) ──────
+epcScopingSuite.test('TASK-003: fetchProyectosDirectory resolves cliente_final projects via profiles.cliente_crm_id', async () => {
+  const serviceClient = getServiceRoleClient()
+
+  const { data: clientProfile, error: pErr } = await serviceClient
+    .from('profiles')
+    .select('id, cliente_crm_id')
+    .eq('rol', 'cliente_final')
+    .limit(1)
+    .single()
+  assert(!pErr && clientProfile, 'Expected at least one cliente_final profile in database')
+
+  const { data: sampleProject, error: prjErr } = await serviceClient
+    .from('proyectos')
+    .select('id, cliente_id')
+    .not('cliente_id', 'is', null)
+    .limit(1)
+    .single()
+  assert(!prjErr && sampleProject, 'Expected at least one project with cliente_id')
+
+  const targetClientId = sampleProject.cliente_id
+  const originalClienteCrmId = clientProfile.cliente_crm_id
+
+  try {
+    await serviceClient.from('profiles').update({ cliente_crm_id: targetClientId }).eq('id', clientProfile.id)
+
+    const projects = await fetchProyectosDirectory(serviceClient, {
+      role: 'cliente_final',
+      userId: clientProfile.id,
+    })
+    assert(Array.isArray(projects), 'Expected projects array')
+    assert(projects.length > 0, 'Must return projects for linked client')
+    for (const p of projects) {
+      assertEqual(p.cliente_id, targetClientId, 'Project must match linked client CRM id')
+    }
+
+    // Also verify unlinked client returns [] gracefully
+    await serviceClient.from('profiles').update({ cliente_crm_id: null }).eq('id', clientProfile.id)
+    const emptyProjects = await fetchProyectosDirectory(serviceClient, {
+      role: 'cliente_final',
+      userId: clientProfile.id,
+    })
+    assertEqual(emptyProjects.length, 0, 'Unlinked cliente_final user must receive []')
+  } finally {
+    await serviceClient.from('profiles').update({ cliente_crm_id: originalClienteCrmId }).eq('id', clientProfile.id)
   }
 })
 

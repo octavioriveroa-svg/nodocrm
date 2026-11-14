@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
-  ChevronDown, ChevronRight, Camera, FileText, StickyNote, 
-  Trash2, Eye, User, Sparkles,
-  BarChart2, List, Grid, Maximize2, X
+  ChevronDown, ChevronRight, Camera,
+  Trash2, Sparkles,
+  BarChart2, List, Grid
 } from 'lucide-react'
 import type { 
   Profile, PlanFase, PlanActividad, PlanTarea, 
   InstalacionEvidencia 
 } from '@/lib/types'
 import EvidenciaModal from './EvidenciaModal'
-import CommentThread from './plan/CommentThread'
+import { EvidenciaGallery } from './instalaciones/EvidenciaGallery'
+import { EvidenciaLightbox } from './instalaciones/EvidenciaLightbox'
 
 interface InstalacionMonitorProps {
   proyectoId: string
@@ -160,17 +161,29 @@ export default function InstalacionMonitor({
 
     supabase
       .from('proyectos')
-      .select('epcista_id, cliente_id, financiero_id')
+      .select('epcista_id, cliente_id, financiero_id, responsable_nodo_id, finder_id')
       .eq('id', proyectoId)
       .single()
-      .then(({ data: proyecto }) => {
+      .then(async ({ data: proyecto }) => {
         if (!proyecto) return
         const recipientIds = new Set<string>()
 
-        // Notify stakeholders
+        // Notify stakeholders (profile UUIDs)
         if (proyecto.epcista_id) recipientIds.add(proyecto.epcista_id)
-        if (proyecto.cliente_id) recipientIds.add(proyecto.cliente_id)
         if (proyecto.financiero_id) recipientIds.add(proyecto.financiero_id)
+        if (proyecto.responsable_nodo_id) recipientIds.add(proyecto.responsable_nodo_id)
+        if (proyecto.finder_id) recipientIds.add(proyecto.finder_id)
+
+        // Resolve cliente_final user profile UUIDs from cliente_crm_id (proyectos.cliente_id references clientes.id)
+        if (proyecto.cliente_id) {
+          const { data: clientProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('cliente_crm_id', proyecto.cliente_id)
+          if (clientProfiles) {
+            clientProfiles.forEach((cp: { id: string }) => recipientIds.add(cp.id))
+          }
+        }
 
         // Don't notify the author
         recipientIds.delete(currentUser.id)
@@ -186,7 +199,10 @@ export default function InstalacionMonitor({
           proyecto_id: proyectoId,
         }))
 
-        supabase.from('notificaciones').insert(notifications).then(() => {})
+        const { error } = await supabase.from('notificaciones').insert(notifications)
+        if (error) {
+          console.error('Error creating evidence notifications:', error)
+        }
       })
   }
 
@@ -240,107 +256,29 @@ export default function InstalacionMonitor({
   }
 
   // Sub-component: Gallery Grid
-  const EvidenceGallery = ({ items }: { items: InstalacionEvidencia[] }) => {
-    if (!items || items.length === 0) return null
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-3">
-        {items.map(ev => (
-          <div 
-            key={ev.id} 
-            className="flex flex-col border border-gray-150 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow group relative"
-          >
-            {/* Media Content */}
-            <div className="relative aspect-[4/3] bg-gray-50 flex items-center justify-center border-b border-gray-100 overflow-hidden">
-              {ev.tipo === 'foto' && ev.url ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={ev.url} 
-                    alt={ev.titulo}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <button 
-                    onClick={() => setActivePhotoUrl(ev.url)}
-                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Maximize2 size={14} />
-                  </button>
-                </>
-              ) : ev.tipo === 'documento' && ev.url ? (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <FileText size={48} className="text-acento" />
-                  <a 
-                    href={ev.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs font-bold text-acento hover:underline flex items-center gap-1.5"
-                  >
-                    <Eye size={12} /> Ver documento
-                  </a>
-                </div>
-              ) : (
-                <div className="p-4 w-full h-full flex flex-col justify-between bg-amber-50/30 text-amber-900">
-                  <StickyNote size={32} className="text-amber-500" />
-                  <p className="text-xs italic line-clamp-4 leading-relaxed font-medium">
-                    &quot;{ev.descripcion}&quot;
-                  </p>
-                  <div />
-                </div>
-              )}
-
-              {/* Delete button (owner or admin) */}
-              {!readOnly && (currentUser.id === ev.autor_id || currentUser.rol === 'nodo_admin') && (
-                <button
-                  onClick={() => handleDeleteEvidence(ev.id)}
-                  className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Eliminar evidencia"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Metadata & Title */}
-            <div className="p-4 flex-1 flex flex-col justify-between">
-              <div>
-                <h4 className="font-bold text-sm text-principal line-clamp-1 mb-1" title={ev.titulo}>
-                  {ev.titulo}
-                </h4>
-                {ev.tipo !== 'nota' && ev.descripcion && (
-                  <p className="text-xs text-gray-600 line-clamp-2 mb-3 leading-relaxed">
-                    {ev.descripcion}
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-gray-100 flex items-center justify-between mt-auto">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <User size={12} />
-                  <span className="truncate max-w-[80px]" title={ev.autor?.nombre ?? 'Usuario'}>
-                    {ev.autor?.nombre ?? 'Usuario'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-gray-400 font-medium">
-                    {formatDate(ev.created_at)}
-                  </span>
-                  
-                  {/* Inline Comments Thread for Evidence */}
-                  <CommentThread
-                    proyectoId={proyectoId}
-                    targetType="evidencia"
-                    targetId={ev.id}
-                    currentUser={currentUser}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
+  const EvidenceGallery = ({ items }: { items: InstalacionEvidencia[] }) => (
+    <EvidenciaGallery
+      items={items}
+      proyectoId={proyectoId}
+      currentUser={currentUser}
+      onSelectPhoto={url => setActivePhotoUrl(url)}
+      formatDate={formatDate}
+      renderActions={ev => (
+        <>
+          {/* Delete button (owner or admin) */}
+          {!readOnly && (currentUser.id === ev.autor_id || currentUser.rol === 'nodo_admin') && (
+            <button
+              onClick={() => handleDeleteEvidence(ev.id)}
+              className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Eliminar evidencia"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </>
+      )}
+    />
+  )
 
   return (
     <div className="space-y-6">
@@ -648,26 +586,7 @@ export default function InstalacionMonitor({
       )}
 
       {/* 5. Lightbox Modal for Fullscreen Photo */}
-      {activePhotoUrl && (
-        <div 
-          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
-          onClick={() => setActivePhotoUrl(null)}
-        >
-          <button 
-            onClick={() => setActivePhotoUrl(null)}
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
-          >
-            <X size={24} />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={activePhotoUrl} 
-            alt="Fullscreen preview" 
-            className="max-w-full max-h-[90vh] object-contain rounded-xl select-none"
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <EvidenciaLightbox photoUrl={activePhotoUrl} onClose={() => setActivePhotoUrl(null)} />
 
     </div>
   )

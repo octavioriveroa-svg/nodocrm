@@ -53,23 +53,27 @@ export async function proxy(request: NextRequest) {
   if (!user || authError) {
     if (isProtectedPath) {
       const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('returnUrl', path)
+      loginUrl.searchParams.set('returnUrl', `${path}${request.nextUrl.search}`)
       return NextResponse.redirect(loginUrl)
     }
     return supabaseResponse
   }
 
-  // ── 5. Determine authoritative user role from public.profiles ──
-  // Never trust client-editable user.user_metadata.rol
+  // ── 5. Determine authoritative user role ─────────────────────────
+  // Prefer cryptographically verified JWT claim (user.app_metadata.user_role)
+  // Fall back to database query only if claim is not yet populated
   let rol = user.app_metadata?.user_role as string | undefined
-  const { data: profileRow } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', user.id)
-    .single()
 
-  if (profileRow?.rol) {
-    rol = profileRow.rol
+  if (!rol) {
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (profileRow?.rol) {
+      rol = profileRow.rol
+    }
   }
 
   const targetPath = rol ? ROLE_TO_PATH[rol] : undefined

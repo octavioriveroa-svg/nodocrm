@@ -23,6 +23,7 @@ interface ProyectoInfo {
   nombre_proyecto: string
   ubicacion_estado: string
   estado: string
+  tarifa_actual_cfe?: string | null
   configuraciones_tecnicas?: Pick<
     ConfiguracionTecnica,
     'ahorro_estimado_anual' | 'ahorro_estimado_mensual' | 'ahorro_moneda' | 'seleccionada'
@@ -63,7 +64,7 @@ export default function ClienteDashboard() {
       const { data: projs } = await supabase
         .from('proyectos')
         .select(
-          'id, nombre_proyecto, ubicacion_estado, estado, configuraciones_tecnicas(ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, seleccionada)'
+          'id, nombre_proyecto, ubicacion_estado, estado, tarifa_actual_cfe, configuraciones_tecnicas(ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, seleccionada)'
         )
         .eq('cliente_id', profile.cliente_crm_id)
         .order('created_at', { ascending: false })
@@ -107,6 +108,7 @@ export default function ClienteDashboard() {
         const savingsMxn = calculateProjectSavingsMxn({
           totalGeneratedKwh: totalGenerated,
           selectedConfig,
+          tarifaCfe: activeProj?.tarifa_actual_cfe,
         })
         setMetrics({ totalGenerated, savingsMxn })
       } else if (error) {

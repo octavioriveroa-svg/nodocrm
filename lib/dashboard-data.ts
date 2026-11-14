@@ -159,6 +159,20 @@ export interface TelemetryQueryOptions {
   limit?: number
 }
 
+export interface TelemetryHistoricalRow {
+  id: string
+  proyecto_id: string
+  timestamp: string
+  solar_produccion_kwh: number
+  consumo_red_kwh: number
+  bateria_descarga_kwh: number
+  bateria_porcentaje: number
+  solarProductionKwh: number
+  gridConsumptionKwh: number
+  batteryDischargeKwh: number
+  batteryChargePct: number
+}
+
 export async function getTelemetryStats(
   supabaseClient?: Awaited<ReturnType<typeof createClient>>,
   options?: TelemetryQueryOptions
@@ -190,7 +204,7 @@ export async function getTelemetryStats(
 export async function getTelemetryHistorical(
   supabaseClient?: Awaited<ReturnType<typeof createClient>>,
   options?: TelemetryQueryOptions
-) {
+): Promise<TelemetryHistoricalRow[]> {
   const supabase = supabaseClient || (await createClient())
   const days = options?.days ?? 90
   const limit = options?.limit ?? 10000
@@ -199,7 +213,7 @@ export async function getTelemetryHistorical(
   let query = supabase
     .from('telemetria_egauge')
     .select(
-      'id, proyecto_id, timestamp, generacion_kwh, consumo_kwh, potencia_kw, bateria_soc_pct, bateria_estado, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh, bateria_porcentaje'
+      'id, proyecto_id, timestamp, solar_produccion_kwh, consumo_red_kwh, bateria_descarga_kwh, bateria_porcentaje'
     )
     .gte('timestamp', startDate)
     .order('timestamp', { ascending: true })
@@ -214,7 +228,26 @@ export async function getTelemetryHistorical(
     console.error('Error fetching historical telemetry:', error)
     return []
   }
-  return data ?? []
+  return (data ?? []).map((row) => {
+    const solarProductionKwh = Number(row.solar_produccion_kwh) || 0
+    const gridConsumptionKwh = Number(row.consumo_red_kwh) || 0
+    const batteryDischargeKwh = Number(row.bateria_descarga_kwh) || 0
+    const batteryChargePct = Number(row.bateria_porcentaje) || 0
+
+    return {
+      id: row.id,
+      proyecto_id: row.proyecto_id,
+      timestamp: row.timestamp,
+      solar_produccion_kwh: solarProductionKwh,
+      consumo_red_kwh: gridConsumptionKwh,
+      bateria_descarga_kwh: batteryDischargeKwh,
+      bateria_porcentaje: batteryChargePct,
+      solarProductionKwh,
+      gridConsumptionKwh,
+      batteryDischargeKwh,
+      batteryChargePct,
+    }
+  })
 }
 
 

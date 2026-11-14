@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Zap, MapPin, Building, ChevronRight, CheckCircle2, DollarSign } from 'lucide-react'
 import { resolveCfeTariffLabel } from '@/lib/tariffs/cfe-calculator'
+import { Modal } from '@/components/ui/Modal'
 
 interface ProyectoMEM {
   id: string
@@ -148,96 +149,91 @@ export default function OfertasBoard({ suministradorId }: OfertasBoardProps) {
       </div>
 
       {/* Bidding Modal */}
-      {selectedProyecto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-borde flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-black text-principal">Oferta de Suministro</h2>
-              <button onClick={() => setSelectedProyecto(null)} className="text-gray-400 hover:text-gray-600">
-                ✕
-              </button>
-            </div>
-            
-            {success ? (
-              <div className="p-12 flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce">
-                  <CheckCircle2 size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-principal mb-2">Oferta Enviada Exitosamente</h3>
-                <p className="text-gray-500">Nodo notificará al cliente y a nuestro equipo de analistas.</p>
+      <Modal
+        isOpen={Boolean(selectedProyecto)}
+        onClose={() => setSelectedProyecto(null)}
+        title="Oferta de Suministro"
+        maxWidth="lg"
+      >
+        {selectedProyecto &&
+          (success ? (
+            <div className="p-12 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce">
+                <CheckCircle2 size={32} />
               </div>
-            ) : (
-              <form onSubmit={handleSumbitBid} className="p-6">
-                <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <p className="text-sm font-semibold text-blue-900 mb-1">{selectedProyecto.nombre_proyecto}</p>
-                  <p className="text-xs text-blue-700">Consumo: {selectedProyecto.consumo_anual_gwh || 0} GWh/año • Tarifa actual: {selectedProyecto.tarifa_actual_cfe || 'GDMTH'}</p>
-                </div>
+              <h3 className="text-xl font-bold text-principal mb-2">Oferta Enviada Exitosamente</h3>
+              <p className="text-gray-500">Nodo notificará al cliente y a nuestro equipo de analistas.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSumbitBid} className="p-6">
+              <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-sm font-semibold text-blue-900 mb-1">{selectedProyecto.nombre_proyecto}</p>
+                <p className="text-xs text-blue-700">Consumo: {selectedProyecto.consumo_anual_gwh || 0} GWh/año • Tarifa actual: {selectedProyecto.tarifa_actual_cfe || 'GDMTH'}</p>
+              </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Precio propuesto (MXN/kWh)</label>
-                    <div className="relative">
-                      <DollarSign size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        value={precioKwh}
-                        onChange={e => setPrecioKwh(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all font-medium"
-                        placeholder="Ej: 1.85"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Vigencia del Contrato (Meses)</label>
-                    <select
-                      value={vigenciaMeses}
-                      onChange={e => setVigenciaMeses(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all font-medium bg-white"
-                    >
-                      <option value="12">12 meses</option>
-                      <option value="24">24 meses</option>
-                      <option value="36">36 meses</option>
-                      <option value="48">48 meses</option>
-                      <option value="60">60 meses</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Condiciones y Notas (Opcional)</label>
-                    <textarea
-                      value={notas}
-                      onChange={e => setNotas(e.target.value)}
-                      rows={3}
-                      className="w-full px-4 py-3 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all text-sm resize-none"
-                      placeholder="Agrega condiciones especiales, detalles de factor de carga, etc."
-                    ></textarea>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Precio propuesto (MXN/kWh)</label>
+                  <div className="relative">
+                    <DollarSign size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={precioKwh}
+                      onChange={e => setPrecioKwh(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all font-medium"
+                      placeholder="Ej: 1.85"
+                    />
                   </div>
                 </div>
 
-                <div className="mt-8 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProyecto(null)}
-                    className="flex-1 py-3 px-4 rounded-lg font-bold text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Vigencia del Contrato (Meses)</label>
+                  <select
+                    value={vigenciaMeses}
+                    onChange={e => setVigenciaMeses(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all font-medium bg-white"
                   >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="flex-1 py-3 px-4 rounded-lg font-bold text-sm text-principal bg-acento hover:bg-acento-hover transition-colors shadow-sm disabled:opacity-50"
-                  >
-                    {submitting ? 'Enviando...' : 'Enviar Oferta en Firme'}
-                  </button>
+                    <option value="12">12 meses</option>
+                    <option value="24">24 meses</option>
+                    <option value="36">36 meses</option>
+                    <option value="48">48 meses</option>
+                    <option value="60">60 meses</option>
+                  </select>
                 </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Condiciones y Notas (Opcional)</label>
+                  <textarea
+                    value={notas}
+                    onChange={e => setNotas(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-lg border border-borde focus:border-acento focus:ring-2 focus:ring-acento/30 transition-all text-sm resize-none"
+                    placeholder="Agrega condiciones especiales, detalles de factor de carga, etc."
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedProyecto(null)}
+                  className="flex-1 py-3 px-4 rounded-lg font-bold text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 py-3 px-4 rounded-lg font-bold text-sm text-principal bg-acento hover:bg-acento-hover transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {submitting ? 'Enviando...' : 'Enviar Oferta en Firme'}
+                </button>
+              </div>
+            </form>
+          ))}
+      </Modal>
     </div>
   )
 }

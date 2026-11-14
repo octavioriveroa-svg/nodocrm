@@ -366,6 +366,44 @@ domainAuthSuite.test('Auth.8: Server actions (adminDeleteUser, crearUsuarioAdmin
   clearActiveSessionCookies()
 })
 
+// ── 9. JWT Custom Claims Sync & Proxy Zero-DB Fallback (TASK-005) ─────────────
+domainAuthSuite.test('Auth.9: Proxy JWT custom claims & user_role sync across all profiles', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const { getServiceRoleClient } = await import('./test-utils.mjs')
+
+  const migPath = path.resolve('supabase/migrations/20261112000002_sync_user_role_claim.sql')
+  assert(fs.existsSync(migPath), '20261112000002_sync_user_role_claim.sql must exist')
+  const sql = fs.readFileSync(migPath, 'utf8')
+  assertIncludes(sql, 'sync_profile_role_to_app_metadata', 'Migration defines trigger function')
+  assertIncludes(sql, 'trg_sync_profile_role_to_app_metadata', 'Migration creates trigger on profiles')
+
+  const proxySrc = fs.readFileSync(path.resolve('proxy.ts'), 'utf8')
+  assertIncludes(proxySrc, 'user.app_metadata?.user_role', 'proxy.ts prioritizes user.app_metadata.user_role')
+  assertIncludes(proxySrc, 'if (!rol) {', 'proxy.ts wraps DB fallback in if (!rol)')
+
+  const provSrc = fs.readFileSync(path.resolve('lib/domains/auth/user-provisioning.ts'), 'utf8').replace(/\r\n/g, '\n')
+  assertIncludes(provSrc, 'app_metadata: {\n          user_role: input.rol,', 'createUser stamps app_metadata.user_role')
+  assertIncludes(provSrc, 'app_metadata: { user_role: input.rol }', 'invite flows stamp app_metadata.user_role via updateUserById')
+
+  // Live check: verify all reachable auth.users matching public.profiles have synced app_metadata.user_role
+  const admin = getServiceRoleClient()
+  const { data: profs, error: profErr } = await admin.from('profiles').select('id, rol')
+  assert(!profErr && Array.isArray(profs) && profs.length > 0, 'Must load live profiles')
+  let verifiedCount = 0
+  const mismatches = []
+  for (const p of profs) {
+    const { data, error } = await admin.auth.admin.getUserById(p.id)
+    if (error || !data?.user) continue // Skip orphaned profiles (404) or unreachable legacy auth rows
+    verifiedCount++
+    if (data.user.app_metadata?.user_role !== p.rol) {
+      mismatches.push(`${p.id}: expected ${p.rol}, got ${data.user.app_metadata?.user_role}`)
+    }
+  }
+  assert(verifiedCount > 0, 'Must verify at least one live auth user')
+  assertEqual(mismatches.length, 0, `Role claim mismatches found: ${mismatches.join('; ')}`)
+})
+
 if (process.argv[1] && process.argv[1].endsWith('domain-auth.test.mjs')) {
   domainAuthSuite.run().catch((err) => {
     console.error('Test suite failed:', err)

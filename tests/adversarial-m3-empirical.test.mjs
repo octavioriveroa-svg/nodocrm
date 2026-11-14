@@ -24,7 +24,6 @@ import {
   assert,
   assertEqual,
   assertIncludes,
-  QA_USERS,
   getServiceRoleClient,
 } from './test-utils.mjs'
 

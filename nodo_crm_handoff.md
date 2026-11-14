@@ -11,11 +11,11 @@ This document summarizes the current production-hardened state of the **Nodo CRM
 - **Framework**: Next.js 16.2.3 (App Router, `proxy.ts` request interceptor) + React 19.2.4 + TypeScript
 - **Styling**: Tailwind CSS, Lucide Icons, custom responsive HTML/SVG visualizations
 - **Database & Auth**: Supabase (`nlqrdxwyxmgdwawedweh` — PostgreSQL, Row Level Security, Auth, Storage, Transactional RPCs)
-- **Testing & CI**: 4-Tier Automated Acceptance Suite (`npx tsx tests/test-runner.mjs` / `npm test`) + GitHub Actions CI/CD (`.github/workflows/main.yml`)
+- **Testing & CI**: 4-Tier Automated Acceptance Suite (`npx tsx tests/test-runner.mjs` / `npm test`, 65 tests) + Empirical Security/Lifecycle Suites + GitHub Actions CI/CD (`.github/workflows/main.yml`)
 - **Deployment**: Vercel
 
 ### User Roles & Portals (7 Portals)
-The platform enforces strict server-side Role-Based Access Control (RBAC) via `proxy.ts` and portal layouts, querying the authoritative `public.profiles.rol` column (never trusting client-editable `user_metadata`):
+The platform enforces strict server-side Role-Based Access Control (RBAC) via `proxy.ts` and portal layouts: `proxy.ts` inspects the signed JWT custom claim `user.app_metadata?.user_role` first (synchronized by DB trigger `trg_sync_profile_role_to_app_metadata` and Auth Admin API provisioning) and falls back to `public.profiles.rol` only when absent, never trusting client-editable `user_metadata`:
 - **`nodo_admin` (`/admin`)**: Full platform visibility, global analytics dashboard, project creation & oversight, client & site management, user directory (`/admin/usuarios`), and role/account administration (`/admin/configuracion/roles`).
 - **`nodo_analista` (`/analista`)**: Global analytics dashboard (`/analista`), full projects directory with search/status/type filters and `"Limpiar filtros"` controls (`/analista/proyectos`), project creation (`/analista/proyectos/nuevo`), client management, and non-admin user management.
 - **`epc` (`/epc`)**: Engineering, Procurement & Construction installers. Submit and manage projects (`/epc/nuevo`), configure technical FV/BESS solutions, manage construction plans & milestones (`/epc/proyectos/[id]/plan`), and monitor installations (`/epc/instalaciones`).
@@ -35,7 +35,8 @@ The platform enforces strict server-side Role-Based Access Control (RBAC) via `p
 - **`proyecto_sitios` & `proyecto_sitio_productos`**: Multi-site project associations and legacy/summary FV/BESS product line items (`capex`, `ahorro_mensual_estimado`, `potencia_kwp`, `capacidad_kwh`).
 - **`configuraciones_tecnicas` & `opciones_financiamiento` & `config_financiamiento`**: Multi-option technical configurations (FV, BESS, hybrid inverter linkages, multi-currency MXN/USD CAPEX) and financing vehicles (`ppa`, `credito_simple`, `arrendamiento`, `contado`, `otro`).
 - **`plan_fases`, `plan_actividades`, `hitos_financieros`**: EPC construction schedule (with topological cascade scheduling via `lib/cascade-scheduler.ts`) and financial disbursement milestones.
-- **`telemetria_egauge`**: Time-series production and consumption readings (`generacion_kwh`, `consumo_kwh`, `potencia_kw`, `bateria_soc_pct`, `bateria_estado`) indexed by `(proyecto_id, timestamp DESC)`.
+- **`telemetria_egauge`**: Time-series production and consumption readings (`id`, `proyecto_id`, `timestamp`, `solar_produccion_kwh`, `consumo_red_kwh`, `bateria_descarga_kwh`, `bateria_porcentaje`) indexed by `(proyecto_id, timestamp DESC)`.
+- **`notificaciones`**: Real-time user notification inbox (`id`, `usuario_id`, `proyecto_id`, `comentario_id`, `tipo` including `'evidencia'`, `titulo`, `mensaje`, `enlace`, `leido`, `created_at`) protected by user-scoped RLS policies and client-recipient resolution via `profiles.cliente_crm_id`.
 
 ### Transactional RPCs & Security Triggers (`supabase/migrations/`)
 1. **`20261021000001_sprint1_security_rpcs_and_profile_prefs.sql`**:
@@ -46,26 +47,33 @@ The platform enforces strict server-side Role-Based Access Control (RBAC) via `p
 2. **`20261021000002_dashboard_views_and_indexes.sql`**:
    - Composite indexes `idx_telemetria_proyecto_time` and `idx_proyectos_estado_created`.
    - Explicit foreign key `proyectos_epcista_id_fkey` enabling single-roundtrip PostgREST relational joins for `epc`, `responsable`, and `finder` profiles.
+3. **Sprint 3 Remediation Migrations (`20261112000001`–`20261112000004` + Consolidated Bundle `20261112000000_consolidated_sprint3_ddl.sql`)**:
+   - **`20261112000001_create_notificaciones.sql`**: Creates `public.notificaciones` (`leido`, `enlace`, `comentario_id`, `'evidencia'`), indexes, and RLS policies.
+   - **`20261112000002_sync_user_role_claim.sql`**: Adds `sync_profile_role_to_app_metadata()` + `trg_sync_profile_role_to_app_metadata` trigger and backfills `auth.users.raw_app_meta_data->>'user_role'` from `public.profiles.rol`.
+   - **`20261112000003_tarifa_cfe_varchar.sql`**: Migrates `proyectos.tarifa_actual_cfe` to `VARCHAR(20)` idempotently.
+   - **`20261112000004_fk_indexes.sql`**: Adds 10 B-tree indexes across `proyectos`, `sitios`, `proyecto_sitios`, `configuraciones_tecnicas`, and `opciones_financiamiento`.
 
 ---
 
-## 3. Major Engineering Milestones Completed (Sprints 1 & 2)
+## 3. Major Engineering Milestones Completed (Sprints 1–3)
 
 ### A. Security & RBAC Hardening
-- **Authoritative Role Checks**: `proxy.ts`, `app/login/page.tsx`, `app/pendiente/page.tsx`, and all 7 portal layouts query `profiles.rol` directly and never fall back to `user_metadata?.rol`.
+- **Authoritative Role Checks**: `proxy.ts` reads the signed JWT custom claim `user.app_metadata?.user_role` (synced via DB trigger and `lib/domains/auth/user-provisioning.ts`) with a conditional `public.profiles.rol` fallback when absent, while `app/login/page.tsx`, `app/pendiente/page.tsx`, and portal layouts enforce authoritative role verification and `getUser()` SSR validation (`app/(portals)/cliente/proyectos/[id]/instalaciones/page.tsx`). `proxy.ts` and `app/login/page.tsx` preserve query strings in `returnUrl` with open-redirect defense and `resolveCrossPortalDeepLink` rewriting.
 - **Admin Server Actions (`app/actions/*.ts`)**: Enforced strict server-side caller verification: only `nodo_admin` can delete users (`adminDeleteUser`) or assign the `nodo_admin` role (`crearUsuarioAdmin`, `invitarUsuario`).
 - **Pendiente Session Refresh**: `app/pendiente/page.tsx` calls `supabase.auth.refreshSession()` upon role approval to eliminate redirect loops.
 
-### B. Unified `ProjectWizard` & Safe Modal Mutations
-- **Consolidated Wizard (`components/proyectos/ProjectWizard.tsx` + `components/proyectos/wizard/*`)**: Replaced ~6,200 lines of duplicated wizard code across Admin, Analyst, EPC, and Finder portals with a single modular wizard supporting role-specific selectors, `"Nodo busca instalador"` 2-step flows, hybrid BESS+FV inverter linking, `crypto.randomUUID()` temp keys, and atomic `crear_proyecto_completo` persistence with compensating rollback.
+### B. Unified `ProjectWizard`, Modular Components & UI Primitives
+- **Consolidated Wizard (`components/proyectos/ProjectWizard.tsx` + `components/proyectos/wizard/useProjectWizardState.ts`)**: Decomposed wizard state, catalog loading, site CRUD, product/config/financing handlers, and RPC/fallback payload builders into `useProjectWizardState.ts`, reducing `ProjectWizard.tsx` to 303 lines while preserving atomic `crear_proyecto_completo` persistence with compensating rollback and hybrid BESS+FV inverter linking.
+- **Evidence & Marketplace Decomposition**: Extracted `EvidenciaGallery.tsx` and `EvidenciaLightbox.tsx` under `components/instalaciones/` for `InstalacionMonitor.tsx`, added reusable primitives (`Modal.tsx`, `DropdownMenu.tsx`, `Tabs.tsx`) under `components/ui/`, refactored `OfertasBoard.tsx` to use `Modal`, and consolidated Tailwind v4 `@theme` design tokens in `app/globals.css`.
 - **Insert-Before-Delete Modals**: `EditarSolucionTecnicaModal.tsx` and `EditarFinanciamientoModal.tsx` insert new rows before deleting removed ones to prevent data loss on network failure.
 
-### C. Zero-Mockups, Deterministic CFE Tariffs & Real Persistence
-- **Removed Synthetic Code**: Deleted `lib/egauge.ts` (`Math.sin`/`Math.random` fake telemetry) and `app/brand-preview/page.tsx`.
-- **Deterministic CFE Tariff Calculator (`lib/tariffs/cfe-calculator.ts`)**: Replaced hardcoded `* 3.9` and `'GDMTH'` multipliers across `cliente`, `financiero`, and `mem` portals with official CFE tariff tables (`GDMTH`, `GDMTO`, `PDBT`, `GDBT`, `DIST`, `DIT`) and 0.423 kg CO₂e/kWh SEMARNAT emissions factors.
+### C. Zero-Mockups, Deterministic CFE Tariffs, Telemetry & Real Persistence
+- **Removed Synthetic Code**: Deleted `lib/egauge.ts` and `app/brand-preview/page.tsx`.
+- **Telemetry & Client Directory Alignment**: `getTelemetryHistorical` in `lib/dashboard-data.ts` selects explicit live `telemetria_egauge` columns with camelCase aliases, and `fetchProyectosDirectory` in `lib/domains/proyectos/queries.ts` resolves `profiles.cliente_crm_id` for `cliente_final` users.
+- **Deterministic CFE Tariff Calculator (`lib/tariffs/cfe-calculator.ts`)**: Supports all 8 CFE tariffs (`GDMTH`, `GDMTO`, `PDBT`, `GDBT`, `DIST`, `DIT`, `01`, `DAC`), `SEMARNAT_EMISSIONS_FACTOR_KG_CO2_PER_KWH = 0.423` (`calculateCo2AvoidedTonnes`), and `USD`->`MXN` savings normalization (`exchangeRateUsdMxn = 18.0`), wired into `cliente`, `financiero`, and `mem` portals.
 - **Database-Backed Settings (`components/Configuracion.tsx`)**: Replaced `localStorage` persistence with real Supabase `profiles` updates across all 7 portals (`/{portal}/configuracion`).
 
 ### D. App Router UX Boundaries, Query Optimization & CI/CD
 - **Resilience Boundaries (`REL-01`)**: Added root and per-portal `error.tsx`, `loading.tsx`, and `not-found.tsx` boundaries across all 7 portals.
-- **Single-Roundtrip Project Directories (`PERF-01`, `PERF-03`)**: Refactored `/admin/proyectos` and `/analista/proyectos` to use single PostgREST relational joins with automatic fallback and added `"Limpiar filtros"` empty-state controls.
-- **4-Tier Automated Acceptance Suite & CI/CD (`REL-06`)**: 31 automated tests in `tests/` covering RBAC, boundary conditions, cross-feature flows, and live multi-table transactional persistence, integrated into `.github/workflows/main.yml`.
+- **Single-Roundtrip Project Directories & Foreign Key Indexing (`PERF-01`, `PERF-03`)**: Refactored `/admin/proyectos` and `/analista/proyectos` to use single PostgREST relational joins with automatic fallback, added `"Limpiar filtros"` empty-state controls, and added 10 B-tree foreign key indexes (`20261112000004_fk_indexes.sql`).
+- **4-Tier Automated Acceptance Suite & Empirical Suites (`REL-06`)**: 65 acceptance tests in `npm test` (`npx tsx tests/test-runner.mjs`) plus 16 empirical M3 security tests (`npx tsx tests/adversarial-m3-empirical.test.mjs`), with 0 TypeScript errors and 0 ESLint warnings (`npx eslint . --max-warnings=0`).

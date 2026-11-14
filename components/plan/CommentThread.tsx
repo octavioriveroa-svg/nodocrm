@@ -216,17 +216,29 @@ export default function CommentThread({ proyectoId, targetType, targetId, curren
     // In a production app, this would be a server action. For now, we notify the project stakeholders.
     supabase
       .from('proyectos')
-      .select('epcista_id, cliente_id, financiero_id')
+      .select('epcista_id, cliente_id, financiero_id, responsable_nodo_id, finder_id')
       .eq('id', proyectoId)
       .single()
-      .then(({ data: proyecto }) => {
+      .then(async ({ data: proyecto }) => {
         if (!proyecto) return
         const recipientIds = new Set<string>()
 
-        // Add project stakeholders
+        // Add project stakeholders (profile UUIDs)
         if (proyecto.epcista_id) recipientIds.add(proyecto.epcista_id)
-        if (proyecto.cliente_id) recipientIds.add(proyecto.cliente_id)
         if (proyecto.financiero_id) recipientIds.add(proyecto.financiero_id)
+        if (proyecto.responsable_nodo_id) recipientIds.add(proyecto.responsable_nodo_id)
+        if (proyecto.finder_id) recipientIds.add(proyecto.finder_id)
+
+        // Resolve cliente_final user profile UUIDs from cliente_crm_id (proyectos.cliente_id references clientes.id)
+        if (proyecto.cliente_id) {
+          const { data: clientProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('cliente_crm_id', proyecto.cliente_id)
+          if (clientProfiles) {
+            clientProfiles.forEach((cp: { id: string }) => recipientIds.add(cp.id))
+          }
+        }
 
         // If replying, also notify the parent comment author
         if (parentId) {
@@ -257,7 +269,10 @@ export default function CommentThread({ proyectoId, targetType, targetId, curren
           comentario_id: comment.id,
         }))
 
-        supabase.from('notificaciones').insert(notifications).then(() => {})
+        const { error } = await supabase.from('notificaciones').insert(notifications)
+        if (error) {
+          console.error('Error creating comment notifications:', error)
+        }
       })
   }
 
