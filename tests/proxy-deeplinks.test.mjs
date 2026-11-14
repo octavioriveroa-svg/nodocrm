@@ -182,6 +182,63 @@ proxyDeeplinksSuite.test('Proxy.6: Query parameters are strictly preserved acros
   )
 })
 
+// ── 7. Login ReturnUrl & Open-Redirect Defense (TASK-004) ────────────────────
+proxyDeeplinksSuite.test('Proxy.7: Login returnUrl validation, query preservation, and open-redirect defense', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const { assert, assertIncludes } = await import('./test-utils.mjs')
+
+  const resolveLoginDestination = (returnUrl, targetSub) => {
+    const isSafeRelative =
+      Boolean(returnUrl) &&
+      returnUrl.startsWith('/') &&
+      !returnUrl.startsWith('//') &&
+      !returnUrl.startsWith('/\\')
+
+    if (!isSafeRelative) return `/${targetSub}`
+    const [pathPart, ...queryParts] = returnUrl.split('?')
+    const searchPart = queryParts.length > 0 ? `?${queryParts.join('?')}` : ''
+    return resolveCrossPortalDeepLink(pathPart, targetSub, searchPart)
+  }
+
+  // Same-portal with query parameters
+  assertEqual(
+    resolveLoginDestination('/admin/clientes?tab=active', 'admin'),
+    '/admin/clientes?tab=active',
+    'Same-portal deep link with query params must be preserved'
+  )
+
+  // Cross-portal deep link + route alias translation
+  assertEqual(
+    resolveLoginDestination('/admin/proyectos/nuevo?step=2', 'epc'),
+    '/epc/nuevo?step=2',
+    'Cross-portal alias deep link must translate with query params'
+  )
+
+  // Open-redirect payloads blocked
+  assertEqual(resolveLoginDestination('//evil.com/phish', 'epc'), '/epc', 'Protocol-relative redirect blocked')
+  assertEqual(resolveLoginDestination('/\\evil.com', 'epc'), '/epc', 'Backslash redirect blocked')
+  assertEqual(resolveLoginDestination('https://evil.com', 'admin'), '/admin', 'Absolute external URL blocked')
+
+  // Verify PORTAL_SUPPORTED_ROUTES exports rules for all 7 portals
+  for (const portal of ['admin', 'analista', 'epc', 'finder', 'cliente', 'financiero', 'mem']) {
+    assert(Array.isArray(PORTAL_SUPPORTED_ROUTES[portal]), `PORTAL_SUPPORTED_ROUTES must define rules for ${portal}`)
+  }
+
+  // Static audit of proxy.ts, app/login/page.tsx, and cliente instalaciones SSR guard
+  const proxySrc = fs.readFileSync(path.resolve('proxy.ts'), 'utf8')
+  assertIncludes(proxySrc, '${path}${request.nextUrl.search}', 'proxy.ts must preserve query string in returnUrl')
+
+  const loginSrc = fs.readFileSync(path.resolve('app/login/page.tsx'), 'utf8')
+  assertIncludes(loginSrc, 'Suspense', 'app/login/page.tsx must wrap LoginForm in Suspense')
+  assertIncludes(loginSrc, 'useSearchParams', 'app/login/page.tsx must read returnUrl via useSearchParams')
+  assert(!loginSrc.includes('getSession'), 'app/login/page.tsx must use signInWithPassword user id instead of getSession')
+
+  const clienteInstSrc = fs.readFileSync(path.resolve('app/(portals)/cliente/proyectos/[id]/instalaciones/page.tsx'), 'utf8')
+  assertIncludes(clienteInstSrc, 'auth.getUser()', 'Cliente instalaciones page must validate auth with getUser()')
+  assert(!clienteInstSrc.includes('getSession'), 'Cliente instalaciones page must not call getSession()')
+})
+
 if (process.argv[1] && process.argv[1].endsWith('proxy-deeplinks.test.mjs')) {
   proxyDeeplinksSuite.run().catch((err) => {
     console.error('Test suite failed:', err)

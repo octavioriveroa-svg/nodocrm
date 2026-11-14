@@ -106,11 +106,39 @@ export async function fetchProyectoDetalleCompleto(
   }
 }
 
+function applyDirectoryRoleFilter<T extends { eq: (column: string, value: string) => T }>(
+  query: T,
+  role: Rol | undefined,
+  userId: string | undefined,
+  clienteCrmId: string | null
+): T {
+  if (role === 'epc' && userId) return query.eq('epcista_id', userId)
+  if (role === 'finder' && userId) return query.eq('finder_id', userId)
+  if (role === 'cliente_final' && clienteCrmId) return query.eq('cliente_id', clienteCrmId)
+  if (role === 'financiero' && userId) return query.eq('financiero_id', userId)
+  return query
+}
+
 export async function fetchProyectosDirectory(
   supabase: SupabaseClient,
   options?: { role?: Rol; userId?: string }
 ): Promise<ProyectoConEpcista[]> {
-  let query = supabase
+  // Resolve linked commercial entity (cliente_crm_id) when scoping for cliente_final users
+  let effectiveClienteCrmId: string | null = null
+  if (options?.role === 'cliente_final' && options.userId) {
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('cliente_crm_id')
+      .eq('id', options.userId)
+      .maybeSingle()
+
+    effectiveClienteCrmId = profileRow?.cliente_crm_id || null
+    if (!effectiveClienteCrmId) {
+      return []
+    }
+  }
+
+  const baseQuery = supabase
     .from('proyectos')
     .select(`
       *,
@@ -120,15 +148,7 @@ export async function fetchProyectosDirectory(
     `)
     .order('created_at', { ascending: false })
 
-  if (options?.role === 'epc' && options.userId) {
-    query = query.eq('epcista_id', options.userId)
-  } else if (options?.role === 'finder' && options.userId) {
-    query = query.eq('finder_id', options.userId)
-  } else if (options?.role === 'cliente_final' && options.userId) {
-    query = query.eq('cliente_id', options.userId)
-  } else if (options?.role === 'financiero' && options.userId) {
-    query = query.eq('financiero_id', options.userId)
-  }
+  const query = applyDirectoryRoleFilter(baseQuery, options?.role, options?.userId, effectiveClienteCrmId)
 
   const { data: joinedData, error: joinError } = await query
 
@@ -136,20 +156,17 @@ export async function fetchProyectosDirectory(
 
   if (joinError) {
     console.warn('PostgREST relational join failed, falling back to manual resolution:', joinError.message)
-    let fallbackQuery = supabase
+    const baseFallback = supabase
       .from('proyectos')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (options?.role === 'epc' && options.userId) {
-      fallbackQuery = fallbackQuery.eq('epcista_id', options.userId)
-    } else if (options?.role === 'finder' && options.userId) {
-      fallbackQuery = fallbackQuery.eq('finder_id', options.userId)
-    } else if (options?.role === 'cliente_final' && options.userId) {
-      fallbackQuery = fallbackQuery.eq('cliente_id', options.userId)
-    } else if (options?.role === 'financiero' && options.userId) {
-      fallbackQuery = fallbackQuery.eq('financiero_id', options.userId)
-    }
+    const fallbackQuery = applyDirectoryRoleFilter(
+      baseFallback,
+      options?.role,
+      options?.userId,
+      effectiveClienteCrmId
+    )
 
     const { data: fallbackData } = await fallbackQuery
     prs = (fallbackData as RawProyecto[]) || null

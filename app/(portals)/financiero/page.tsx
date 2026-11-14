@@ -41,7 +41,7 @@ export default function FinancieroDashboard() {
       const { data: projs, error: pErr } = await supabase
         .from('proyectos')
         .select(
-          'id, nombre_proyecto, cliente_final_empresa, capex_estimado, capacidad_mwh, estado, configuraciones_tecnicas(ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, seleccionada)'
+          'id, nombre_proyecto, cliente_final_empresa, capex_estimado, capacidad_mwh, estado, tarifa_actual_cfe, configuraciones_tecnicas(ahorro_estimado_anual, ahorro_estimado_mensual, ahorro_moneda, seleccionada)'
         )
         .eq('financiero_id', session.user.id)
 
@@ -89,6 +89,7 @@ export default function FinancieroDashboard() {
         const pSavings = calculateProjectSavingsMxn({
           totalGeneratedKwh: pGen,
           selectedConfig,
+          tarifaCfe: p.tarifa_actual_cfe,
         })
         return {
           id: p.id,

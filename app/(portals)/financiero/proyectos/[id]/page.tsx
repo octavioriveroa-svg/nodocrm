@@ -64,7 +64,10 @@ export default function FinancieroProyectoDetalle() {
       if (teleData && teleData.length > 0) {
         setTelemetry(teleData)
         const totalGenerated = teleData.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0)
-        const savingsMxn = calculateProjectSavingsMxn({ totalGeneratedKwh: totalGenerated })
+        const savingsMxn = calculateProjectSavingsMxn({
+          totalGeneratedKwh: totalGenerated,
+          tarifaCfe: (pData as Proyecto).tarifa_actual_cfe,
+        })
         setMetrics({ totalGenerated, savingsMxn })
       }
 

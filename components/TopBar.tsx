@@ -73,20 +73,23 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
   // Fetch notifications
   const loadNotifs = useCallback(async () => {
     if (!userId) return
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('notificaciones')
       .select('*')
       .eq('usuario_id', userId)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (error) return
     if (data) setNotifs(data as Notificacion[])
     // Unread count
-    const { count: unread } = await supabase
+    const { count: unread, error: countErr } = await supabase
       .from('notificaciones')
       .select('*', { count: 'exact', head: true })
       .eq('usuario_id', userId)
       .eq('leido', false)
-    setUnreadCount(unread || 0)
+    if (!countErr) {
+      setUnreadCount(unread || 0)
+    }
   }, [userId, supabase])
 
   useEffect(() => {
@@ -203,14 +206,16 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
   }
 
   async function markAsRead(id: string) {
-    await supabase.from('notificaciones').update({ leido: true }).eq('id', id)
+    const { error } = await supabase.from('notificaciones').update({ leido: true }).eq('id', id)
+    if (error) return
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, leido: true } : n))
     setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   async function markAllRead() {
     if (!userId) return
-    await supabase.from('notificaciones').update({ leido: true }).eq('usuario_id', userId).eq('leido', false)
+    const { error } = await supabase.from('notificaciones').update({ leido: true }).eq('usuario_id', userId).eq('leido', false)
+    if (error) return
     setNotifs(prev => prev.map(n => ({ ...n, leido: true })))
     setUnreadCount(0)
   }

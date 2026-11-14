@@ -103,7 +103,8 @@ export function computePipeline(prs: RawProject[]) {
   return { byStage, funnel, velocity, winRate, total }
 }
 
-export function computeFinancial(prs: RawProject[], prods: RawProduct[], opts: RawFinancingOption[] = []) {
+export function computeFinancial(prs: RawProject[], prods: RawProduct[], _opts: RawFinancingOption[] = []) {
+  void _opts
   const ids = new Set(prs.map(p => p.id))
   let totalCapex = 0
   let savingsAnnual = 0

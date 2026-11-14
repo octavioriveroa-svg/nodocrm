@@ -4,7 +4,6 @@ import {
   assertEqual,
   assertIncludes,
   getAuthSession,
-  setActiveSessionCookies,
   clearActiveSessionCookies,
   getAnonClient,
 } from './test-utils.mjs'
@@ -55,6 +54,11 @@ tier3Suite.test('3.1: Analyst can discover project in directory and inspect full
   assertEqual(cfgErr, null, 'Technical configurations query must succeed')
   assertEqual(fErr, null, 'Financing options query must succeed')
   assertEqual(mErr, null, 'Milestones query must succeed')
+  assert(Array.isArray(comments), 'Comments must be an array')
+  assert(Array.isArray(sites), 'Sites must be an array')
+  assert(Array.isArray(configs), 'Technical configs must be an array')
+  assert(Array.isArray(financing), 'Financing options must be an array')
+  assert(Array.isArray(milestones), 'Milestones must be an array')
 
   assertEqual(projectData.id, targetProject.id, 'Inspected project ID must match directory item')
 })
@@ -111,10 +115,18 @@ tier3Suite.test('3.3: Finder capabilities allow inviting EPC and reject non-EPC 
     rol: 'cliente_final',
   }
 
-  // When unauthenticated, rejects with No autenticado
+  // When unauthenticated, both reject with No autenticado
   clearActiveSessionCookies()
   const resUnauth = await crearUsuarioAdmin(invalidRolePayload)
   assertIncludes(resUnauth.error, 'No autenticado', 'Must require authenticated session')
+
+  const resUnauthInvite = await invitarUsuario({
+    email: 'new_client@prueba.com',
+    nombre: 'Cliente Invalido',
+    empresa: 'Empresa',
+    rol: 'cliente_final',
+  })
+  assertIncludes(resUnauthInvite.error, 'No autenticado', 'invitarUsuario must require authenticated session')
 })
 
 // ── 4. MEM Banner Activation on High Demand (> 1000 kW) ──────────────────────

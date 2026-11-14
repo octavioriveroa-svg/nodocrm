@@ -263,3 +263,64 @@ tier2Suite.test('6.1: High demand MEM threshold triggers strictly when demand ex
   ]
   assertEqual(checkMemTrigger(multiSites), true, 'Multiple sites with one > 1000 must trigger MEM')
 })
+
+// ── 7. CFE Tariff Engine Expansion & Currency Normalization (TASK-006) ───────
+tier2Suite.test('7.1: CFE Calculator handles all 8 tariffs, CO2 avoidance, and USD normalization', async () => {
+  const {
+    CFE_TARIFF_RATES_MXN,
+    SEMARNAT_EMISSIONS_FACTOR_KG_CO2_PER_KWH,
+    calculateCo2AvoidedTonnes,
+    calculateProjectSavingsMxn,
+    resolveCfeTariffLabel,
+  } = await import('../lib/tariffs/cfe-calculator.ts')
+
+  // 1. All 8 tariffs defined with positive non-zero rates
+  const tariffs = ['GDMTH', 'GDMTO', 'PDBT', 'GDBT', 'DIST', 'DIT', '01', 'DAC']
+  assertEqual(Object.keys(CFE_TARIFF_RATES_MXN).length, 8, 'Catalog must contain exactly 8 tariffs')
+  tariffs.forEach((t) => {
+    assert(CFE_TARIFF_RATES_MXN[t] > 0, `Tariff rate for ${t} must be > 0`)
+    const savings = calculateProjectSavingsMxn({ totalGeneratedKwh: 1000, tarifaCfe: t })
+    assert(savings > 0, `Savings for tariff ${t} must be positive`)
+  })
+  assertEqual(CFE_TARIFF_RATES_MXN.DIST, 2.15, 'DIST rate must be 2.15')
+  assertEqual(CFE_TARIFF_RATES_MXN.DIT, 1.98, 'DIT rate must be 1.98')
+  assertEqual(CFE_TARIFF_RATES_MXN['01'], 1.05, '01 rate must be 1.05')
+  assertEqual(CFE_TARIFF_RATES_MXN.DAC, 5.80, 'DAC rate must be 5.80')
+
+  // 2. SEMARNAT CO2 Avoidance
+  assertEqual(SEMARNAT_EMISSIONS_FACTOR_KG_CO2_PER_KWH, 0.423, 'SEMARNAT factor must be 0.423 kg CO2e/kWh')
+  assertEqual(calculateCo2AvoidedTonnes(1000), 0.423, '1,000 kWh should avoid 0.423 tonnes of CO2')
+  assertEqual(calculateCo2AvoidedTonnes(0), 0, '0 kWh should avoid 0 tonnes')
+  assertEqual(calculateCo2AvoidedTonnes(-100), 0, 'Negative kWh should return 0')
+  assertEqual(calculateCo2AvoidedTonnes(NaN), 0, 'NaN should return 0')
+
+  // 3. USD Multi-Currency Normalization
+  const usdSavings = calculateProjectSavingsMxn({
+    totalGeneratedKwh: 0,
+    selectedConfig: { ahorro_estimado_anual: 36500, ahorro_moneda: 'USD' },
+    exchangeRateUsdMxn: 18.0,
+  })
+  assertEqual(usdSavings, 1800.0, '36,500 USD annual savings pro-rates to 1,800 MXN daily at 18.0 exchange rate')
+
+  const usdMonthly = calculateProjectSavingsMxn({
+    totalGeneratedKwh: 0,
+    selectedConfig: { ahorro_estimado_mensual: 3000, ahorro_moneda: 'USD' },
+    exchangeRateUsdMxn: 20.0,
+  })
+  assertEqual(usdMonthly, 2000.0, '3,000 USD monthly savings pro-rates to 2,000 MXN daily at 20.0 exchange rate')
+
+  // 4. Tariff Label Resolution Thresholds (DIST, DIT, 01, DAC)
+  assertEqual(resolveCfeTariffLabel(1200, 9000), 'DIT', 'Demand >= 1000 kW and volume >= 8000 MWh resolves to DIT')
+  assertEqual(resolveCfeTariffLabel(1500, 5000), 'DIST', 'Demand >= 1000 kW and volume >= 4000 MWh resolves to DIST')
+  assertEqual(resolveCfeTariffLabel(1000, 2000, { tension: 'transmision' }), 'DIT', 'Demand >= 1000 kW with transmision tension resolves to DIT')
+  assertEqual(resolveCfeTariffLabel(1000, 2000, { tension: 'subtransmision' }), 'DIST', 'Demand >= 1000 kW with subtransmision tension resolves to DIST')
+  assertEqual(resolveCfeTariffLabel(1000, 2000, { tension: 'media' }), 'GDMTH', 'Demand >= 1000 kW with media tension resolves to GDMTH')
+  assertEqual(resolveCfeTariffLabel(3, 2.5), '01', 'Demand <= 5 kW and volume <= 3 MWh resolves to residential 01')
+  assertEqual(resolveCfeTariffLabel(5, 2.0, { tipoServicio: 'domestico' }), '01', 'Domestic service with volume <= 3 MWh resolves to 01')
+  assertEqual(resolveCfeTariffLabel(8, 12, { tipoServicio: 'domestico' }), 'DAC', 'Domestic service with volume > 3 MWh resolves to DAC')
+  assertEqual(resolveCfeTariffLabel(120, 100), 'GDMTH', 'Demand >= 100 kW resolves to GDMTH')
+  assertEqual(resolveCfeTariffLabel(35, 100), 'GDMTO', 'Demand >= 25 kW and volume >= 100 MWh resolves to GDMTO')
+  assertEqual(resolveCfeTariffLabel(35, 50), 'GDBT', 'Demand > 25 kW and volume < 100 MWh resolves to GDBT')
+  assertEqual(resolveCfeTariffLabel(10, 50), 'PDBT', 'Demand <= 25 kW commercial resolves to PDBT')
+  assertEqual(resolveCfeTariffLabel(null, null), 'GDMTH', 'Null inputs resolve to default GDMTH')
+})

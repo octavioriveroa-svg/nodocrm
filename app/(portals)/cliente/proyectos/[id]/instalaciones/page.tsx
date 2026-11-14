@@ -6,14 +6,15 @@ export default async function ClienteInstalacionesPage({ params }: { params: Pro
   const { id } = await params
   const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) redirect('/login')
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('cliente_crm_id, rol')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
 
   if (!profile || profile.rol !== 'cliente_final') redirect('/login')
