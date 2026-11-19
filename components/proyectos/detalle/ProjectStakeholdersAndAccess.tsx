@@ -193,7 +193,8 @@ export default function ProjectStakeholdersAndAccess({
         )}
       </Seccion>
 
-      {/* Accesos al Portal */}
+      {/* Accesos al Portal (oculto para cliente_final) */}
+      {currentUser.rol !== 'cliente_final' && (
       <Seccion title="Accesos al Portal">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Portal de Cliente */}
@@ -417,6 +418,7 @@ export default function ProjectStakeholdersAndAccess({
           </div>
         </div>
       </Seccion>
+      )}
     </div>
   )
 }

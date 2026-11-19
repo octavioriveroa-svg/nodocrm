@@ -136,13 +136,28 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, read
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este archivo? Esta acción no se puede deshacer.')) return
+    const target = archivos.find(a => a.id === id)
     const { error } = await supabase.from('archivos').delete().eq('id', id)
     if (error) {
       console.error('Delete error:', error)
       alert('Error al eliminar: ' + error.message)
-    } else {
-      onDeleteSuccess(id)
+      return
     }
+    if (target?.url) {
+      const marker = '/archivos-proyectos/'
+      const idx = target.url.indexOf(marker)
+      if (idx !== -1) {
+        const rawPath = target.url.slice(idx + marker.length).split('?')[0]
+        if (rawPath) {
+          try {
+            await supabase.storage.from('archivos-proyectos').remove([decodeURIComponent(rawPath)])
+          } catch (storageErr) {
+            console.warn('Storage cleanup warning:', storageErr)
+          }
+        }
+      }
+    }
+    onDeleteSuccess(id)
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {

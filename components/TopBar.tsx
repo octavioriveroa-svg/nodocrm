@@ -236,7 +236,7 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
   }
 
   return (
-    <header className="flex items-center justify-between gap-4 h-16 px-4 md:px-8 pl-16 md:pl-8 mx-4 mt-4 mb-2 rounded-2xl glass-panel sticky top-4 z-40">
+    <header className="flex items-center justify-between gap-3 sm:gap-4 h-16 px-4 md:px-8 pl-[68px] md:pl-8 mx-4 mt-4 mb-2 rounded-2xl glass-panel sticky top-4 z-30">
       {/* Global Search Bar */}
       <div className="relative flex-1 max-w-md" ref={searchContainerRef}>
         <div className="relative">

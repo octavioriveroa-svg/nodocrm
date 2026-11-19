@@ -39,7 +39,7 @@ export default function OfertasBoard({ suministradorId }: OfertasBoardProps) {
       const { data, error } = await supabase
         .from('proyectos')
         .select('id, nombre_proyecto, cliente_final_empresa, demanda_kw, volumen_energia_mwh_anual, ubicacion_estado, estado')
-        .in('tipo', ['MEM', 'BESS+MEM'])
+        .or('incluye_mem.eq.true,tipo.in.(MEM,BESS+MEM)')
 
       if (error) {
         console.error('Error fetching proyectos MEM:', error)

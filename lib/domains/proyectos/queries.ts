@@ -61,7 +61,7 @@ export async function fetchProyectoDetalleCompleto(
     { data: comentarios },
     { data: archivos },
     { data: currentUser },
-    { data: ps },
+    { data: ps, error: psErr },
     { data: prods },
     { data: configs },
     { data: hitos },
@@ -88,9 +88,28 @@ export async function fetchProyectoDetalleCompleto(
       ? await supabase.from('config_financiamiento').select('*').in('configuracion_id', configIds)
       : { data: [] }
 
-  const sitios: Sitio[] = (ps ?? [])
+  let sitios: Sitio[] = (ps ?? [])
     .map((p: { sitios?: Sitio | null }) => p.sitios)
     .filter(Boolean) as Sitio[]
+
+  if (psErr) {
+    const { data: psLinks } = await supabase
+      .from('proyecto_sitios')
+      .select('sitio_id')
+      .eq('proyecto_id', proyectoId)
+    const sitioIds = (psLinks ?? [])
+      .map((row: { sitio_id?: string | null }) => row.sitio_id)
+      .filter((id): id is string => Boolean(id))
+    if (sitioIds.length > 0) {
+      const { data: sitiosRows } = await supabase
+        .from('sitios')
+        .select('*')
+        .in('id', sitioIds)
+      if (Array.isArray(sitiosRows)) {
+        sitios = sitiosRows as Sitio[]
+      }
+    }
+  }
 
   return {
     proyecto: proyecto as Proyecto,

@@ -62,10 +62,10 @@ export default function DetalleProyecto({
 
   useEffect(() => {
     if (initial.responsable_nodo_id) {
-      supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).single().then(({ data }) => { if (data) setResponsableProfile(data) })
+      supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', initial.responsable_nodo_id).maybeSingle().then(({ data }) => { if (data) setResponsableProfile(data) })
     }
     if (initial.finder_id) {
-      supabase.from('profiles').select('nombre, empresa').eq('id', initial.finder_id).single().then(({ data }) => { if (data) setFinderProfile(data) })
+      supabase.from('profiles').select('nombre, empresa').eq('id', initial.finder_id).maybeSingle().then(({ data }) => { if (data) setFinderProfile(data) })
     }
     loadProjectSimulatorContext(supabase, initial.id).then((ctx) => {
       setOfertasMem(ctx.ofertasMem)
@@ -208,10 +208,10 @@ export default function DetalleProyecto({
             setProyecto(u)
             setEditando(false)
             if (u.responsable_nodo_id) {
-              supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', u.responsable_nodo_id).single().then(({ data: rp }) => setResponsableProfile(rp as { nombre: string; empresa: string; calendario_url: string | null } | null))
+              supabase.from('profiles').select('nombre, empresa, calendario_url').eq('id', u.responsable_nodo_id).maybeSingle().then(({ data: rp }) => setResponsableProfile(rp as { nombre: string; empresa: string; calendario_url: string | null } | null))
             } else setResponsableProfile(null)
             if (u.finder_id) {
-              supabase.from('profiles').select('nombre, empresa').eq('id', u.finder_id).single().then(({ data: fp }) => setFinderProfile(fp as { nombre: string; empresa: string } | null))
+              supabase.from('profiles').select('nombre, empresa').eq('id', u.finder_id).maybeSingle().then(({ data: fp }) => setFinderProfile(fp as { nombre: string; empresa: string } | null))
             } else setFinderProfile(null)
             router.refresh()
           }}
@@ -319,15 +319,17 @@ export default function DetalleProyecto({
             </Seccion>
           )}
 
-          <ProjectCommentsSection
-            comentarios={comentarios}
-            onEnviarComentario={async (contenido) => {
-              const { data, error } = await supabase.from('comentarios').insert({ proyecto_id: proyecto.id, user_id: currentUser.id, contenido }).select('*, profiles(*)').single()
-              if (error) return { success: false, error: error.message }
-              if (data) setComentarios(prev => [...prev, data as Comentario])
-              return { success: true }
-            }}
-          />
+          {!isCliente && (
+            <ProjectCommentsSection
+              comentarios={comentarios}
+              onEnviarComentario={async (contenido) => {
+                const { data, error } = await supabase.from('comentarios').insert({ proyecto_id: proyecto.id, user_id: currentUser.id, contenido }).select('*, profiles(*)').single()
+                if (error) return { success: false, error: error.message }
+                if (data) setComentarios(prev => [...prev, data as Comentario])
+                return { success: true }
+              }}
+            />
+          )}
         </div>
       )}
 
