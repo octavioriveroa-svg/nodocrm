@@ -83,6 +83,16 @@ export function parseNum(v: string | number | null | undefined): number {
   return Number(clean);
 }
 
+/** Parse signed string with commas (preserving leading '-') to a raw number */
+export function parseSignedNum(v: string | number | null | undefined): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const clean = v.replace(/,/g, '').trim();
+  if (!clean || clean === '-' || clean === '.' || clean === '-.') return 0;
+  const parsed = Number(clean);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /** Formats a text input value dynamically to include thousands separators */
 export function formatNumberInput(value: string): string {
   // Remove everything except digits and dot
@@ -115,4 +125,13 @@ export function formatNumberInput(value: string): string {
     return `${integerPart}.${decimalPart}`;
   }
   return integerPart;
+}
+
+/** Formats a signed numeric input value while preserving a leading '-' for negative percentages */
+export function formatSignedNumberInput(value: string): string {
+  const trimmed = value.trimStart();
+  const isNegative = trimmed.startsWith('-');
+  const unsigned = isNegative ? trimmed.slice(1) : trimmed;
+  const formatted = formatNumberInput(unsigned);
+  return isNegative ? `-${formatted}` : formatted;
 }

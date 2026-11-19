@@ -6,6 +6,7 @@ import type { Profile, Cliente } from '@/lib/types'
 import NuevoUsuarioModal from '@/components/NuevoUsuarioModal'
 import type { WizardFormData, WizardCapabilities, ManualClienteForm } from './types'
 import { inp } from './constants'
+import { formatNumberInput } from '@/lib/format'
 
 interface Step0GeneralInfoProps {
   capabilities: WizardCapabilities
@@ -322,6 +323,58 @@ export function Step0GeneralInfo({
               </button>
             )
           })}
+        </div>
+      </div>
+
+      {/* Datos energéticos opcionales para el simulador de ahorros */}
+      <div className="rounded-xl border border-borde bg-fondo/50 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-principal">
+            Datos energéticos y de ubicación (Opcional)
+          </span>
+          <span className="text-[11px] text-texto-suave">
+            Precarga la tarifa CFE y el consumo en el Simulador de Ahorros
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1 text-principal">
+              Tarifa actual CFE (código o MXN/kWh)
+            </label>
+            <input
+              type="text"
+              maxLength={20}
+              value={form.tarifa_actual_cfe}
+              onChange={e => setF('tarifa_actual_cfe', e.target.value)}
+              className={inp}
+              placeholder="Ej: GDMTH o 3.20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-principal">
+              Consumo anual (GWh/año)
+            </label>
+            <input
+              type="text"
+              value={form.consumo_anual_gwh}
+              onChange={e => setF('consumo_anual_gwh', formatNumberInput(e.target.value))}
+              className={inp}
+              placeholder="Ej: 1.5"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-principal">
+              Código postal (CP)
+            </label>
+            <input
+              type="text"
+              maxLength={10}
+              value={form.codigo_postal}
+              onChange={e => setF('codigo_postal', e.target.value)}
+              className={inp}
+              placeholder="Ej: 64000"
+            />
+          </div>
         </div>
       </div>
 

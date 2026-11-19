@@ -10,6 +10,7 @@ interface DocumentCenterProps {
   archivos: Archivo[]
   proyectoId: string
   currentUser: Profile
+  readOnly?: boolean
   onUploadSuccess: (archivo: Archivo) => void
   onDeleteSuccess: (id: string) => void
 }
@@ -108,7 +109,7 @@ function SpecialFileCard({ a, title, icon: Icon, onUploadNew, canUpload, canDele
 
 // ── Main Component ───────────────────────────────────────────────────
 
-export default function DocumentCenter({ archivos, proyectoId, currentUser, onUploadSuccess, onDeleteSuccess }: DocumentCenterProps) {
+export default function DocumentCenter({ archivos, proyectoId, currentUser, readOnly = false, onUploadSuccess, onDeleteSuccess }: DocumentCenterProps) {
   const supabase = createClient()
   
   // State for the upload modal
@@ -247,13 +248,15 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
 
   // Helper to check if current user can delete a specific file
   function canDeleteFile(a: Archivo) {
-    return isAdmin || a.autor_id === currentUser.id
+    return !readOnly && (isAdmin || a.autor_id === currentUser.id)
   }
 
   return (
     <div className="space-y-8">
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
+      {!readOnly && (
+        <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
+      )}
 
       {/* Featured Documents Section */}
       <div>
@@ -263,7 +266,7 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
             title="Propuesta Comercial" 
             icon={FileText} 
             a={activeProposal} 
-            canUpload={isAnalista || isAdmin}
+            canUpload={!readOnly && (isAnalista || isAdmin)}
             canDelete={activeProposal ? canDeleteFile(activeProposal) : false}
             onUploadNew={() => triggerSpecialUpload('propuesta')}
             onDelete={handleDelete}
@@ -272,7 +275,7 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
             title="Contrato (Machote)" 
             icon={FileSignature} 
             a={activeContract} 
-            canUpload={isAnalista || isAdmin}
+            canUpload={!readOnly && (isAnalista || isAdmin)}
             canDelete={activeContract ? canDeleteFile(activeContract) : false}
             onUploadNew={() => triggerSpecialUpload('machote_contrato')}
             onDelete={handleDelete}
@@ -317,9 +320,11 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
             <h2 className="text-lg font-black text-principal">Centro de Documentos</h2>
             <p className="text-sm text-gray-500">Recibos CFE, evidencias, planos y anexos.</p>
           </div>
-          <Button onClick={triggerGeneralUpload}>
-            <Upload size={16} className="mr-2" /> Subir archivo
-          </Button>
+          {!readOnly && (
+            <Button onClick={triggerGeneralUpload}>
+              <Upload size={16} className="mr-2" /> Subir archivo
+            </Button>
+          )}
         </div>
         
         <div className="p-4 border-b border-borde bg-gray-50 flex flex-col sm:flex-row gap-4">
@@ -368,7 +373,7 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, onUp
       </div>
 
       {/* Upload Modal */}
-      {showUpload && uploadFile && (
+      {!readOnly && showUpload && uploadFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-borde">

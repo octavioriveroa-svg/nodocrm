@@ -5,9 +5,22 @@ import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import BatteryStatus from '@/components/telemetry/BatteryStatus'
+import { SimuladorAhorrosSeccion } from '@/components/calculator/SimuladorAhorrosSeccion'
+import { loadFullProjectSimulatorBundle } from '@/lib/calculator/load-context'
 import { ChevronLeft, Zap, MapPin, Briefcase } from 'lucide-react'
 import Link from 'next/link'
-import type { Proyecto } from '@/lib/types'
+import type {
+  CalculadoraTemplate,
+  ConfigFinanciamiento,
+  ConfiguracionTecnica,
+  OfertaMem,
+  OpcionFinanciamiento,
+  Proyecto,
+  ProyectoSitioProducto,
+  Rol,
+  SimulacionAhorro,
+  Sitio,
+} from '@/lib/types'
 import { fmtNum, fmtCurrency } from '@/lib/format'
 import { calculateProjectSavingsMxn } from '@/lib/tariffs/cfe-calculator'
 
@@ -19,12 +32,28 @@ interface TelemetriaDB {
   bateria_descarga_kwh: number
 }
 
+interface SimulatorBundle {
+  sitios: Sitio[]
+  productos: ProyectoSitioProducto[]
+  configuraciones: ConfiguracionTecnica[]
+  opcionesFinanciamiento: OpcionFinanciamiento[]
+  configFinanciamientoLinks: ConfigFinanciamiento[]
+  ofertasMem: OfertaMem[]
+  activeTemplate: CalculadoraTemplate
+  templatesById: Record<string, CalculadoraTemplate>
+  initialSimulaciones: SimulacionAhorro[]
+}
+
 export default function FinancieroProyectoDetalle() {
   const { id } = useParams()
+  const proyectoId = Array.isArray(id) ? id[0] : (id ?? '')
   const router = useRouter()
   const supabase = createClient()
   
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
+  const [userId, setUserId] = useState<string>('')
+  const [userRole, setUserRole] = useState<Rol>('financiero')
+  const [simBundle, setSimBundle] = useState<SimulatorBundle | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetriaDB[]>([])
   const [metrics, setMetrics] = useState({ totalGenerated: 0, savingsMxn: 0 })
   const [loading, setLoading] = useState(true)
@@ -32,19 +61,35 @@ export default function FinancieroProyectoDetalle() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
+      if (!proyectoId) {
+        setError('Proyecto no encontrado.')
+        setLoading(false)
         return
       }
 
-      // Fetch Project
-      const { data: pData, error: pErr } = await supabase
-        .from('proyectos')
-        .select('*')
-        .eq('id', id)
-        .eq('financiero_id', session.user.id)
-        .single()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        router.push('/login')
+        return
+      }
+      setUserId(session.user.id)
+
+      const [{ data: pData, error: pErr }, { data: profileRow }, { data: teleData }, simContext] =
+        await Promise.all([
+          supabase
+            .from('proyectos')
+            .select('*')
+            .eq('id', proyectoId)
+            .eq('financiero_id', session.user.id)
+            .single(),
+          supabase.from('profiles').select('rol').eq('id', session.user.id).single(),
+          supabase
+            .from('telemetria_egauge')
+            .select('*')
+            .eq('proyecto_id', proyectoId)
+            .order('timestamp', { ascending: true }),
+          loadFullProjectSimulatorBundle(supabase, proyectoId),
+        ])
       
       if (pErr || !pData) {
         setError('Proyecto no encontrado o no autorizado.')
@@ -52,21 +97,19 @@ export default function FinancieroProyectoDetalle() {
         return
       }
 
-      setProyecto(pData as Proyecto)
-
-      // Fetch Telemetry
-      const { data: teleData } = await supabase
-        .from('telemetria_egauge')
-        .select('*')
-        .eq('proyecto_id', id)
-        .order('timestamp', { ascending: true })
+      const typedProyecto = pData as Proyecto
+      setProyecto(typedProyecto)
+      if (profileRow?.rol) {
+        setUserRole(profileRow.rol as Rol)
+      }
+      setSimBundle(simContext)
       
       if (teleData && teleData.length > 0) {
         setTelemetry(teleData)
         const totalGenerated = teleData.reduce((acc, row) => acc + (row.solar_produccion_kwh || 0), 0)
         const savingsMxn = calculateProjectSavingsMxn({
           totalGeneratedKwh: totalGenerated,
-          tarifaCfe: (pData as Proyecto).tarifa_actual_cfe,
+          tarifaCfe: typedProyecto.tarifa_actual_cfe,
         })
         setMetrics({ totalGenerated, savingsMxn })
       }
@@ -75,7 +118,7 @@ export default function FinancieroProyectoDetalle() {
     }
 
     loadData()
-  }, [id, router, supabase])
+  }, [proyectoId, router, supabase])
 
   if (loading) {
     return (
@@ -85,7 +128,7 @@ export default function FinancieroProyectoDetalle() {
     )
   }
 
-  if (error || !proyecto) {
+  if (error || !proyecto || !simBundle) {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
         <h2 className="text-2xl font-bold mb-4">{error}</h2>
@@ -104,6 +147,11 @@ export default function FinancieroProyectoDetalle() {
     batteryChargePct: t.bateria_porcentaje,
     batteryDischargeKwh: t.bateria_descarga_kwh
   }))
+
+  const activeConfigId =
+    simBundle.configuraciones.find((c) => c.seleccionada)?.id ??
+    simBundle.configuraciones[0]?.id ??
+    null
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -172,6 +220,23 @@ export default function FinancieroProyectoDetalle() {
           <p className="text-gray-500 text-sm">Este proyecto aún no transmite telemetría o no está operativo.</p>
         </div>
       )}
+
+      <SimuladorAhorrosSeccion
+        proyecto={proyecto}
+        sitios={simBundle.sitios}
+        productos={simBundle.productos}
+        configuraciones={simBundle.configuraciones}
+        opcionesFinanciamiento={simBundle.opcionesFinanciamiento}
+        configFinanciamiento={simBundle.configFinanciamientoLinks}
+        ofertasMem={simBundle.ofertasMem}
+        activeTemplate={simBundle.activeTemplate}
+        templatesById={simBundle.templatesById}
+        initialSimulaciones={simBundle.initialSimulaciones}
+        userRole={userRole}
+        currentUserId={userId}
+        activeConfigId={activeConfigId}
+        readOnlyMode={false}
+      />
     </div>
   )
 }

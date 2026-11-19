@@ -731,6 +731,9 @@ export function useProjectWizardState(portalType: PortalType) {
       tecnologia_bateria: null,
       duracion_descarga_hrs: null,
       punto_interconexion: null,
+      tarifa_actual_cfe: form.tarifa_actual_cfe.trim() || null,
+      consumo_anual_gwh: form.consumo_anual_gwh.trim() ? parseNum(form.consumo_anual_gwh) : null,
+      codigo_postal: form.codigo_postal.trim() || null,
       tipo_participacion_mem: null,
       volumen_energia_mwh_anual: null,
     }

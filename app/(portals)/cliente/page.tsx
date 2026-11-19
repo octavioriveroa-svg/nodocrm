@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import BatteryStatus from '@/components/telemetry/BatteryStatus'
@@ -8,7 +9,7 @@ import { fmtNum, fmtCurrency } from '@/lib/format'
 import GanttChart from '@/components/gantt/GanttChart'
 import { calculateProjectSavingsMxn } from '@/lib/tariffs/cfe-calculator'
 import type { HitoConstruccion, ConfiguracionTecnica } from '@/lib/types'
-import { MapPin, Zap, CalendarDays } from 'lucide-react'
+import { MapPin, Zap, CalendarDays, Calculator, ArrowRight, Folder } from 'lucide-react'
 
 interface TelemetriaDB {
   timestamp: string
@@ -155,22 +156,33 @@ export default function ClienteDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-wrap justify-between items-end gap-4">
         <div>
           <h1 className="text-3xl font-black mb-2 tracking-tight text-principal">Mi Portal de Cliente</h1>
           <p className="text-gray-500">Monitoreo en tiempo real de tus sistemas de generación y seguimiento de construcción.</p>
         </div>
-        {proyectos.length > 1 && (
-          <select
-            value={activeProyectoId || ''}
-            onChange={e => setActiveProyectoId(e.target.value)}
-            className="px-4 py-2 border border-borde rounded-lg text-sm font-bold shadow-sm bg-white"
-          >
-            {proyectos.map(p => (
-              <option key={p.id} value={p.id}>{p.nombre_proyecto}</option>
-            ))}
-          </select>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {proyectos.length > 0 && (
+            <Link
+              href="/cliente/proyectos"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-borde rounded-xl text-xs font-bold bg-white text-principal hover:bg-fondo transition-colors shadow-sm"
+            >
+              <Folder size={14} />
+              Mis proyectos ({proyectos.length})
+            </Link>
+          )}
+          {proyectos.length > 1 && (
+            <select
+              value={activeProyectoId || ''}
+              onChange={e => setActiveProyectoId(e.target.value)}
+              className="px-4 py-2 border border-borde rounded-lg text-sm font-bold shadow-sm bg-white"
+            >
+              {proyectos.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre_proyecto}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       {proyectos.length === 0 ? (
@@ -181,7 +193,7 @@ export default function ClienteDashboard() {
         </div>
       ) : (
         <>
-          <div className="bg-gray-50 border border-borde p-4 rounded-xl flex items-center gap-6">
+          <div className="bg-gray-50 border border-borde p-4 rounded-xl flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 text-principal font-bold">
               <Zap size={18} className="text-acento" />
               {activeProjectInfo?.nombre_proyecto}
@@ -200,6 +212,16 @@ export default function ClienteDashboard() {
               )}
               <span className="font-semibold text-gray-700 capitalize">{activeProjectInfo?.estado.replace('_', ' ')}</span>
             </div>
+            {activeProyectoId && (
+              <Link
+                href={`/cliente/proyectos/${activeProyectoId}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-principal text-acento hover:opacity-90 transition-all shadow-sm"
+              >
+                <Calculator size={14} />
+                Ver solución y simulador
+                <ArrowRight size={14} />
+              </Link>
+            )}
           </div>
 
           {activeProjectInfo?.estado === 'operativo' ? (

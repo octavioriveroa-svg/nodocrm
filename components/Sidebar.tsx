@@ -86,7 +86,8 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
 
   const navCliente: NavSection[] = [
     { label: null, items: [
-      { href: '/cliente', label: 'Mis Proyectos', icon: Folder },
+      { href: '/cliente', label: 'Resumen', icon: LayoutDashboard },
+      { href: '/cliente/proyectos', label: 'Proyectos y Simulador', icon: Folder },
       { href: '/cliente/instalaciones', label: 'Instalaciones', icon: Wrench },
     ]},
   ]
