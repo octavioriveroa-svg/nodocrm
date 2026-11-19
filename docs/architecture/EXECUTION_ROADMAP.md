@@ -2,8 +2,8 @@
 
 **Document ID**: `EXECUTION_ROADMAP.md`  
 **Target Environment**: Next.js 16.2.3, React 19.2.4, TypeScript 5.x, Supabase PostgreSQL (`nlqrdxwyxmgdwawedweh`)  
-**Version**: 2.2.0  
-**Status**: Completed & Verified (Phases 1–5 + v29 Savings Calculator / Simulator)  
+**Version**: 2.3.0  
+**Status**: Completed & Verified (Phases 1–5 + v29 Savings Calculator / Simulator + v30–v31 Live QA Remediation)  
 
 ---
 
@@ -175,6 +175,8 @@ Because `.env.local` provides `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_
    - Using `SUPABASE_SERVICE_ROLE_KEY`, the execution agent runs `adminClient.auth.admin.updateUserById(p.id, { app_metadata: { user_role: p.rol } })` across all rows in `public.profiles` over HTTPS so that 100% of existing users immediately have their `user_role` JWT custom claim populated even before the SQL Editor script is run.
 3. **Savings Calculator & Simulator Migration (`supabase/migrations/20261119000000_v29_savings_calculator.sql`)**:
    - Idempotently ensures `proyectos` columns (`consumo_anual_gwh`, `codigo_postal`, `tarifa_actual_cfe` if missing), creates `calculadora_templates` (with append-only immutability trigger and `v1` 28-field + 7-formula seed) and `simulaciones_ahorro` (with stale-simulation invalidation triggers and multi-portal RLS policies), and extends read/upload policies for simulator consumers.
+4. **Live Platform QA Remediation & Post-Deploy Polish Migrations (`supabase/migrations/20261120000000_v30_live_qa_remediation.sql`, `supabase/migrations/20261120000001_v31_qa_polish.sql`)**:
+   - Ensures `proyecto_sitios` foreign keys (`sitio_id`, `proyecto_id`) and aligns `proyectos` stakeholder foreign keys (`epcista_id`, `responsable_nodo_id`, `finder_id`) to `public.profiles(id)`, enables `suministrador` `SELECT` RLS on MEM-eligible `proyectos`, adds `FOR DELETE` RLS on `storage.objects` (`archivos-proyectos/<proyecto_id>/*`), removes QA template artifacts, and reloads the PostgREST schema cache (`NOTIFY pgrst, 'reload schema'`).
 
 ---
 
