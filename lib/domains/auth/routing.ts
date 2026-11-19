@@ -15,34 +15,35 @@ export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/usuarios(\/.*)?$/,
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
   epc: [
     /^\/proyectos(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/nuevo$/,
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
   finder: [
     /^\/proyectos(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/nuevo$/,
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
   cliente: [
+    /^\/proyectos(\/[^/]+)?$/,
     /^\/proyectos\/[^/]+\/instalaciones$/,
     /^\/instalaciones$/,
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
   financiero: [
     /^\/proyectos(\/.*)?$/,
     /^\/instalaciones$/,
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
   mem: [
-    /^\/configuracion(\/.*)?$/,
+    /^\/configuracion(\/(?!calculadora).*)?$/,
   ],
 }
 

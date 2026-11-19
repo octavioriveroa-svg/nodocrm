@@ -152,33 +152,43 @@ export default function Sidebar({ rol, nombre }: SidebarProps) {
   return (
     <>
       {/* Mobile Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="md:hidden fixed top-6 left-6 z-50 p-2.5 bg-principal text-acento rounded-xl shadow-xl hover:scale-105 active:scale-95 transition-all"
-        aria-label="Toggle Menu"
-      >
-        {isOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="md:hidden fixed top-6 left-6 z-40 p-2.5 bg-principal text-acento rounded-xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+          aria-label="Abrir menú"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* Overlay for mobile */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden" 
-          onClick={() => setIsOpen(false)} 
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar Content */}
       <aside className={`
-        fixed md:sticky top-4 h-[calc(100vh-2rem)] flex flex-col w-[260px] m-4 md:mr-0 p-5 
-        rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-40 transition-transform duration-300 ease-in-out
+        fixed md:sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex flex-col w-[260px] m-4 md:mr-0 p-5 
+        rounded-2xl glass-panel-dark text-white shadow-2xl overflow-hidden z-50 transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-[150%] md:translate-x-0'}
       `}>
-        <div className="mb-8 px-1">
+        <div className="mb-8 px-1 flex items-center justify-between">
           <Logo inverted size="sm" />
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="md:hidden p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <nav className="flex flex-col gap-1 flex-1">
+        <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
           {sections.map((section, sIdx) => (
             <div key={sIdx} className={sIdx > 0 ? 'mt-3' : ''}>
               {/* Section label */}

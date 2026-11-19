@@ -105,9 +105,21 @@ export default function ProjectHeaderAndPipeline({
 
   const effectiveCapex = proyecto.capex_estimado || leadingConfig?.inversion_total || 0
   const effectiveCapexMoneda = proyecto.moneda || leadingConfig?.moneda || 'MXN'
+  const DEFAULT_FX_MXN_USD = 17.5
+  const normalizedSavingsForPayback =
+    !effectiveSavings
+      ? null
+      : effectiveCapexMoneda === effectiveSavingsMoneda
+        ? effectiveSavings
+        : effectiveCapexMoneda === 'USD' && effectiveSavingsMoneda === 'MXN'
+          ? effectiveSavings / DEFAULT_FX_MXN_USD
+          : effectiveCapexMoneda === 'MXN' && effectiveSavingsMoneda === 'USD'
+            ? effectiveSavings * DEFAULT_FX_MXN_USD
+            : effectiveSavings
+
   const effectivePaybackYears =
-    effectiveCapex > 0 && effectiveSavings && effectiveSavings > 0
-      ? effectiveCapex / effectiveSavings
+    effectiveCapex > 0 && normalizedSavingsForPayback && normalizedSavingsForPayback > 0
+      ? effectiveCapex / normalizedSavingsForPayback
       : null
 
   const leadingVehiculoLabel = leadingOpt
@@ -235,7 +247,7 @@ export default function ProjectHeaderAndPipeline({
       )}
 
       {/* Plan Bloqueado Banner */}
-      {proyecto.plan_bloqueado && (
+      {proyecto.plan_bloqueado && ['en_construccion', 'operativo', 'completado'].includes(proyecto.estado) && (
         <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-medium shadow-sm">
           <AlertTriangle size={18} className="text-amber-600 shrink-0" />
           <div>

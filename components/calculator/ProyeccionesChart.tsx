@@ -163,9 +163,9 @@ export function ProyeccionesChart({
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                width={76}
+                width={88}
                 tick={{ fill: 'var(--color-texto-suave)', fontSize: 11 }}
-                tickFormatter={(val: number) => fmtCurrencyCompact(val, moneda)}
+                tickFormatter={(val: number) => fmtCurrencyCompact(val, moneda).replace(/ ([Mk])$/, '$1')}
               />
               <Tooltip content={<ChartTooltipContent tab="monetario" moneda={moneda} />} />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
@@ -243,7 +243,7 @@ export function ProyeccionesChart({
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                width={76}
+                width={88}
                 tick={{ fill: 'var(--color-texto-suave)', fontSize: 11 }}
                 tickFormatter={(val: number) => fmtNum(val, 0)}
               />

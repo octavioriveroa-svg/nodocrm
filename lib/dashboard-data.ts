@@ -430,7 +430,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // ─── Financial ───
   let fvCapex = 0, bessCapex = 0
   const projectCapex: Record<string, number> = {}
+  const projectCapexMoneda: Record<string, string> = {}
   const projectSavings: Record<string, number> = {}
+  const projectSavingsMoneda: Record<string, string> = {}
   const projectLeadingInfo: Record<string, { moneda: string; configNombre?: string }> = {}
 
   const configs = (configuracionesTecnicas ?? []) as Record<string, unknown>[]
@@ -477,7 +479,16 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       : 0
 
     const effectiveSavings = optSavings > 0 ? optSavings : configSavings
+    const capexMoneda = ((p.moneda || leadingConfig?.moneda || 'MXN') as string).toUpperCase()
+    const savingsMoneda = (
+      optSavings > 0
+        ? leadingOpt?.moneda || 'MXN'
+        : leadingConfig?.ahorro_moneda || leadingConfig?.moneda || p.moneda || 'MXN'
+    ).toString().toUpperCase()
+
     projectSavings[pid] = effectiveSavings
+    projectCapexMoneda[pid] = capexMoneda
+    projectSavingsMoneda[pid] = savingsMoneda
     projectLeadingInfo[pid] = {
       moneda: (leadingOpt?.moneda || leadingConfig?.moneda || p.moneda || 'MXN') as string,
       configNombre: leadingConfig ? (leadingConfig.nombre as string) : undefined,
@@ -493,11 +504,26 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const totalSavingsMonthly = totalSavingsAnnual / 12
   const avgCapexPerProject = totalProjects > 0 ? totalCapex / totalProjects : 0
 
-  // Avg payback in years
+  // Avg payback in years (normalize savings into CAPEX currency when mixed USD/MXN)
+  const DEFAULT_FX_MXN_USD = 17.5
   const paybacks: number[] = []
   for (const pid of Object.keys(projectCapex)) {
-    if (projectCapex[pid] > 0 && projectSavings[pid] > 0) {
-      paybacks.push(projectCapex[pid] / projectSavings[pid])
+    const cap = projectCapex[pid]
+    const sav = projectSavings[pid]
+    if (cap > 0 && sav > 0) {
+      const cMon = projectCapexMoneda[pid] || 'MXN'
+      const sMon = projectSavingsMoneda[pid] || 'MXN'
+      const normalizedSavings =
+        cMon === sMon
+          ? sav
+          : cMon === 'USD' && sMon === 'MXN'
+            ? sav / DEFAULT_FX_MXN_USD
+            : cMon === 'MXN' && sMon === 'USD'
+              ? sav * DEFAULT_FX_MXN_USD
+              : sav
+      if (normalizedSavings > 0) {
+        paybacks.push(cap / normalizedSavings)
+      }
     }
   }
   const avgPaybackYears = paybacks.length > 0 ? Math.round((paybacks.reduce((a, b) => a + b, 0) / paybacks.length) * 10) / 10 : null

@@ -157,10 +157,40 @@ proxyDeeplinksSuite.test('Proxy.5: Unsupported routes fall back safely to /${tar
     'Cliente portal does not support /clientes, must fallback to /cliente'
   )
 
-  // /admin/configuracion/roles for EPC -> fallback to /epc
+  // /admin/configuracion/roles for EPC -> /epc/configuracion/roles
   assertEqual(
     resolveCrossPortalDeepLink('/admin/configuracion/roles', 'epc'),
     '/epc/configuracion/roles',
+  )
+
+  // /admin/configuracion/calculadora is admin-only -> fallback to portal root for non-admin
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/configuracion/calculadora', 'cliente'),
+    '/cliente',
+    'Cliente cannot access /configuracion/calculadora, must fallback to /cliente'
+  )
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/configuracion/calculadora', 'analista'),
+    '/analista',
+    'Analista cannot access /configuracion/calculadora, must fallback to /analista'
+  )
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/configuracion/calculadora', 'epc'),
+    '/epc',
+    'EPC cannot access /configuracion/calculadora, must fallback to /epc'
+  )
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/configuracion/calculadora', 'admin'),
+    '/admin/configuracion/calculadora',
+    'Admin keeps /admin/configuracion/calculadora'
+  )
+
+  // /admin/proyectos/[id] for Cliente -> /cliente/proyectos/[id]
+  const clientProjId = '92985502-a709-4c90-ac42-fad41883ea3f'
+  assertEqual(
+    resolveCrossPortalDeepLink(`/admin/proyectos/${clientProjId}`, 'cliente'),
+    `/cliente/proyectos/${clientProjId}`,
+    'Cliente supports project detail deep link'
   )
 })
 

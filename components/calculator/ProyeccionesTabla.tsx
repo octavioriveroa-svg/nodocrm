@@ -82,17 +82,17 @@ export function ProyeccionesTabla({
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-principal text-white">
-              <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Periodo</th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">
+              <th className="text-left font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">Periodo</th>
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">
                 Ahorro Energía (kWh)
               </th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Ahorro Bruto</th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">O&amp;M</th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">Ahorro Bruto</th>
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">O&amp;M</th>
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">
                 Financiamiento
               </th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Flujo Neto</th>
-              <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">Flujo Neto</th>
+              <th className="text-right font-semibold px-2.5 lg:px-3 py-3 whitespace-nowrap">
                 Flujo Acumulado
               </th>
             </tr>
@@ -103,34 +103,34 @@ export function ProyeccionesTabla({
                 key={row.periodo}
                 className={idx % 2 === 0 ? 'bg-white' : 'bg-fondo/60'}
               >
-                <td className="px-4 py-2.5 font-semibold text-principal whitespace-nowrap">
+                <td className="px-2.5 lg:px-3 py-2.5 font-semibold text-principal whitespace-nowrap">
                   {row.etiqueta}
                 </td>
-                <td className="num px-4 py-2.5 text-right text-principal whitespace-nowrap">
+                <td className="num px-2.5 lg:px-3 py-2.5 text-right text-principal whitespace-nowrap">
                   {fmtNum(row.energia_total_kwh, 0)}
                 </td>
-                <td className="num px-4 py-2.5 text-right text-principal whitespace-nowrap">
-                  {fmtCurrency(row.ahorro_bruto, moneda)}
+                <td className="num px-2.5 lg:px-3 py-2.5 text-right text-principal whitespace-nowrap">
+                  {fmtCurrency(Math.round(row.ahorro_bruto), moneda)}
                 </td>
-                <td className="num px-4 py-2.5 text-right text-texto-suave whitespace-nowrap">
-                  {fmtCurrency(row.costo_om, moneda)}
+                <td className="num px-2.5 lg:px-3 py-2.5 text-right text-texto-suave whitespace-nowrap">
+                  {fmtCurrency(Math.round(row.costo_om), moneda)}
                 </td>
-                <td className="num px-4 py-2.5 text-right text-texto-suave whitespace-nowrap">
-                  {fmtCurrency(row.cuota_financiamiento, moneda)}
+                <td className="num px-2.5 lg:px-3 py-2.5 text-right text-texto-suave whitespace-nowrap">
+                  {fmtCurrency(Math.round(row.cuota_financiamiento), moneda)}
                 </td>
                 <td
-                  className={`num px-4 py-2.5 text-right font-bold whitespace-nowrap ${
+                  className={`num px-2.5 lg:px-3 py-2.5 text-right font-bold whitespace-nowrap ${
                     row.flujo_neto < 0 ? 'text-red-600' : 'text-exito'
                   }`}
                 >
-                  {fmtCurrency(row.flujo_neto, moneda)}
+                  {fmtCurrency(Math.round(row.flujo_neto), moneda)}
                 </td>
                 <td
-                  className={`num px-4 py-2.5 text-right font-bold whitespace-nowrap ${
+                  className={`num px-2.5 lg:px-3 py-2.5 text-right font-bold whitespace-nowrap ${
                     row.flujo_acumulado < 0 ? 'text-red-600' : 'text-principal'
                   }`}
                 >
-                  {fmtCurrency(row.flujo_acumulado, moneda)}
+                  {fmtCurrency(Math.round(row.flujo_acumulado), moneda)}
                 </td>
               </tr>
             ))}

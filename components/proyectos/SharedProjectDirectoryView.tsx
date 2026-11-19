@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Trash2, Eye, Plus, Search } from 'lucide-react'
+import { Trash2, Eye, Plus, Search, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import BadgeEstado from '@/components/BadgeEstado'
 import BadgeTipo from '@/components/BadgeTipo'
@@ -101,6 +101,14 @@ export default function SharedProjectDirectoryView({ portalPrefix, canDelete = f
     return matchEstado && matchTipo && matchBusqueda
   })
 
+  const hasActiveFilters = busqueda.trim() !== '' || filtroEstado !== 'todos' || filtroTipo !== 'todos'
+
+  function clearFilters() {
+    setBusqueda('')
+    setFiltroEstado('todos')
+    setFiltroTipo('todos')
+  }
+
   const newProjectHref =
     portalPrefix === 'epc' || portalPrefix === 'finder' ? `/${portalPrefix}/nuevo` : `/${portalPrefix}/proyectos/nuevo`
 
@@ -139,15 +147,16 @@ export default function SharedProjectDirectoryView({ portalPrefix, canDelete = f
           className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-principal/20 focus:border-principal text-gray-700 font-medium"
         >
           <option value="todos">Todos los Estados</option>
-          <option value="prospecto">Prospecto</option>
-          <option value="evaluacion">Evaluación</option>
-          <option value="oferta_enviada">Oferta Enviada</option>
-          <option value="negociacion">Negociación</option>
-          <option value="aprobado">Aprobado</option>
+          <option value="recibido">Lead / Recibido</option>
+          <option value="en_analisis">En Análisis</option>
+          <option value="propuesta_lista">Propuesta Lista</option>
+          <option value="enviada">Propuesta Enviada</option>
+          <option value="cliente_interesado">Cliente Interesado</option>
+          <option value="negociacion">En Negociación</option>
+          <option value="aprobado">Cierre / Aprobado</option>
           <option value="en_construccion">En Construcción</option>
           <option value="operativo">Operativo</option>
-          <option value="rechazado">Rechazado</option>
-          <option value="cancelado">Cancelado</option>
+          <option value="completado">Completado</option>
         </select>
         <select
           value={filtroTipo}
@@ -158,7 +167,19 @@ export default function SharedProjectDirectoryView({ portalPrefix, canDelete = f
           <option value="FV">FV</option>
           <option value="BESS">BESS</option>
           <option value="FV+BESS">FV + BESS</option>
+          <option value="MEM">MEM</option>
+          <option value="BESS+MEM">BESS + MEM</option>
         </select>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-principal bg-fondo border border-borde rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <RotateCcw size={13} />
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
@@ -168,8 +189,18 @@ export default function SharedProjectDirectoryView({ portalPrefix, canDelete = f
             Cargando proyectos...
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-400">
-            No se encontraron proyectos con los filtros seleccionados.
+          <div className="p-12 text-center text-sm text-gray-400 flex flex-col items-center gap-3">
+            <p>No se encontraron proyectos con los filtros seleccionados.</p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-principal bg-fondo border border-borde rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <RotateCcw size={13} />
+                Limpiar filtros
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

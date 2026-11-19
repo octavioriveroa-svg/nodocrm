@@ -336,7 +336,7 @@ export function Step0GeneralInfo({
             Precarga la tarifa CFE y el consumo en el Simulador de Ahorros
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
             <label className="block text-xs font-medium mb-1 text-principal">
               Tarifa actual CFE (código o MXN/kWh)

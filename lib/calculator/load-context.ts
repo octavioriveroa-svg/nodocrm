@@ -74,7 +74,7 @@ export async function loadProjectSimulatorContext(
       .from('simulaciones_ahorro')
       .select('*')
       .eq('proyecto_id', proyectoId)
-      .order('is_baseline', { ascending: false })
+      .order('usa_parametros_base', { ascending: false })
       .order('created_at', { ascending: false }),
   ])
 
@@ -130,9 +130,28 @@ export async function loadFullProjectSimulatorBundle(
     supabase.from('config_financiamiento').select('*'),
   ])
 
-  const sitios = (psRes.data ?? [])
+  let sitios = (psRes.data ?? [])
     .map((row) => (row as { sitios?: Sitio | null }).sitios ?? null)
     .filter((s): s is Sitio => s !== null)
+
+  if (psRes.error) {
+    const { data: psLinks } = await supabase
+      .from('proyecto_sitios')
+      .select('sitio_id')
+      .eq('proyecto_id', proyectoId)
+    const sitioIds = (psLinks ?? [])
+      .map((row) => (row as { sitio_id?: string | null }).sitio_id)
+      .filter((id): id is string => Boolean(id))
+    if (sitioIds.length > 0) {
+      const { data: sitiosRows } = await supabase
+        .from('sitios')
+        .select('*')
+        .in('id', sitioIds)
+      if (Array.isArray(sitiosRows)) {
+        sitios = sitiosRows as Sitio[]
+      }
+    }
+  }
 
   return {
     ...simCtx,
