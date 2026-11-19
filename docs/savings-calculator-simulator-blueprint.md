@@ -1,6 +1,6 @@
 # Nodo CRM — Energy & Monetary Savings Calculator / Simulator Technical Blueprint
 
-**Status:** Design & Implementation Plan (Pre-Implementation)  
+**Status:** Implemented & Verified in Production (v29–v31)  
 **Target Codebase:** `nodo` (`Next.js 16.2.3`, `React 19.2.4`, `TypeScript strict`, `Tailwind CSS v4`, `Supabase PostgreSQL + RLS`)  
 **Requirements Covered:** R1 (Platform-Wide Audit & Integration), R2 (Quantitative Calculator, Persistence & Financial Preconditions), R3 (Configurable Calculation Logic, Excel Formulas & Excel File Import with Mapping Confirmation), R4 (Monthly / Quarterly / Yearly Projections & Payback Period)
 

@@ -2,8 +2,8 @@
 
 **Platform**: Commercial & Industrial Solar PV (FV) & Battery Energy Storage Systems (BESS) Asset Management Platform  
 **Target Environment**: Next.js 16.2.3 (App Router, Turbopack, `proxy.ts`), React 19.2.4, TypeScript 5.x, Tailwind CSS v4, Supabase PostgreSQL (`nlqrdxwyxmgdwawedweh`)  
-**Document Version**: 2.2.0 (Sprint 3 + Savings Calculator & Simulator v29 Completed & Verified)  
-**Last Verified Baseline**: 65/65 acceptance tests pass (9 suites); 29/29 calculator Vitest unit tests pass; 16/16 adversarial M3 tests pass; 0 TypeScript errors; 0 ESLint errors/warnings (`--max-warnings=0`); all portal routes including `/admin/configuracion/calculadora`, `/cliente/proyectos`, `/cliente/proyectos/[id]`, and `/api/calculator/excel/parse` build cleanly.
+**Document Version**: 2.3.0 (Sprint 3 + Savings Calculator & Simulator v29 + Live QA Remediation v30–v31 Completed & Verified)  
+**Last Verified Baseline**: 65/65 acceptance tests pass (9 suites); 29/29 calculator Vitest unit tests pass; 16/16 adversarial M3 tests pass; 0 TypeScript errors; 0 ESLint errors/warnings (`--max-warnings=0`); live post-deploy E2E verification passed on `https://www.nodo.energy` with `0` HTTP `>= 400` errors and `Δ = 0` Zero-Trace cleanup across 22 tables & 3 storage buckets; all portal routes build cleanly.
 
 ---
 
@@ -106,6 +106,7 @@ The platform features are mapped to architectural milestones: Completed Foundati
 | **FEAT-CALC-02** | Admin / Formulas | Bilingual EN/ES Formula AST & 3-Step Excel Importer | `lib/calculator/formula-engine.ts`, `excel-mapper.ts`, `app/api/calculator/excel/parse/route.ts` (`exceljs`), and `/admin/configuracion/calculadora` provide `#CYCLE!`/`#NAME?`-validated bilingual AST formulas and 3-step `.xlsx`/`.csv` upload → mapping → publish workflows. | Operational | **v29 Savings Calculator (Verified)** |
 | **FEAT-CALC-03** | Portals / UI | Interactive Multi-Granular Simulator & Scenario Comparison | `SimuladorAhorrosSeccion`, `ProyeccionesChart`, `ProyeccionesTabla`, and `SimulacionesGuardadasPanel` mounted across `/admin`, `/analista`, `/epc`, `/finder`, `/financiero/proyectos/[id]`, and read-only `/cliente/proyectos/[id]` (monthly/quarterly/yearly views, bruto vs neto). | Operational | **v29 Savings Calculator (Verified)** |
 | **FEAT-CALC-04** | Database / Schema | Append-Only Versioned Templates & Stale-Sim Triggers | `supabase/migrations/20261119000000_v29_savings_calculator.sql` creates `calculadora_templates` and `simulaciones_ahorro` with RLS, `v1` 28-field + 7-formula seed, append-only immutability, and stale-simulation invalidation triggers. | Operational | **v29 Savings Calculator (Verified)** |
+| **FEAT-QA-01** | QA / Live Hardening | Responsive Shell, Modal Portals, RLS & FK Remediation | `20261120000000_v30_live_qa_remediation.sql`, `20261120000001_v31_qa_polish.sql`, sticky `PortalShell` (`overflow-x-clip`), `shrink-0` 260px `Sidebar`, `createPortal` modals, `cliente_final` UI isolation, mixed-FX payback normalization, `/mem` RLS, and `archivos-proyectos` Storage DELETE cleanup. | Operational | **Live QA v30–v31 (Verified)** |
 
 ---
 
@@ -389,7 +390,7 @@ C:\Users\vmont\.gemini\antigravity\worktrees\nodocrm\platform_diagnostics_and_re
 │   ├── format.ts                       # Currency, number, and date formatters
 │   └── types.ts                        # Global TypeScript interface definitions
 ├── supabase/
-│   ├── migrations/                     # Production SQL migrations (Sprints 1–3, consolidated DDL & 20261119000000_v29_savings_calculator.sql)
+│   ├── migrations/                     # Production SQL migrations (Sprints 1–3, v29 calculator, v30–v31 live QA remediation)
 │   ├── archive/                        # Archived development migrations (v2 - v28)
 │   └── schema.sql                      # Base schema reference
 ├── tests/                              # 4-Tier Automated Acceptance & Domain Suites
