@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from './ui/Button'
 import type { Archivo, Profile, TipoArchivo } from '@/lib/types'
@@ -387,8 +388,8 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, read
         </div>
       </div>
 
-      {/* Upload Modal */}
-      {!readOnly && showUpload && uploadFile && (
+      {/* Upload Modal (portaled to document.body to avoid ancestor transform hijacking fixed positioning) */}
+      {!readOnly && showUpload && uploadFile && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-borde">
@@ -483,7 +484,8 @@ export default function DocumentCenter({ archivos, proyectoId, currentUser, read
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export interface ModalProps {
@@ -51,8 +52,8 @@ export function Modal({
 
   if (!isOpen) return null
 
-  if (variant === 'lightbox') {
-    return (
+  const modalContent =
+    variant === 'lightbox' ? (
       <div
         role="dialog"
         aria-modal="true"
@@ -73,40 +74,39 @@ export function Modal({
           {children}
         </div>
       </div>
-    )
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    ) : (
       <div
-        className={`glass-card bg-white w-full ${MAX_WIDTH_CLASSES[maxWidth]} shadow-2xl overflow-hidden ${className}`}
-        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        {(title || subtitle || showCloseButton) && (
-          <div className="p-6 border-b border-borde bg-gray-50 flex justify-between items-start gap-4">
-            <div className="min-w-0">
-              {title && <h3 className="font-bold text-lg text-principal">{title}</h3>}
-              {subtitle && <div className="text-xs text-gray-500 mt-0.5">{subtitle}</div>}
+        <div
+          className={`glass-card bg-white w-full ${MAX_WIDTH_CLASSES[maxWidth]} shadow-2xl overflow-hidden ${className}`}
+          onClick={e => e.stopPropagation()}
+        >
+          {(title || subtitle || showCloseButton) && (
+            <div className="p-6 border-b border-borde bg-gray-50 flex justify-between items-start gap-4">
+              <div className="min-w-0">
+                {title && <h3 className="font-bold text-lg text-principal">{title}</h3>}
+                {subtitle && <div className="text-xs text-gray-500 mt-0.5">{subtitle}</div>}
+              </div>
+              {showCloseButton && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Cerrar modal"
+                  className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              )}
             </div>
-            {showCloseButton && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Cerrar modal"
-                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            )}
-          </div>
-        )}
-        {children}
+          )}
+          {children}
+        </div>
       </div>
-    </div>
-  )
+    )
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent
 }
