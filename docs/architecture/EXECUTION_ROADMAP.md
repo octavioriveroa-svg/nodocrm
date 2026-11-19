@@ -2,8 +2,8 @@
 
 **Document ID**: `EXECUTION_ROADMAP.md`  
 **Target Environment**: Next.js 16.2.3, React 19.2.4, TypeScript 5.x, Supabase PostgreSQL (`nlqrdxwyxmgdwawedweh`)  
-**Version**: 2.1.0  
-**Status**: Completed & Verified (Phases 1–5 Implemented)  
+**Version**: 2.2.0  
+**Status**: Completed & Verified (Phases 1–5 + v29 Savings Calculator / Simulator)  
 
 ---
 
@@ -173,14 +173,17 @@ Because `.env.local` provides `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_
    - A single idempotent consolidated script is generated at `supabase/migrations/20261112000000_consolidated_sprint3_ddl.sql` combining all 4 migrations for one-click paste-and-run execution in the Supabase Dashboard SQL Editor (`https://supabase.com/dashboard/project/nlqrdxwyxmgdwawedweh/sql/new`).
 2. **Automated Live Auth Admin API Backfill (`TASK-005`)**:
    - Using `SUPABASE_SERVICE_ROLE_KEY`, the execution agent runs `adminClient.auth.admin.updateUserById(p.id, { app_metadata: { user_role: p.rol } })` across all rows in `public.profiles` over HTTPS so that 100% of existing users immediately have their `user_role` JWT custom claim populated even before the SQL Editor script is run.
+3. **Savings Calculator & Simulator Migration (`supabase/migrations/20261119000000_v29_savings_calculator.sql`)**:
+   - Idempotently ensures `proyectos` columns (`consumo_anual_gwh`, `codigo_postal`, `tarifa_actual_cfe` if missing), creates `calculadora_templates` (with append-only immutability trigger and `v1` 28-field + 7-formula seed) and `simulaciones_ahorro` (with stale-simulation invalidation triggers and multi-portal RLS policies), and extends read/upload policies for simulator consumers.
 
 ---
 
 ## 6. Summary of Deliverables & Verification Protocols
 
-Every phase must satisfy the **Five Mandatory Verification Gates** before handoff:
+Every phase must satisfy the **Mandatory Verification Gates** before handoff:
 1. **Type Safety**: `npx tsc --noEmit` must return code 0 (zero errors).
 2. **Linting Standards**: `npm run lint` (`npx eslint . --max-warnings=0`) must return code 0 (zero errors, zero warnings).
-3. **Acceptance Test Suite**: `npm test` (`npx tsx tests/test-runner.mjs`) must pass all test cases cleanly against live Supabase.
-4. **Adversarial Empirical M3 Suite**: `npx tsx tests/adversarial-m3-empirical.test.mjs` must pass all 12 empirical tests cleanly.
-5. **Production Compilation**: `npm run build` must compile all static and dynamic routes cleanly with Turbopack.
+3. **Calculator Unit Tests**: `npm run test:calculator` (`vitest run`) must pass all calculator & formula AST tests cleanly.
+4. **Acceptance Test Suite**: `npm test` (`npx tsx tests/test-runner.mjs`) must pass all test cases cleanly against live Supabase.
+5. **Adversarial Empirical M3 Suite**: `npx tsx tests/adversarial-m3-empirical.test.mjs` must pass all empirical tests cleanly.
+6. **Production Compilation**: `npm run build` must compile all static and dynamic routes cleanly with Turbopack.

@@ -2,8 +2,8 @@
 
 **Platform**: Commercial & Industrial Solar PV (FV) & Battery Energy Storage Systems (BESS) Asset Management Platform  
 **Target Environment**: Next.js 16.2.3 (App Router, Turbopack, `proxy.ts`), React 19.2.4, TypeScript 5.x, Tailwind CSS v4, Supabase PostgreSQL (`nlqrdxwyxmgdwawedweh`)  
-**Document Version**: 2.1.0 (Sprint 3 Completed & Verified)  
-**Last Verified Baseline**: 65/65 acceptance tests pass (9 suites); 16/16 adversarial M3 tests pass; 0 TypeScript errors; 0 ESLint errors/warnings (`--max-warnings=0`); 46 routes build cleanly.
+**Document Version**: 2.2.0 (Sprint 3 + Savings Calculator & Simulator v29 Completed & Verified)  
+**Last Verified Baseline**: 65/65 acceptance tests pass (9 suites); 29/29 calculator Vitest unit tests pass; 16/16 adversarial M3 tests pass; 0 TypeScript errors; 0 ESLint errors/warnings (`--max-warnings=0`); all portal routes including `/admin/configuracion/calculadora`, `/cliente/proyectos`, `/cliente/proyectos/[id]`, and `/api/calculator/excel/parse` build cleanly.
 
 ---
 
@@ -102,6 +102,10 @@ The platform features are mapped to architectural milestones: Completed Foundati
 | **FEAT-CODE-01** | Code Quality | ESLint Warning Cleanup | Eliminated all remaining ESLint warnings across components and tests (`0 errors, 0 warnings`). | Operational | **Phase 4 (TASK-007 Verified)** |
 | **FEAT-UI-01** | UI / Components | Headless Primitive Components | Added `Modal.tsx`, `DropdownMenu.tsx`, and `Tabs.tsx` to `components/ui/` and consolidated Tailwind tokens in `app/globals.css`. | Operational | **Phase 5 (TASK-008 Verified)** |
 | **FEAT-UI-02** | UI / Components | Component Monolith Decomposition | Extracted `useProjectWizardState.ts` (`ProjectWizard.tsx` 303 lines) and `EvidenciaGallery.tsx` / `EvidenciaLightbox.tsx`. | Operational | **Phase 5 (TASK-008 Verified)** |
+| **FEAT-CALC-01** | Simulator / Engine | Declarative 3-Tier Savings & Cash-Flow Engine | `lib/calculator/engine.ts` (`evaluateSimulation`, `hasValidFinancialFigures`, `resolveTier2Context`) computes 1..360 month series in `< 1 ms`, VAN, TIR, dual ROI (`ROI s/CAPEX`, `Cash-on-Cash`), simple & discounted payback (5 edge cases), with strict missing-CAPEX financial gating. | Operational | **v29 Savings Calculator (Verified)** |
+| **FEAT-CALC-02** | Admin / Formulas | Bilingual EN/ES Formula AST & 3-Step Excel Importer | `lib/calculator/formula-engine.ts`, `excel-mapper.ts`, `app/api/calculator/excel/parse/route.ts` (`exceljs`), and `/admin/configuracion/calculadora` provide `#CYCLE!`/`#NAME?`-validated bilingual AST formulas and 3-step `.xlsx`/`.csv` upload → mapping → publish workflows. | Operational | **v29 Savings Calculator (Verified)** |
+| **FEAT-CALC-03** | Portals / UI | Interactive Multi-Granular Simulator & Scenario Comparison | `SimuladorAhorrosSeccion`, `ProyeccionesChart`, `ProyeccionesTabla`, and `SimulacionesGuardadasPanel` mounted across `/admin`, `/analista`, `/epc`, `/finder`, `/financiero/proyectos/[id]`, and read-only `/cliente/proyectos/[id]` (monthly/quarterly/yearly views, bruto vs neto). | Operational | **v29 Savings Calculator (Verified)** |
+| **FEAT-CALC-04** | Database / Schema | Append-Only Versioned Templates & Stale-Sim Triggers | `supabase/migrations/20261119000000_v29_savings_calculator.sql` creates `calculadora_templates` and `simulaciones_ahorro` with RLS, `v1` 28-field + 7-formula seed, append-only immutability, and stale-simulation invalidation triggers. | Operational | **v29 Savings Calculator (Verified)** |
 
 ---
 
@@ -324,19 +328,23 @@ export function calculateCo2AvoidedTonnes(totalGeneratedKwh: number): number;
 C:\Users\vmont\.gemini\antigravity\worktrees\nodocrm\platform_diagnostics_and_refactoring
 ├── app/
 │   ├── (portals)/                      # Grouped App Router role-based portals (7 portals)
-│   │   ├── admin/                      # nodo_admin portal (/admin)
+│   │   ├── admin/                      # nodo_admin portal (/admin, incl. /admin/configuracion/calculadora)
 │   │   ├── analista/                   # nodo_analista portal (/analista)
-│   │   ├── cliente/                    # cliente_final portal (/cliente)
+│   │   ├── cliente/                    # cliente_final portal (/cliente, /cliente/proyectos, /cliente/proyectos/[id])
 │   │   ├── epc/                        # epc installer portal (/epc)
 │   │   ├── financiero/                 # financiero portal (/financiero)
 │   │   ├── finder/                     # finder originator portal (/finder)
 │   │   └── mem/                        # suministrador wholesale market portal (/mem)
-│   ├── actions/                        # Server Actions ('use server' privileged RPC callers)
+│   ├── api/
+│   │   └── calculator/excel/parse/route.ts # ExcelJS .xlsx/.csv upload parser for Admin template import
+│   ├── actions/                        # Server Actions ('use server' privileged RPC & feature handlers)
 │   │   ├── adminDeleteUser.ts          # Admin-only account deletion
 │   │   ├── adminResetPassword.ts       # Admin-only password resets
 │   │   ├── adminUpdateEmail.ts         # Admin-only email changes
+│   │   ├── calculatorConfig.ts         # Admin declarative template creation & activation
 │   │   ├── crearUsuario.ts             # Provisioning for admins & analysts
 │   │   ├── invitar.ts                  # Portal user invitations
+│   │   ├── simulaciones.ts             # Savings simulation scenario persistence & management
 │   │   └── vincularUsuario.ts          # Client CRM linking
 │   ├── login/page.tsx                  # Public login entry point
 │   ├── pendiente/page.tsx              # Account approval waiting room
@@ -348,6 +356,7 @@ C:\Users\vmont\.gemini\antigravity\worktrees\nodocrm\platform_diagnostics_and_re
 │   ├── globals.css                     # Tailwind CSS v4 @theme tokens & brand CSS
 │   └── page.tsx                        # Root redirect to /login
 ├── components/
+│   ├── calculator/                     # SimuladorAhorrosSeccion, ProyeccionesChart/Tabla, AdminCalculadoraConfig, ExcelImportStepper
 │   ├── clientes/                       # Client directory, detail, and site views
 │   ├── gantt/                          # Svar Gantt integration & milestone modals
 │   ├── instalaciones/                  # EvidenciaGallery.tsx, EvidenciaLightbox.tsx
@@ -361,8 +370,10 @@ C:\Users\vmont\.gemini\antigravity\worktrees\nodocrm\platform_diagnostics_and_re
 │   └── ui/                             # Modal, DropdownMenu, Tabs, Badge, Button, Card, Input...
 ├── docs/
 │   ├── architecture/                   # Architectural assessments & execution roadmaps
+│   ├── savings-calculator-simulator-blueprint.md # Declarative calculator & simulator architecture blueprint
 │   └── tasks/                          # Modular task specifications (TASK-001 to TASK-008)
 ├── lib/
+│   ├── calculator/                     # Declarative 3-tier engine, bilingual AST, excel-mapper, load-context & Vitest unit tests
 │   ├── domains/                        # Domain-driven architecture
 │   │   ├── auth/                       # permissions.ts, user-provisioning.ts, routing.ts
 │   │   ├── clientes/                   # queries.ts, mutations.ts
@@ -378,7 +389,7 @@ C:\Users\vmont\.gemini\antigravity\worktrees\nodocrm\platform_diagnostics_and_re
 │   ├── format.ts                       # Currency, number, and date formatters
 │   └── types.ts                        # Global TypeScript interface definitions
 ├── supabase/
-│   ├── migrations/                     # Production SQL migrations (Sprints 1–3 + consolidated Sprint 3 DDL)
+│   ├── migrations/                     # Production SQL migrations (Sprints 1–3, consolidated DDL & 20261119000000_v29_savings_calculator.sql)
 │   ├── archive/                        # Archived development migrations (v2 - v28)
 │   └── schema.sql                      # Base schema reference
 ├── tests/                              # 4-Tier Automated Acceptance & Domain Suites

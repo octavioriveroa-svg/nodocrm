@@ -8,9 +8,14 @@ import { createClient } from '@/lib/supabase/client'
 import type {
   Proyecto, Comentario, Archivo, Profile, EstadoProyecto, ModalidadFinanciamiento,
   Sitio, ProyectoSitioProducto, ConfiguracionTecnica, Moneda, OpcionFinanciamiento,
-  ConfigFinanciamiento, HitoConstruccion,
+  ConfigFinanciamiento, HitoConstruccion, CalculadoraTemplate, OfertaMem, SimulacionAhorro,
 } from '@/lib/types'
 import { getStageTransitionPayload } from '@/lib/domains/proyectos/lifecycle'
+import {
+  buildFallbackCalculatorTemplate,
+  loadProjectSimulatorContext,
+} from '@/lib/calculator/load-context'
+import { SimuladorAhorrosSeccion } from '@/components/calculator/SimuladorAhorrosSeccion'
 import { Seccion, buildDefaultHitos } from './proyectos/detalle/common'
 import ProjectHeaderAndPipeline from './proyectos/detalle/ProjectHeaderAndPipeline'
 import ProjectEditForm from './proyectos/detalle/ProjectEditForm'
@@ -47,9 +52,13 @@ export default function DetalleProyecto({
   const [showEditTecnica, setShowEditTecnica] = useState(false), [showEditFinanciamiento, setShowEditFinanciamiento] = useState(false)
   const [responsableProfile, setResponsableProfile] = useState<{ nombre: string; empresa: string; calendario_url: string | null } | null>(null)
   const [finderProfile, setFinderProfile] = useState<{ nombre: string; empresa: string } | null>(null)
+  const [ofertasMem, setOfertasMem] = useState<OfertaMem[]>([])
+  const [activeTemplate, setActiveTemplate] = useState<CalculadoraTemplate>(() => buildFallbackCalculatorTemplate())
+  const [templatesById, setTemplatesById] = useState<Record<string, CalculadoraTemplate>>({})
+  const [initialSimulaciones, setInitialSimulaciones] = useState<SimulacionAhorro[]>([])
 
-  const isAdmin = currentUser.rol === 'nodo_admin', isAnalista = currentUser.rol === 'nodo_analista', isEpcista = currentUser.rol === 'epc', isFinder = currentUser.rol === 'finder'
-  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : isFinder ? '/finder' : '/epc'
+  const isAdmin = currentUser.rol === 'nodo_admin', isAnalista = currentUser.rol === 'nodo_analista', isEpcista = currentUser.rol === 'epc', isFinder = currentUser.rol === 'finder', isCliente = currentUser.rol === 'cliente_final'
+  const backHref = isAdmin ? '/admin/proyectos' : isAnalista ? '/analista' : isCliente ? '/cliente/proyectos' : isFinder ? '/finder' : '/epc'
 
   useEffect(() => {
     if (initial.responsable_nodo_id) {
@@ -58,19 +67,30 @@ export default function DetalleProyecto({
     if (initial.finder_id) {
       supabase.from('profiles').select('nombre, empresa').eq('id', initial.finder_id).single().then(({ data }) => { if (data) setFinderProfile(data) })
     }
-  }, [initial.responsable_nodo_id, initial.finder_id, supabase])
+    loadProjectSimulatorContext(supabase, initial.id).then((ctx) => {
+      setOfertasMem(ctx.ofertasMem)
+      setActiveTemplate(ctx.activeTemplate)
+      setTemplatesById(ctx.templatesById)
+      setInitialSimulaciones(ctx.initialSimulaciones)
+    })
+  }, [initial.id, initial.responsable_nodo_id, initial.finder_id, supabase])
 
   const handleRefresh = useCallback(async () => {
-    const [{ data: p }, { data: c }, { data: pr }, { data: o }, { data: cl }] = await Promise.all([
+    const [{ data: p }, { data: c }, { data: pr }, { data: o }, { data: cl }, simCtx] = await Promise.all([
       supabase.from('proyectos').select('*').eq('id', initial.id).single(),
       supabase.from('configuraciones_tecnicas').select('*').eq('proyecto_id', initial.id).order('created_at', { ascending: true }),
       supabase.from('proyecto_sitio_productos').select('*, sitios(nombre)').eq('proyecto_id', initial.id),
       supabase.from('opciones_financiamiento').select('*').eq('proyecto_id', initial.id).order('created_at', { ascending: true }),
       supabase.from('config_financiamiento').select('*'),
+      loadProjectSimulatorContext(supabase, initial.id),
     ])
     if (p) setProyecto(p as Proyecto)
     if (c) setConfigsList(c as ConfiguracionTecnica[]); if (pr) setProductos(pr as ProyectoSitioProducto[])
     if (o) setOpcionesFin(o as OpcionFinanciamiento[]); if (cl) setConfigFinLinks(cl as ConfigFinanciamiento[])
+    setOfertasMem(simCtx.ofertasMem)
+    setActiveTemplate(simCtx.activeTemplate)
+    setTemplatesById(simCtx.templatesById)
+    setInitialSimulaciones(simCtx.initialSimulaciones)
     router.refresh()
   }, [initial.id, router, supabase])
 
@@ -213,6 +233,23 @@ export default function DetalleProyecto({
             proyecto={proyecto} currentUser={currentUser} configsList={configsList} opcionesFin={opcionesFin}
             configFinLinks={configFinLinks} onOpenEditFinanciamiento={() => setShowEditFinanciamiento(true)}
             onSelectFinancing={(optId) => handleSelectFinancing(optId)} seleccionandoFinancing={seleccionandoFinancing}
+          />
+          <SimuladorAhorrosSeccion
+            proyecto={proyecto}
+            sitios={sitios}
+            productos={productos}
+            configuraciones={configsList}
+            opcionesFinanciamiento={opcionesFin}
+            configFinanciamiento={configFinLinks}
+            ofertasMem={ofertasMem}
+            activeTemplate={activeTemplate}
+            templatesById={templatesById}
+            initialSimulaciones={initialSimulaciones}
+            userRole={currentUser.rol}
+            currentUserId={currentUser.id}
+            activeConfigId={configsList.find((c) => c.seleccionada)?.id ?? null}
+            onEditSolucionTecnica={isCliente ? undefined : () => setShowEditTecnica(true)}
+            readOnlyMode={isCliente}
           />
           <ProjectOverviewSections
             proyecto={proyecto} currentUser={currentUser} sitios={sitios} archivos={archivos} setArchivos={setArchivos}

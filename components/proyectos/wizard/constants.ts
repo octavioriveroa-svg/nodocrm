@@ -101,4 +101,7 @@ export const initialForm: WizardFormData = {
   moneda: 'MXN',
   notas_adicionales: '',
   incluye_mem: false,
+  tarifa_actual_cfe: '',
+  consumo_anual_gwh: '',
+  codigo_postal: '',
 }

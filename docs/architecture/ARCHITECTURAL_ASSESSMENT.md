@@ -284,6 +284,9 @@ Evaluating current status against `nodo_crm_handoff.md` and `AGENTS.md`:
 | **Telemetry Queries** | Historical telemetry charts | **BROKEN** | `lib/dashboard-data.ts` queries nonexistent columns (`BUG-42703`). |
 | **Client Portal Projects**| Client views projects | **BROKEN** | `lib/domains/proyectos/queries.ts` joins on `profiles.id` instead of `clientes.id`. |
 
+> [!NOTE]
+> The diagnostic table above reflects the pre-Sprint-3 point-in-time snapshot before remediation. All gaps (`GAP-01`–`GAP-09`) were resolved in Sprint 3 (`v2.1.0`), and the Declarative Savings Calculator / Simulator (`v2.2.0`) was added atop the hardened baseline. See Section 7 below and `nodo_crm_handoff.md`.
+
 ---
 
 ## 6. Comprehensive Catalog of Architectural Gaps & Technical Debt
@@ -365,3 +368,6 @@ Evaluating current status against `nodo_crm_handoff.md` and `AGENTS.md`:
 ## 7. Conclusion
 
 Nodo CRM has established a robust, resilient foundation. Its core RBAC architecture, Next.js 16 App Router compliance, unified project wizard, and transactional RPCs pass all four verification gates with zero errors. Resolving the 9 identified technical gaps—prioritizing the P0 runtime defects and schema alignments—will elevate the platform to institutional-grade production readiness.
+
+> [!NOTE]
+> **Post-Sprint-3 & Savings Calculator Addendum (`v2.2.0`)**: All 9 architectural gaps (`GAP-01`–`GAP-09`) documented above were resolved and verified in Sprint 3 (`v2.1.0`, see `nodo_crm_handoff.md` Section 3). On `v2.2.0`, the platform was further extended with the Declarative Energy & Monetary Savings Calculator / Simulator (`supabase/migrations/20261119000000_v29_savings_calculator.sql`, `lib/calculator/*`, `components/calculator/*`, `/admin/configuracion/calculadora`, `/cliente/proyectos`, `/cliente/proyectos/[id]`, `/api/calculator/excel/parse`), verified by `29/29` Vitest unit tests alongside TypeScript, ESLint (`--max-warnings=0`), and production build gates.

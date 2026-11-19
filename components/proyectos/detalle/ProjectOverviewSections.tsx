@@ -243,6 +243,7 @@ export default function ProjectOverviewSections({
           archivos={archivos}
           proyectoId={proyecto.id}
           currentUser={currentUser}
+          readOnly={currentUser.rol === 'cliente_final'}
           onUploadSuccess={(newA) => setArchivos((prev) => [newA, ...prev])}
           onDeleteSuccess={(id) => setArchivos((prev) => prev.filter((a) => a.id !== id))}
         />

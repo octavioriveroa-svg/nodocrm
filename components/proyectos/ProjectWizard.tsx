@@ -68,6 +68,17 @@ export default function ProjectWizard({
     })
 
     if (!rpcErr && rpcProyectoId) {
+      const { tarifa_actual_cfe, consumo_anual_gwh, codigo_postal } = proyectoPayload
+      if (tarifa_actual_cfe != null || consumo_anual_gwh != null || codigo_postal != null) {
+        await supabase
+          .from('proyectos')
+          .update({
+            tarifa_actual_cfe: (tarifa_actual_cfe as string | null) ?? null,
+            consumo_anual_gwh: (consumo_anual_gwh as number | null) ?? null,
+            codigo_postal: (codigo_postal as string | null) ?? null,
+          })
+          .eq('id', rpcProyectoId as string)
+      }
       router.push(
         onSuccessRedirect
           ? onSuccessRedirect(rpcProyectoId as string)

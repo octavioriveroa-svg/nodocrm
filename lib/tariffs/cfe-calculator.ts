@@ -36,7 +36,7 @@ export interface ProjectSavingsInput {
     ConfiguracionTecnica,
     'ahorro_estimado_anual' | 'ahorro_estimado_mensual' | 'ahorro_moneda'
   > | null
-  tarifaCfe?: string | null
+  tarifaCfe?: string | number | null
   exchangeRateUsdMxn?: number // Default: 18.0
 }
 
@@ -71,7 +71,12 @@ export function calculateProjectSavingsMxn({
     return 0
   }
 
-  const rate = CFE_TARIFF_RATES_MXN[tarifaCfe || 'GDMTH'] ?? CFE_TARIFF_RATES_MXN.GDMTH
+  const rawTarifa = tarifaCfe != null ? String(tarifaCfe).trim() : ''
+  const numericRate = rawTarifa ? Number(rawTarifa) : NaN
+  const rate =
+    Number.isFinite(numericRate) && numericRate > 0
+      ? numericRate
+      : (CFE_TARIFF_RATES_MXN[rawTarifa.toUpperCase() || 'GDMTH'] ?? CFE_TARIFF_RATES_MXN.GDMTH)
   const result = Math.round(genKwh * rate * 100) / 100
   return Number.isFinite(result) ? result : 0
 }

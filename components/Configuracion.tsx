@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays, Users } from 'lucide-react'
+import { User, Building2, SlidersHorizontal, Bell, ShieldCheck, Check, CalendarDays, Users, Calculator } from 'lucide-react'
 import type { Profile, Moneda } from '@/lib/types'
 
 const ESTADOS_MX = [
@@ -214,6 +214,15 @@ export default function Configuracion({ profile: initialProfile, email }: Props)
                 </Link>
               )
             })()}
+            {initialProfile.rol === 'nodo_admin' && (
+              <Link
+                href="/admin/configuracion/calculadora"
+                className="flex items-center gap-3 px-4 py-3 text-sm font-medium w-full text-left transition-colors text-gray-600 hover:bg-white/50"
+              >
+                <Calculator size={15} />
+                Calculadora y Fórmulas
+              </Link>
+            )}
           </nav>
         </div>
 

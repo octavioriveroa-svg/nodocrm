@@ -40,6 +40,9 @@ export interface WizardFormData {
   moneda: Moneda
   notas_adicionales: string
   incluye_mem: boolean
+  tarifa_actual_cfe: string
+  consumo_anual_gwh: string
+  codigo_postal: string
 }
 
 export interface CreationConfig {
