@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -10,10 +10,13 @@ export interface ModalProps {
   title?: React.ReactNode
   subtitle?: React.ReactNode
   children: React.ReactNode
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | 'full'
   variant?: 'default' | 'lightbox'
   className?: string
   showCloseButton?: boolean
+  scrollable?: boolean
+  closeOnBackdrop?: boolean
+  closeOnEscape?: boolean
 }
 
 const MAX_WIDTH_CLASSES: Record<NonNullable<ModalProps['maxWidth']>, string> = {
@@ -22,11 +25,23 @@ const MAX_WIDTH_CLASSES: Record<NonNullable<ModalProps['maxWidth']>, string> = {
   lg: 'max-w-lg',
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
+  '5xl': 'max-w-5xl',
   full: 'max-w-full',
 }
 
+const emptySubscribe = () => () => {}
+
+function useIsClient(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  )
+}
+
 /**
- * Reusable accessible modal dialog with backdrop dismiss and Escape key handling.
+ * Reusable accessible modal dialog portaled to document.body with scroll locking,
+ * backdrop dismiss, and Escape key handling.
  */
 export function Modal({
   isOpen,
@@ -38,9 +53,14 @@ export function Modal({
   variant = 'default',
   className = '',
   showCloseButton = true,
+  scrollable = false,
+  closeOnBackdrop = true,
+  closeOnEscape = true,
 }: ModalProps) {
+  const isClient = useIsClient()
+
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !closeOnEscape) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
@@ -48,9 +68,18 @@ export function Modal({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, closeOnEscape, onClose])
 
-  if (!isOpen) return null
+  useEffect(() => {
+    if (!isOpen || !isClient) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [isOpen, isClient])
+
+  if (!isOpen || !isClient) return null
 
   const modalContent =
     variant === 'lightbox' ? (
@@ -58,7 +87,11 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
-        onClick={onClose}
+        onClick={(e) => {
+          if (closeOnBackdrop && e.target === e.currentTarget) {
+            onClose()
+          }
+        }}
       >
         {showCloseButton && (
           <button
@@ -78,11 +111,17 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
+        className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (closeOnBackdrop && e.target === e.currentTarget) {
+            onClose()
+          }
+        }}
       >
         <div
-          className={`glass-card bg-white w-full ${MAX_WIDTH_CLASSES[maxWidth]} shadow-2xl overflow-hidden ${className}`}
+          className={`rounded-2xl border border-borde bg-white w-full ${MAX_WIDTH_CLASSES[maxWidth]} shadow-2xl ${
+            scrollable ? 'max-h-[92vh] overflow-y-auto' : 'overflow-hidden'
+          } ${className}`}
           onClick={e => e.stopPropagation()}
         >
           {(title || subtitle || showCloseButton) && (
@@ -108,5 +147,5 @@ export function Modal({
       </div>
     )
 
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent
+  return createPortal(modalContent, document.body)
 }

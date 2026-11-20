@@ -69,6 +69,7 @@ import { fmtCurrency, fmtNum, fmtPct, fmtUnit } from '@/lib/format'
 import StatFigure from '@/components/ui/StatFigure'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
 import { SimuladorContextPanel } from '@/components/calculator/SimuladorContextPanel'
 import { ProyeccionesChart } from '@/components/calculator/ProyeccionesChart'
 import { ProyeccionesTabla } from '@/components/calculator/ProyeccionesTabla'
@@ -830,7 +831,7 @@ export function SimuladorAhorrosSeccion({
   }, [isOk, outcome, tier2Context.ahorroDeclaradoBrutoAnual])
 
   return (
-    <section className="glass-card p-6 mt-6 space-y-6">
+    <section className="glass-surface p-6 mt-6 space-y-6">
       {/* Section Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-linea pb-4">
         <div className="flex items-start gap-3">
@@ -1577,87 +1578,91 @@ export function SimuladorAhorrosSeccion({
       />
 
       {/* Save Scenario Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <form
-            onSubmit={handleSaveSimulation}
-            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-linea bg-fondo/50">
-              <div>
-                <h4 className="text-base font-black text-principal">Guardar Simulación</h4>
-                <p className="text-xs text-texto-suave">
-                  {calcMode === 'mem_horaria' ? memInputs.fin_horizonte_anios : horizonteAnios} años ·{' '}
-                  {monedaCalculo} · {vistaFinanciamiento === 'neto' ? 'Vista Neta' : 'Vista Bruta'}
-                </p>
+      <Modal
+        isOpen={showSaveModal}
+        onClose={() => {
+          if (!savingSim) setShowSaveModal(false)
+        }}
+        maxWidth="md"
+        showCloseButton={false}
+        closeOnBackdrop={!savingSim}
+        closeOnEscape={!savingSim}
+      >
+        <form onSubmit={handleSaveSimulation} className="bg-white">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-linea bg-fondo/50">
+            <div>
+              <h4 className="text-base font-black text-principal">Guardar Simulación</h4>
+              <p className="text-xs text-texto-suave">
+                {calcMode === 'mem_horaria' ? memInputs.fin_horizonte_anios : horizonteAnios} años ·{' '}
+                {monedaCalculo} · {vistaFinanciamiento === 'neto' ? 'Vista Neta' : 'Vista Bruta'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSaveModal(false)}
+              disabled={savingSim}
+              className="p-1.5 rounded-lg text-texto-suave hover:text-principal hover:bg-fondo"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {errorMsg && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                {errorMsg}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowSaveModal(false)}
-                disabled={savingSim}
-                className="p-1.5 rounded-lg text-texto-suave hover:text-principal hover:bg-fondo"
-              >
-                <X size={18} />
-              </button>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-principal mb-1">
+                Nombre del escenario *
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder='Ej. "Escenario Base 25 años"'
+                className="w-full rounded-xl border border-borde px-3.5 py-2 text-sm text-principal bg-white"
+              />
             </div>
 
-            <div className="p-5 space-y-4">
-              {errorMsg && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
-                  {errorMsg}
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-principal mb-1">
+                Notas o descripción (opcional)
+              </label>
+              <textarea
+                rows={2}
+                value={saveDesc}
+                onChange={(e) => setSaveDesc(e.target.value)}
+                placeholder="Supuestos clave de este escenario..."
+                className="w-full rounded-xl border border-borde px-3.5 py-2 text-sm text-principal bg-white resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="px-5 py-4 border-t border-linea bg-fondo/50 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={savingSim}
+              onClick={() => setShowSaveModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" disabled={savingSim || !saveName.trim()}>
+              {savingSim ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
               )}
-
-              <div>
-                <label className="block text-xs font-bold text-principal mb-1">
-                  Nombre del escenario *
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  placeholder='Ej. "Escenario Base 25 años"'
-                  className="w-full rounded-xl border border-borde px-3.5 py-2 text-sm text-principal bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-principal mb-1">
-                  Notas o descripción (opcional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={saveDesc}
-                  onChange={(e) => setSaveDesc(e.target.value)}
-                  placeholder="Supuestos clave de este escenario..."
-                  className="w-full rounded-xl border border-borde px-3.5 py-2 text-sm text-principal bg-white resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="px-5 py-4 border-t border-linea bg-fondo/50 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={savingSim}
-                onClick={() => setShowSaveModal(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" variant="primary" disabled={savingSim || !saveName.trim()}>
-                {savingSim ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-                Guardar escenario
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
+              Guardar escenario
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Nodo Admin Template & Formula Configuration Modal */}
       {showAdminModal && userRole === 'nodo_admin' && (

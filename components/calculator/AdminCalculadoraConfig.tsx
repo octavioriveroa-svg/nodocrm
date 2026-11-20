@@ -56,6 +56,7 @@ import {
 } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
 import { ExcelImportStepper } from '@/components/calculator/ExcelImportStepper'
 
 export interface AdminCalculadoraConfigProps {
@@ -108,9 +109,18 @@ export function AdminCalculadoraConfig({
   onClose,
   onTemplateActivated,
 }: AdminCalculadoraConfigProps) {
-  const [templates, setTemplates] = useState<CalculadoraTemplate[]>(initialTemplates)
+  const [localTemplates, setLocalTemplates] = useState<CalculadoraTemplate[]>([])
   const [activeTemplate, setActiveTemplate] = useState<CalculadoraTemplate>(initialActive)
   const [tab, setTab] = useState<AdminTab>('campos')
+
+  const templates = useMemo(() => {
+    const byId = new Map<string, CalculadoraTemplate>()
+    for (const t of initialTemplates) byId.set(t.id, t)
+    for (const t of localTemplates) byId.set(t.id, t)
+    return Array.from(byId.values())
+      .map((t) => ({ ...t, is_active: t.id === activeTemplate.id }))
+      .sort((a, b) => b.version - a.version)
+  }, [initialTemplates, localTemplates, activeTemplate.id])
 
   // Editable draft state
   const [draftNombre, setDraftNombre] = useState(
@@ -186,11 +196,9 @@ export function AdminCalculadoraConfig({
   }
 
   function handleTemplateSavedOrActivated(newTpl: CalculadoraTemplate, noticeText: string) {
-    setTemplates((prev) => {
-      const updated = prev.map((t) => ({ ...t, is_active: t.id === newTpl.id }))
-      const exists = updated.some((t) => t.id === newTpl.id)
-      if (exists) return updated
-      return [newTpl, ...updated].sort((a, b) => b.version - a.version)
+    setLocalTemplates((prev) => {
+      const withoutDup = prev.filter((t) => t.id !== newTpl.id)
+      return [newTpl, ...withoutDup]
     })
     syncDraftFromTemplate(newTpl)
     onTemplateActivated?.(newTpl)
@@ -458,8 +466,11 @@ export function AdminCalculadoraConfig({
             onClose && (
               <button
                 type="button"
-                onClick={onClose}
-                className="p-2 rounded-xl border border-borde bg-white text-texto-suave hover:text-principal"
+                disabled={saving || activatingId !== null}
+                onClick={() => {
+                  if (!saving && !activatingId) onClose()
+                }}
+                className="p-2 rounded-xl border border-borde bg-white text-texto-suave hover:text-principal disabled:opacity-50"
                 aria-label="Cerrar configuración"
               >
                 <X size={18} />
@@ -1123,18 +1134,28 @@ export function AdminCalculadoraConfig({
   )
 
   if (mode === 'modal') {
+    const isBusy = saving || activatingId !== null
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto shadow-2xl p-6">
-          {workspaceBody}
-        </div>
-      </div>
+      <Modal
+        isOpen
+        onClose={() => {
+          if (!isBusy) onClose?.()
+        }}
+        maxWidth="5xl"
+        showCloseButton={false}
+        scrollable
+        closeOnBackdrop={!isBusy}
+        closeOnEscape={!isBusy}
+        className="p-6"
+      >
+        {workspaceBody}
+      </Modal>
     )
   }
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="glass-card p-6">{workspaceBody}</div>
+      <div className="glass-surface p-6">{workspaceBody}</div>
     </div>
   )
 }
