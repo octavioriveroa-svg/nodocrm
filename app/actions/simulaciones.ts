@@ -23,7 +23,7 @@ import {
   extractTemplateDefaults,
   validateOverridesAgainstTemplate,
 } from '@/lib/calculator/template-schema'
-import { evaluateSimulation } from '@/lib/calculator/engine'
+import { evaluateSimulation, runSimulation } from '@/lib/calculator/engine'
 
 const DENIED_ROLES = new Set<Rol>(['pendiente', 'suministrador'])
 
@@ -335,44 +335,155 @@ export async function guardarSimulacion(
       return { error: ctx.error, status: ctx.status }
     }
 
-    const outcome = evaluateSimulation({
-      proyecto: auth.proyecto,
-      activeConfig: ctx.activeConfig,
-      configProducts: ctx.configProducts,
-      activeFinancing: ctx.activeFinancing,
-      sitios: ctx.sitios,
-      ofertasMem: ctx.ofertasMem,
-      template: ctx.activeTemplate,
-      monedaCalculo: req.moneda_calculo,
-      horizonteAnios: req.horizonte_anios,
-      vistaFinanciamiento: req.vista_financiamiento,
-      overrides: req.parametros_override,
-    })
+    const isMemMode = req.parametros_override?.modo_motor === 'mem_horaria'
 
-    if (outcome.status === 'gated') {
-      return {
-        error:
-          'No es posible calcular o guardar simulaciones sin cifras financieras válidas (CAPEX > 0).',
-        status: 422,
+    let insertPayload: Record<string, unknown>
+
+    if (isMemMode) {
+      const overrideCheck = validateOverridesAgainstTemplate(
+        ctx.activeTemplate.campos,
+        req.parametros_override as Record<string, unknown>,
+      )
+      if (!overrideCheck.valid) {
+        return {
+          error: 'Uno o más parámetros MEM son inválidos.',
+          status: 422,
+          fieldErrors: overrideCheck.errors,
+        }
       }
-    }
 
-    if (outcome.status === 'invalid_override') {
-      return {
-        error: 'Uno o más parámetros personalizados son inválidos.',
-        status: 422,
-        fieldErrors: outcome.errors,
+      const memOutcome = runSimulation({
+        mode: 'mem_horaria',
+        proyecto: auth.proyecto,
+        activeConfig: ctx.activeConfig,
+        configProducts: ctx.configProducts,
+        activeFinancing: ctx.activeFinancing,
+        sitios: ctx.sitios,
+        ofertasMem: ctx.ofertasMem,
+        template: ctx.activeTemplate,
+        monedaCalculo: req.moneda_calculo,
+        horizonteAnios: req.horizonte_anios,
+        vistaFinanciamiento: req.vista_financiamiento,
+        overrides: overrideCheck.sanitized as Record<string, unknown>,
+        ignoreProjectGating: true,
+      })
+
+      if (memOutcome.status === 'gated') {
+        return {
+          error:
+            'No es posible calcular o guardar simulaciones sin cifras financieras válidas (CAPEX > 0).',
+          status: 422,
+        }
       }
-    }
+      if (memOutcome.status === 'invalid_override') {
+        return {
+          error: 'Uno o más parámetros personalizados son inválidos.',
+          status: 422,
+          fieldErrors: memOutcome.errors,
+        }
+      }
+      if (memOutcome.mode !== 'mem_horaria') {
+        return { error: 'Modo MEM inesperado.', status: 500 }
+      }
 
-    const templateDefaults = extractTemplateDefaults(ctx.activeTemplate.campos)
-    const fxUsed =
-      outcome.parametros_override_sparse.tipo_cambio_usd_mxn ??
-      templateDefaults.tipo_cambio_usd_mxn
+      const fin = memOutcome.financial
+      if (fin.capex_total <= 0) {
+        return {
+          error:
+            'No es posible guardar una simulación con CAPEX total igual a 0. Ajusta los costos o tamaños FV/BESS.',
+          status: 422,
+        }
+      }
 
-    const { data: inserted, error: insertError } = await auth.adminClient
-      .from('simulaciones_ahorro')
-      .insert({
+      const ahorroEnergiaY1Kwh =
+        (memOutcome.year1.res_fv_auto_mwh + memOutcome.year1.res_descarga_mwh) * 1000
+      const ahorroEnergiaTotalKwh = fin.serie_mensual.reduce(
+        (acc, m) => acc + m.energia_total_kwh,
+        0,
+      )
+      const paybackEstado =
+        fin.payback_simple_estado === 'ok'
+          ? fin.payback_simple_anios !== null && fin.payback_simple_anios <= 0
+            ? 'inmediato'
+            : 'en_horizonte'
+          : fin.payback_simple_estado === 'fuera_horizonte'
+            ? 'fuera_horizonte'
+            : 'no_recuperable'
+
+      insertPayload = {
+        proyecto_id: req.proyecto_id,
+        configuracion_id: ctx.activeConfig?.id ?? null,
+        opcion_financiamiento_id: ctx.activeFinancing?.id ?? null,
+        nombre: req.nombre,
+        descripcion: req.descripcion ?? null,
+        usa_parametros_base: memOutcome.usa_parametros_base,
+        template_id: ctx.activeTemplate.id,
+        template_version: ctx.activeTemplate.version,
+        parametros_override: memOutcome.parametros_override_sparse,
+        moneda_calculo: req.moneda_calculo,
+        tipo_cambio_usado: roundTo(memOutcome.inputs.tc_mxn_usd, 4) ?? 18.7,
+        horizonte_anios: req.horizonte_anios,
+        granularidad_default: req.granularidad_default,
+        vista_financiamiento: req.vista_financiamiento,
+        fuente_calculo: 'fisico_tarifario',
+        capex_snapshot: roundTo(fin.capex_total, 2),
+        desembolso_inicial: roundTo(fin.desembolso_inicial, 2) ?? 0,
+        payback_simple_meses:
+          fin.payback_simple_anios !== null ? roundTo(fin.payback_simple_anios * 12, 2) : null,
+        payback_simple_anios: roundTo(fin.payback_simple_anios, 2),
+        payback_descontado_meses:
+          fin.payback_descontado_anios !== null
+            ? roundTo(fin.payback_descontado_anios * 12, 2)
+            : null,
+        payback_estado: paybackEstado,
+        ahorro_energia_y1_kwh: roundTo(ahorroEnergiaY1Kwh, 2) ?? 0,
+        ahorro_energia_total_kwh: roundTo(ahorroEnergiaTotalKwh, 2) ?? 0,
+        ahorro_monetario_y1: roundTo(fin.ahorro_total_y1, 2) ?? 0,
+        ahorro_monetario_total: roundTo(fin.ahorro_total_horizonte, 2) ?? 0,
+        flujo_neto_total: roundTo(fin.flujo_neto_total, 2) ?? 0,
+        roi_pct: roundTo(fin.roi_pct, 2),
+        tir_pct: roundTo(fin.tir_pct, 4),
+        van: roundTo(fin.vpn, 2),
+        is_stale: false,
+        created_by: auth.userId,
+      }
+    } else {
+      const outcome = evaluateSimulation({
+        proyecto: auth.proyecto,
+        activeConfig: ctx.activeConfig,
+        configProducts: ctx.configProducts,
+        activeFinancing: ctx.activeFinancing,
+        sitios: ctx.sitios,
+        ofertasMem: ctx.ofertasMem,
+        template: ctx.activeTemplate,
+        monedaCalculo: req.moneda_calculo,
+        horizonteAnios: req.horizonte_anios,
+        vistaFinanciamiento: req.vista_financiamiento,
+        overrides: req.parametros_override,
+      })
+
+      if (outcome.status === 'gated') {
+        return {
+          error:
+            'No es posible calcular o guardar simulaciones sin cifras financieras válidas (CAPEX > 0).',
+          status: 422,
+        }
+      }
+
+      if (outcome.status === 'invalid_override') {
+        return {
+          error: 'Uno o más parámetros personalizados son inválidos.',
+          status: 422,
+          fieldErrors: outcome.errors,
+        }
+      }
+
+      const templateDefaults = extractTemplateDefaults(ctx.activeTemplate.campos)
+      const fxUsed =
+        outcome.parametros_override_sparse.tipo_cambio_usd_mxn ??
+        templateDefaults.tipo_cambio_usd_mxn
+
+      insertPayload = {
         proyecto_id: req.proyecto_id,
         configuracion_id: ctx.activeConfig?.id ?? null,
         opcion_financiamiento_id: ctx.activeFinancing?.id ?? null,
@@ -404,7 +515,12 @@ export async function guardarSimulacion(
         van: roundTo(outcome.van, 2),
         is_stale: false,
         created_by: auth.userId,
-      })
+      }
+    }
+
+    const { data: inserted, error: insertError } = await auth.adminClient
+      .from('simulaciones_ahorro')
+      .insert(insertPayload)
       .select('*')
       .single()
 
@@ -485,44 +601,131 @@ export async function recalcularSimulacion(
       }
     }
 
-    const outcome = evaluateSimulation({
-      proyecto: auth.proyecto,
-      activeConfig: ctx.activeConfig,
-      configProducts: ctx.configProducts,
-      activeFinancing: ctx.activeFinancing,
-      sitios: ctx.sitios,
-      ofertasMem: ctx.ofertasMem,
-      template: ctx.activeTemplate,
-      monedaCalculo: sim.moneda_calculo,
-      horizonteAnios: sim.horizonte_anios,
-      vistaFinanciamiento: sim.vista_financiamiento,
-      overrides: overrideCheck.sanitized as Record<string, unknown>,
-    })
+    const isMemMode = storedOverrides.modo_motor === 'mem_horaria'
+    let updatePayload: Record<string, unknown>
 
-    if (outcome.status === 'gated') {
-      return {
-        error:
-          'No es posible recalcular la simulación sin cifras financieras válidas (CAPEX > 0).',
-        status: 422,
+    if (isMemMode) {
+      const memOutcome = runSimulation({
+        mode: 'mem_horaria',
+        proyecto: auth.proyecto,
+        activeConfig: ctx.activeConfig,
+        configProducts: ctx.configProducts,
+        activeFinancing: ctx.activeFinancing,
+        sitios: ctx.sitios,
+        ofertasMem: ctx.ofertasMem,
+        template: ctx.activeTemplate,
+        monedaCalculo: sim.moneda_calculo,
+        horizonteAnios: sim.horizonte_anios,
+        vistaFinanciamiento: sim.vista_financiamiento,
+        overrides: overrideCheck.sanitized as Record<string, unknown>,
+        ignoreProjectGating: true,
+      })
+
+      if (memOutcome.status === 'gated') {
+        return {
+          error:
+            'No es posible recalcular la simulación sin cifras financieras válidas (CAPEX > 0).',
+          status: 422,
+        }
       }
-    }
-
-    if (outcome.status === 'invalid_override') {
-      return {
-        error: 'Uno o más parámetros de la simulación resultan inválidos con la plantilla activa.',
-        status: 422,
-        fieldErrors: outcome.errors,
+      if (memOutcome.status === 'invalid_override') {
+        return {
+          error: 'Uno o más parámetros de la simulación resultan inválidos con la plantilla activa.',
+          status: 422,
+          fieldErrors: memOutcome.errors,
+        }
       }
-    }
+      if (memOutcome.mode !== 'mem_horaria') {
+        return { error: 'Modo MEM inesperado.', status: 500 }
+      }
 
-    const templateDefaults = extractTemplateDefaults(ctx.activeTemplate.campos)
-    const fxUsed =
-      outcome.parametros_override_sparse.tipo_cambio_usd_mxn ??
-      templateDefaults.tipo_cambio_usd_mxn
+      const fin = memOutcome.financial
+      if (fin.capex_total <= 0) {
+        return {
+          error: 'No es posible recalcular la simulación con CAPEX total igual a 0.',
+          status: 422,
+        }
+      }
 
-    const { data: updated, error: updateError } = await auth.adminClient
-      .from('simulaciones_ahorro')
-      .update({
+      const ahorroEnergiaY1Kwh =
+        (memOutcome.year1.res_fv_auto_mwh + memOutcome.year1.res_descarga_mwh) * 1000
+      const ahorroEnergiaTotalKwh = fin.serie_mensual.reduce(
+        (acc, m) => acc + m.energia_total_kwh,
+        0,
+      )
+      const paybackEstado =
+        fin.payback_simple_estado === 'ok'
+          ? fin.payback_simple_anios !== null && fin.payback_simple_anios <= 0
+            ? 'inmediato'
+            : 'en_horizonte'
+          : fin.payback_simple_estado === 'fuera_horizonte'
+            ? 'fuera_horizonte'
+            : 'no_recuperable'
+
+      updatePayload = {
+        template_id: ctx.activeTemplate.id,
+        template_version: ctx.activeTemplate.version,
+        usa_parametros_base: memOutcome.usa_parametros_base,
+        parametros_override: memOutcome.parametros_override_sparse,
+        tipo_cambio_usado: roundTo(memOutcome.inputs.tc_mxn_usd, 4) ?? 18.7,
+        fuente_calculo: 'fisico_tarifario',
+        capex_snapshot: roundTo(fin.capex_total, 2),
+        desembolso_inicial: roundTo(fin.desembolso_inicial, 2) ?? 0,
+        payback_simple_meses:
+          fin.payback_simple_anios !== null ? roundTo(fin.payback_simple_anios * 12, 2) : null,
+        payback_simple_anios: roundTo(fin.payback_simple_anios, 2),
+        payback_descontado_meses:
+          fin.payback_descontado_anios !== null
+            ? roundTo(fin.payback_descontado_anios * 12, 2)
+            : null,
+        payback_estado: paybackEstado,
+        ahorro_energia_y1_kwh: roundTo(ahorroEnergiaY1Kwh, 2) ?? 0,
+        ahorro_energia_total_kwh: roundTo(ahorroEnergiaTotalKwh, 2) ?? 0,
+        ahorro_monetario_y1: roundTo(fin.ahorro_total_y1, 2) ?? 0,
+        ahorro_monetario_total: roundTo(fin.ahorro_total_horizonte, 2) ?? 0,
+        flujo_neto_total: roundTo(fin.flujo_neto_total, 2) ?? 0,
+        roi_pct: roundTo(fin.roi_pct, 2),
+        tir_pct: roundTo(fin.tir_pct, 4),
+        van: roundTo(fin.vpn, 2),
+        is_stale: false,
+      }
+    } else {
+      const outcome = evaluateSimulation({
+        proyecto: auth.proyecto,
+        activeConfig: ctx.activeConfig,
+        configProducts: ctx.configProducts,
+        activeFinancing: ctx.activeFinancing,
+        sitios: ctx.sitios,
+        ofertasMem: ctx.ofertasMem,
+        template: ctx.activeTemplate,
+        monedaCalculo: sim.moneda_calculo,
+        horizonteAnios: sim.horizonte_anios,
+        vistaFinanciamiento: sim.vista_financiamiento,
+        overrides: overrideCheck.sanitized as Record<string, unknown>,
+      })
+
+      if (outcome.status === 'gated') {
+        return {
+          error:
+            'No es posible recalcular la simulación sin cifras financieras válidas (CAPEX > 0).',
+          status: 422,
+        }
+      }
+
+      if (outcome.status === 'invalid_override') {
+        return {
+          error: 'Uno o más parámetros de la simulación resultan inválidos con la plantilla activa.',
+          status: 422,
+          fieldErrors: outcome.errors,
+        }
+      }
+
+      const templateDefaults = extractTemplateDefaults(ctx.activeTemplate.campos)
+      const fxUsed =
+        outcome.parametros_override_sparse.tipo_cambio_usd_mxn ??
+        templateDefaults.tipo_cambio_usd_mxn
+
+      updatePayload = {
         template_id: ctx.activeTemplate.id,
         template_version: ctx.activeTemplate.version,
         usa_parametros_base: outcome.usa_parametros_base,
@@ -544,7 +747,12 @@ export async function recalcularSimulacion(
         tir_pct: roundTo(outcome.tir_pct, 4),
         van: roundTo(outcome.van, 2),
         is_stale: false,
-      })
+      }
+    }
+
+    const { data: updated, error: updateError } = await auth.adminClient
+      .from('simulaciones_ahorro')
+      .update(updatePayload)
       .eq('id', simulacionId)
       .select('*')
       .single()

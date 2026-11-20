@@ -1,5 +1,12 @@
-import type { FormulaDefinicion } from '@/lib/types'
-import { isKnownPlatformIdentifier } from '@/lib/calculator/variable-dictionary'
+import type { ExcelInputMapping, FormulaDefinicion } from '@/lib/types'
+import {
+  isKnownPlatformIdentifier,
+  MEM_PLATFORM_VARIABLES,
+} from '@/lib/calculator/variable-dictionary'
+
+const MEM_KEY_TO_DEFINED_NAME = new Map<string, string>(
+  MEM_PLATFORM_VARIABLES.map((v) => [v.key, v.excelDefinedName]),
+)
 
 export type FormulaErrorCode = '#DIV/0!' | '#VALUE!' | '#REF!' | '#NAME?' | '#CYCLE!' | '#NUM!'
 
@@ -14,12 +21,12 @@ export class FormulaError extends Error {
 }
 
 export type FormulaScalar = number | string | boolean
-export type FormulaValue = FormulaScalar | number[]
+export type FormulaValue = FormulaScalar | FormulaScalar[]
 
 export const MAX_FORMULA_LENGTH = 2000
 export const MAX_AST_DEPTH = 32
 export const MAX_AST_NODES = 512
-export const MAX_RANGE_CELLS = 5000
+export const MAX_RANGE_CELLS = 20_000
 export const MAX_IRR_ITERATIONS = 100
 
 const FORBIDDEN_IDENTIFIERS = new Set<string>([
@@ -242,6 +249,7 @@ function isIdentStart(ch: string): boolean {
   return (
     (code >= 65 && code <= 90) || // A-Z
     (code >= 97 && code <= 122) || // a-z
+    (code >= 0xc0 && code <= 0x024f) || // Latin accented letters (e.g. Análisis, Año)
     ch === '_' ||
     ch === '$'
   )
@@ -253,6 +261,7 @@ function isIdentPart(ch: string): boolean {
     (code >= 65 && code <= 90) ||
     (code >= 97 && code <= 122) ||
     (code >= 48 && code <= 57) ||
+    (code >= 0xc0 && code <= 0x024f) ||
     ch === '_' ||
     ch === '$' ||
     ch === '.'
@@ -657,9 +666,10 @@ class Parser {
           throw new FormulaError('#VALUE!', `Falta ")" en llamada a ${tok.value}().`)
         }
         this.consume() // ')'
+        const normalizedFnName = tok.value.toUpperCase().replace(/^_XLFN\./, '')
         return this.registerNode({
           type: 'CallExpr',
-          name: tok.value.toUpperCase(),
+          name: normalizedFnName,
           args,
         })
       }
@@ -772,11 +782,21 @@ function flattenNumbers(values: FormulaValue[], context: string): number[] {
   const out: number[] = []
   for (const val of values) {
     if (Array.isArray(val)) {
-      for (const n of val) {
-        if (!Number.isFinite(n)) {
-          throw new FormulaError('#NUM!', `Valor no finito en ${context}.`)
+      for (const item of val) {
+        if (typeof item === 'number') {
+          if (!Number.isFinite(item)) {
+            throw new FormulaError('#NUM!', `Valor no finito en ${context}.`)
+          }
+          out.push(item)
+        } else if (typeof item === 'boolean') {
+          out.push(item ? 1 : 0)
+        } else if (typeof item === 'string' && item.trim() !== '') {
+          const n = Number(item.trim())
+          if (!Number.isFinite(n)) {
+            throw new FormulaError('#VALUE!', `Argumento no numérico "${item}" en ${context}.`)
+          }
+          out.push(n)
         }
-        out.push(n)
       }
     } else if (typeof val === 'number') {
       if (!Number.isFinite(val)) {
@@ -1116,7 +1136,311 @@ registerFn(['IRR', 'TIR'], (args) => {
   return solved
 })
 
-const LAZY_FUNCTIONS = new Set<string>(['IF', 'SI', 'IFERROR', 'SI.ERROR', 'COALESCE'])
+function toScalarArray(val: FormulaValue): FormulaScalar[] {
+  return Array.isArray(val) ? val : [val]
+}
+
+function wildcardToRegExp(pattern: string): RegExp {
+  let out = '^'
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i]
+    if (ch === '~' && i + 1 < pattern.length) {
+      const next = pattern[++i]
+      out += next.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    } else if (ch === '*') {
+      out += '.*'
+    } else if (ch === '?') {
+      out += '.'
+    } else {
+      out += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+  }
+  out += '$'
+  return new RegExp(out, 'i')
+}
+
+function matchesExcelCriteria(cellVal: FormulaScalar, rawCriteria: FormulaValue): boolean {
+  const critScalar = Array.isArray(rawCriteria) ? (rawCriteria[0] ?? '') : rawCriteria
+  if (typeof critScalar === 'number') {
+    if (typeof cellVal === 'number') return cellVal === critScalar
+    if (typeof cellVal === 'boolean') return (cellVal ? 1 : 0) === critScalar
+    if (typeof cellVal === 'string' && cellVal.trim() !== '') {
+      const n = Number(cellVal.trim())
+      return Number.isFinite(n) && n === critScalar
+    }
+    return false
+  }
+  if (typeof critScalar === 'boolean') {
+    if (typeof cellVal === 'boolean') return cellVal === critScalar
+    if (typeof cellVal === 'number') return (cellVal !== 0) === critScalar
+    return String(cellVal).trim().toUpperCase() === (critScalar ? 'TRUE' : 'FALSE')
+  }
+
+  const critStr = String(critScalar)
+  let op: '<=' | '>=' | '<>' | '<' | '>' | '=' | '' = ''
+  let rhsRaw = critStr
+  if (critStr.startsWith('<=') || critStr.startsWith('>=') || critStr.startsWith('<>')) {
+    op = critStr.slice(0, 2) as '<=' | '>=' | '<>'
+    rhsRaw = critStr.slice(2)
+  } else if (critStr.startsWith('<') || critStr.startsWith('>') || critStr.startsWith('=')) {
+    op = critStr.slice(0, 1) as '<' | '>' | '='
+    rhsRaw = critStr.slice(1)
+  }
+
+  const rhsTrim = rhsRaw.trim()
+  const rhsNum = rhsTrim !== '' ? Number(rhsTrim) : Number.NaN
+  const rhsIsNum = Number.isFinite(rhsNum)
+
+  if (op === '<' || op === '<=' || op === '>' || op === '>=') {
+    if (typeof cellVal === 'number' && rhsIsNum) {
+      if (op === '<') return cellVal < rhsNum
+      if (op === '<=') return cellVal <= rhsNum
+      if (op === '>') return cellVal > rhsNum
+      return cellVal >= rhsNum
+    }
+    if (typeof cellVal === 'string' && !rhsIsNum) {
+      const a = cellVal.toLowerCase()
+      const b = rhsRaw.toLowerCase()
+      if (op === '<') return a < b
+      if (op === '<=') return a <= b
+      if (op === '>') return a > b
+      return a >= b
+    }
+    return false
+  }
+
+  const wantEqual = op !== '<>'
+  let equal = false
+  if (rhsIsNum && typeof cellVal === 'number') {
+    equal = cellVal === rhsNum
+  } else if (rhsTrim === '' && (cellVal === '' || cellVal === 0)) {
+    equal = cellVal === ''
+  } else if (typeof cellVal === 'string') {
+    if (rhsRaw.includes('*') || rhsRaw.includes('?')) {
+      equal = wildcardToRegExp(rhsRaw).test(cellVal)
+    } else {
+      equal = cellVal.toLowerCase() === rhsRaw.toLowerCase()
+    }
+  } else if (rhsIsNum && typeof cellVal === 'boolean') {
+    equal = (cellVal ? 1 : 0) === rhsNum
+  } else {
+    equal = String(cellVal).toLowerCase() === rhsRaw.toLowerCase()
+  }
+  return wantEqual ? equal : !equal
+}
+
+registerFn(['ISNUMBER', 'ESNUMERO'], (args) => {
+  if (args.length !== 1) throw new FormulaError('#VALUE!', 'ISNUMBER/ESNUMERO requiere 1 argumento.')
+  const v = args[0]
+  return typeof v === 'number' && Number.isFinite(v)
+})
+
+registerFn(['COUNTIF', 'CONTAR.SI'], (args) => {
+  if (args.length !== 2) throw new FormulaError('#VALUE!', 'COUNTIF/CONTAR.SI requiere 2 argumentos.')
+  const range = toScalarArray(args[0])
+  const crit = args[1]
+  let count = 0
+  for (const item of range) {
+    if (matchesExcelCriteria(item, crit)) count++
+  }
+  return count
+})
+
+registerFn(['COUNTIFS', 'CONTAR.SI.CONJUNTO'], (args) => {
+  if (args.length < 2 || args.length % 2 !== 0) {
+    throw new FormulaError('#VALUE!', 'COUNTIFS requiere pares de rango y criterio.')
+  }
+  const pairs: Array<{ range: FormulaScalar[]; crit: FormulaValue }> = []
+  let len = -1
+  for (let i = 0; i < args.length; i += 2) {
+    const r = toScalarArray(args[i])
+    if (len < 0) len = r.length
+    else if (r.length !== len) {
+      throw new FormulaError('#VALUE!', 'COUNTIFS requiere rangos del mismo tamaño.')
+    }
+    pairs.push({ range: r, crit: args[i + 1] })
+  }
+  let count = 0
+  for (let idx = 0; idx < len; idx++) {
+    let ok = true
+    for (const pair of pairs) {
+      if (!matchesExcelCriteria(pair.range[idx], pair.crit)) {
+        ok = false
+        break
+      }
+    }
+    if (ok) count++
+  }
+  return count
+})
+
+registerFn(['SUMIFS', 'SUMAR.SI.CONJUNTO'], (args) => {
+  if (args.length < 3 || args.length % 2 === 0) {
+    throw new FormulaError('#VALUE!', 'SUMIFS requiere rango suma seguido de pares rango/criterio.')
+  }
+  const sumRange = toScalarArray(args[0])
+  const pairs: Array<{ range: FormulaScalar[]; crit: FormulaValue }> = []
+  for (let i = 1; i < args.length; i += 2) {
+    const r = toScalarArray(args[i])
+    if (r.length !== sumRange.length) {
+      throw new FormulaError('#VALUE!', 'SUMIFS requiere rangos del mismo tamaño.')
+    }
+    pairs.push({ range: r, crit: args[i + 1] })
+  }
+  let total = 0
+  for (let idx = 0; idx < sumRange.length; idx++) {
+    let ok = true
+    for (const pair of pairs) {
+      if (!matchesExcelCriteria(pair.range[idx], pair.crit)) {
+        ok = false
+        break
+      }
+    }
+    if (ok) {
+      const val = sumRange[idx]
+      if (typeof val === 'number' && Number.isFinite(val)) total += val
+      else if (typeof val === 'boolean') total += val ? 1 : 0
+    }
+  }
+  return total
+})
+
+registerFn(['AVERAGEIFS', 'PROMEDIO.SI.CONJUNTO'], (args) => {
+  if (args.length < 3 || args.length % 2 === 0) {
+    throw new FormulaError('#VALUE!', 'AVERAGEIFS requiere rango promedio seguido de pares rango/criterio.')
+  }
+  const avgRange = toScalarArray(args[0])
+  const pairs: Array<{ range: FormulaScalar[]; crit: FormulaValue }> = []
+  for (let i = 1; i < args.length; i += 2) {
+    const r = toScalarArray(args[i])
+    if (r.length !== avgRange.length) {
+      throw new FormulaError('#VALUE!', 'AVERAGEIFS requiere rangos del mismo tamaño.')
+    }
+    pairs.push({ range: r, crit: args[i + 1] })
+  }
+  let total = 0
+  let count = 0
+  for (let idx = 0; idx < avgRange.length; idx++) {
+    let ok = true
+    for (const pair of pairs) {
+      if (!matchesExcelCriteria(pair.range[idx], pair.crit)) {
+        ok = false
+        break
+      }
+    }
+    if (ok) {
+      const val = avgRange[idx]
+      if (typeof val === 'number' && Number.isFinite(val)) {
+        total += val
+        count++
+      }
+    }
+  }
+  if (count === 0) throw new FormulaError('#DIV/0!', 'AVERAGEIFS sin celdas que cumplan los criterios.')
+  return total / count
+})
+
+registerFn(['INDEX', 'INDICE'], (args) => {
+  if (args.length < 2 || args.length > 3) {
+    throw new FormulaError('#VALUE!', 'INDEX/INDICE requiere rango y número de fila.')
+  }
+  const arr = toScalarArray(args[0])
+  const rowNum = Math.trunc(toNumber(args[1], 'INDEX'))
+  const colNum = args.length === 3 ? Math.trunc(toNumber(args[2], 'INDEX')) : 1
+  if (colNum !== 1 || rowNum < 1 || rowNum > arr.length) {
+    throw new FormulaError('#REF!', 'Índice fuera de rango en INDEX/INDICE.')
+  }
+  return arr[rowNum - 1]
+})
+
+registerFn(['MATCH', 'COINCIDIR'], (args) => {
+  if (args.length < 2 || args.length > 3) {
+    throw new FormulaError('#VALUE!', 'MATCH/COINCIDIR requiere valor buscado y rango.')
+  }
+  const lookup = Array.isArray(args[0]) ? (args[0][0] ?? '') : args[0]
+  const arr = toScalarArray(args[1])
+  const matchType = args.length === 3 ? Math.trunc(toNumber(args[2], 'MATCH')) : 1
+  if (matchType === 0) {
+    for (let i = 0; i < arr.length; i++) {
+      if (matchesExcelCriteria(arr[i], lookup)) return i + 1
+    }
+    throw new FormulaError('#VALUE!', 'Valor no encontrado en MATCH/COINCIDIR.')
+  }
+  const target = toNumber(lookup, 'MATCH')
+  let bestIdx = -1
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i]
+    if (typeof v !== 'number') continue
+    if (matchType > 0) {
+      if (v <= target) bestIdx = i
+      else break
+    } else {
+      if (v >= target) bestIdx = i
+      else break
+    }
+  }
+  if (bestIdx < 0) throw new FormulaError('#VALUE!', 'Valor no encontrado en MATCH/COINCIDIR.')
+  return bestIdx + 1
+})
+
+registerFn(['XLOOKUP', 'BUSCARX'], (args) => {
+  if (args.length < 3 || args.length > 6) {
+    throw new FormulaError('#VALUE!', 'XLOOKUP/BUSCARX requiere al menos 3 argumentos.')
+  }
+  const lookup = Array.isArray(args[0]) ? (args[0][0] ?? '') : args[0]
+  const lookupArr = toScalarArray(args[1])
+  const returnArr = toScalarArray(args[2])
+  if (lookupArr.length !== returnArr.length) {
+    throw new FormulaError('#VALUE!', 'XLOOKUP/BUSCARX requiere rangos del mismo tamaño.')
+  }
+  const matchMode = args.length >= 5 ? Math.trunc(toNumber(args[4], 'XLOOKUP')) : 0
+  if (matchMode === 0) {
+    for (let i = 0; i < lookupArr.length; i++) {
+      if (matchesExcelCriteria(lookupArr[i], lookup)) {
+        return returnArr[i]
+      }
+    }
+  } else {
+    const target = toNumber(lookup, 'XLOOKUP')
+    let bestIdx = -1
+    let bestDiff = Infinity
+    for (let i = 0; i < lookupArr.length; i++) {
+      const v = lookupArr[i]
+      if (typeof v !== 'number') continue
+      if (v === target) return returnArr[i]
+      if (matchMode === -1 && v < target && target - v < bestDiff) {
+        bestDiff = target - v
+        bestIdx = i
+      } else if (matchMode === 1 && v > target && v - target < bestDiff) {
+        bestDiff = v - target
+        bestIdx = i
+      }
+    }
+    if (bestIdx >= 0) return returnArr[bestIdx]
+  }
+  if (args.length >= 4 && args[3] !== undefined) {
+    return Array.isArray(args[3]) ? (args[3][0] ?? '') : args[3]
+  }
+  throw new FormulaError('#VALUE!', 'Valor no encontrado en XLOOKUP/BUSCARX.')
+})
+
+registerFn(['MONTH', 'MES'], (args) => {
+  if (args.length !== 1) throw new FormulaError('#VALUE!', 'MONTH/MES requiere 1 argumento.')
+  const v = Array.isArray(args[0]) ? (args[0][0] ?? '') : args[0]
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const ms = Date.UTC(1899, 11, 30) + Math.trunc(v) * 86_400_000
+    return new Date(ms).getUTCMonth() + 1
+  }
+  if (typeof v === 'string') {
+    const mIso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v.trim())
+    if (mIso) return Number(mIso[2])
+    const parsed = Date.parse(v.trim())
+    if (Number.isFinite(parsed)) return new Date(parsed).getUTCMonth() + 1
+  }
+  throw new FormulaError('#VALUE!', `Fecha inválida en MONTH/MES: "${String(v)}".`)
+})
+
+const LAZY_FUNCTIONS = new Set<string>(['IF', 'SI', 'IFERROR', 'SI.ERROR', 'COALESCE', 'ROW', 'FILA'])
 
 export function isKnownExcelFunction(name: string): boolean {
   const upper = name.toUpperCase()
@@ -1159,12 +1483,13 @@ export function evaluateFormulaAst(
 
     case 'RangeRef': {
       const refs = expandRangeRef(node)
-      const values: number[] = []
+      const values: FormulaScalar[] = []
       for (const ref of refs) {
         if (!scope.has(ref)) {
           throw new FormulaError('#REF!', `Celda "${ref}" del rango ${node.fullRef} no está mapeada.`)
         }
-        values.push(toNumber(scope.get(ref)!, node.fullRef))
+        const raw = scope.get(ref)!
+        values.push(Array.isArray(raw) ? (raw[0] ?? 0) : raw)
       }
       return values
     }
@@ -1269,6 +1594,16 @@ export function evaluateFormulaAst(
           }
         }
         return 0
+      }
+
+      if (fnName === 'ROW' || fnName === 'FILA') {
+        if (node.args.length === 0) return 1
+        if (node.args.length === 1) {
+          const arg0 = node.args[0]
+          if (arg0.type === 'CellRef') return arg0.row
+          if (arg0.type === 'RangeRef') return arg0.start.row
+        }
+        throw new FormulaError('#VALUE!', `${fnName} requiere 0 o 1 referencia de celda.`)
       }
 
       const fn = EAGER_FUNCTIONS.get(fnName)
@@ -1456,6 +1791,12 @@ export function rewriteFormulaCellRefs(
 ): RewriteFormulaResult {
   const ast = parseExcelFormula(expression)
   const unresolved = new Set<string>()
+  const lowerKeyToVarMap = new Map<string, string>()
+  for (const [k, v] of cellToVarMap) {
+    if (!lowerKeyToVarMap.has(k.toLowerCase())) {
+      lowerKeyToVarMap.set(k.toLowerCase(), v)
+    }
+  }
 
   const lookupMapping = (cell: CellRefNode): string | undefined => {
     const direct = cellToVarMap.get(cell.fullRef)
@@ -1475,6 +1816,14 @@ export function rewriteFormulaCellRefs(
 
   const transform = (node: ASTNode): ASTNode => {
     switch (node.type) {
+      case 'VarRef': {
+        const mapped =
+          cellToVarMap.get(node.name) ?? lowerKeyToVarMap.get(node.name.toLowerCase())
+        if (mapped) {
+          return { type: 'VarRef', name: mapped }
+        }
+        return node
+      }
       case 'CellRef': {
         const mapped = lookupMapping(node)
         if (mapped) {
@@ -1509,6 +1858,41 @@ export function rewriteFormulaCellRefs(
     rewritten: `=${serializeAstNode(transformed)}`,
     unresolvedRefs: Array.from(unresolved),
   }
+}
+
+/**
+ * Builds a prototype-safe Map<normalizedCellRef, platformVar> from confirmed/draft ExcelInputMappings
+ * and previews the rewritten Excel formula with unresolved cell detection.
+ * Shared across both client preview UI and server-side template validation.
+ */
+export function previewFormulaRewrite(
+  rawFormula: string,
+  inputMappings: readonly Pick<ExcelInputMapping, 'cellRef' | 'sheetName' | 'platformVar'>[],
+  defaultSheet?: string,
+): RewriteFormulaResult {
+  const cellToVarMap = new Map<string, string>()
+
+  for (const m of inputMappings) {
+    if (!m.platformVar || m.platformVar === '__ignore__') continue
+    const normRef = normalizeCellRef(m.cellRef)
+    const cleanRef = normRef.includes('!') ? normRef.split('!')[1] : normRef
+    const qualified = m.sheetName ? `${m.sheetName}!${cleanRef}` : normRef
+
+    cellToVarMap.set(qualified, m.platformVar)
+    if (!defaultSheet || !m.sheetName || m.sheetName === defaultSheet) {
+      cellToVarMap.set(cleanRef, m.platformVar)
+    }
+
+    // If mapped to a MEM platform variable, also register its Excel Defined Name alias
+    // so formulas like =BESS_Capacidad/BESS_Potencia or =FV_Potencia*1000*CAPEX_FV*TC rewrite cleanly.
+    const definedNameAlias = MEM_KEY_TO_DEFINED_NAME.get(m.platformVar)
+    if (definedNameAlias) {
+      cellToVarMap.set(definedNameAlias, m.platformVar)
+      cellToVarMap.set(definedNameAlias.toLowerCase(), m.platformVar)
+    }
+  }
+
+  return rewriteFormulaCellRefs(rawFormula, cellToVarMap, defaultSheet)
 }
 
 // ── Compilation, Kahn Topological Sort & Per-Template Memoization ─────────────

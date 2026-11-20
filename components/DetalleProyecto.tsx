@@ -191,7 +191,7 @@ export default function DetalleProyecto({
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
+    <div className="max-w-7xl mx-auto pb-12">
       <ProjectHeaderAndPipeline
         proyecto={proyecto} currentUser={currentUser} backHref={backHref} hitosCount={hitosLocales.length}
         generandoCronograma={generandoCronograma} onGenerarCronograma={generarCronograma} editando={editando}

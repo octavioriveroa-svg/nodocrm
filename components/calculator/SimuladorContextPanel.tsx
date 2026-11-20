@@ -8,6 +8,7 @@ import type {
   Moneda,
 } from '@/lib/types'
 import {
+  ALLOWED_OVERRIDE_KEYS,
   type AllowedOverrideKey,
   FALLBACK_TEMPLATE_CAMPOS,
 } from '@/lib/calculator/template-schema'
@@ -52,6 +53,8 @@ const GROUP_ORDER: readonly CalculadoraCampoGrupo[] = [
   'financiamiento',
 ]
 
+const ALLOWED_OVERRIDE_KEY_SET = new Set<string>(ALLOWED_OVERRIDE_KEYS)
+
 const GROUP_LABELS: Readonly<Record<CalculadoraCampoGrupo, string>> = {
   moneda: 'Moneda y Tipo de Cambio',
   tarifas: 'Tarifas CFE / MEM y Consumo',
@@ -60,6 +63,11 @@ const GROUP_LABELS: Readonly<Record<CalculadoraCampoGrupo, string>> = {
   macro: 'Macroeconomía y O&M',
   financiamiento: 'Financiamiento',
   horizontes: 'Horizontes',
+  cliente: 'Cliente y Demanda',
+  operacion: 'Operación BESS',
+  mercado_tc: 'Mercado y Tipo de Cambio',
+  costos: 'Costos CAPEX / OPEX',
+  evaluacion_financiera: 'Evaluación Financiera',
 }
 
 function resolveDisplayUnit(rawUnit: string, overrideKey: AllowedOverrideKey, moneda: Moneda): string {
@@ -121,6 +129,7 @@ export function SimuladorContextPanel({
       if (!campo.editableByUser) continue
       const overrideKey = (campo.validationRules?.overrideKey ?? campo.key) as string
       if (overrideKey === 'moneda_calculo' || overrideKey === 'moneda_default') continue
+      if (!ALLOWED_OVERRIDE_KEY_SET.has(overrideKey)) continue
 
       items.push({
         key: overrideKey as AllowedOverrideKey,

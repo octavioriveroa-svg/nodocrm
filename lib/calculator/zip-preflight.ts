@@ -3,8 +3,8 @@ export const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024 // 50 MB
 export const MIN_UNCOMPRESSED_RATIO_FLOOR = 1 * 1024 * 1024 // 1 MB floor before ratio check
 export const MAX_COMPRESSION_RATIO = 100
 export const MAX_WORKSHEETS = 20
-export const MAX_XLSX_POPULATED_CELLS = 50_000
-export const MAX_CSV_ROWS = 10_000
+export const MAX_XLSX_POPULATED_CELLS = 350_000
+export const MAX_CSV_ROWS = 15_000
 
 const ZIP_LOCAL_HEADER_SIG = 0x04034b50 // PK\x03\x04 in little-endian
 const ZIP_CD_ENTRY_SIG = 0x02014b50 // PK\x01\x02
@@ -13,6 +13,27 @@ const OLE2_XLS_SIG = 0xe011cfd0 // 0xD0 0xCF 0x11 0xE0 in little-endian
 
 export const LEGACY_XLS_ERROR_MESSAGE =
   'El formato binario .xls (Excel 97-2003) no es compatible por seguridad. Guárdalo como Libro de Excel (.xlsx) o .csv e inténtalo de nuevo.'
+
+/**
+ * Pure client- and server-safe metadata check for uploaded spreadsheet files
+ * before submitting multipart FormData.
+ */
+export function validateSpreadsheetFileClient(file: { name: string; size: number }): string | null {
+  const lowerName = file.name.toLowerCase()
+  if (lowerName.endsWith('.xls')) {
+    return LEGACY_XLS_ERROR_MESSAGE
+  }
+  if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.csv')) {
+    return 'Formato no soportado. Sube únicamente archivos .xlsx o .csv.'
+  }
+  if (file.size === 0) {
+    return 'El archivo seleccionado está vacío.'
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return 'El archivo supera el tamaño máximo permitido de 10 MB.'
+  }
+  return null
+}
 
 export interface ZipInspectionStats {
   entryCount: number

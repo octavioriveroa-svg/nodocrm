@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   Loader2,
   Sparkles,
-  Upload,
   X,
 } from 'lucide-react'
 import type {
@@ -30,15 +29,26 @@ import {
   compileAndSortFormulas,
   FormulaError,
   normalizeCellRef,
-  rewriteFormulaCellRefs,
+  previewFormulaRewrite,
 } from '@/lib/calculator/formula-engine'
-import { evaluateSimulation } from '@/lib/calculator/engine'
-import { FALLBACK_TEMPLATE_FORMULAS } from '@/lib/calculator/template-schema'
+import { runTemplateDryRun } from '@/lib/calculator/engine'
+import { runMemSimulation } from '@/lib/calculator/mem-hourly-engine'
+import {
+  createDefaultMemAnnualAssumptions,
+  DEFAULT_MEM_INPUTS,
+  getBaseline100HC,
+  getBaselineMemHourlyDataset,
+} from '@/lib/calculator/datasets/mem-baseline'
+import {
+  FALLBACK_TEMPLATE_FORMULAS,
+  MEM_TEMPLATE_CAMPOS,
+} from '@/lib/calculator/template-schema'
 import { guardarPlantillaCalculadora } from '@/app/actions/calculatorConfig'
 import { fmtCurrency, fmtNum, fmtPct } from '@/lib/format'
 import StepIndicator from '@/components/ui/StepIndicator'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { SpreadsheetDropzone } from '@/components/calculator/SpreadsheetDropzone'
 
 export interface ExcelImportStepperProps {
   currentCampos: CalculadoraCampoDef[]
@@ -56,29 +66,6 @@ export interface ExcelImportStepperProps {
   onImported: (template: CalculadoraTemplate) => void
 }
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024
-const LEGACY_XLS_CLIENT_MSG =
-  'El formato binario .xls (Excel 97-2003) no es compatible por seguridad. Guárdalo como Libro de Excel (.xlsx) o .csv e inténtalo de nuevo.'
-
-function previewCellRewriteClient(
-  rawFormula: string,
-  inputMappings: readonly Pick<ExcelInputMapping, 'cellRef' | 'sheetName' | 'platformVar'>[],
-  defaultSheet?: string,
-) {
-  const cellToVarMap = new Map<string, string>()
-  for (const m of inputMappings) {
-    if (!m.platformVar || m.platformVar === '__ignore__') continue
-    const normRef = normalizeCellRef(m.cellRef)
-    const cleanRef = normRef.includes('!') ? normRef.split('!')[1] : normRef
-    const qualified = m.sheetName ? `${m.sheetName}!${cleanRef}` : normRef
-    cellToVarMap.set(qualified, m.platformVar)
-    if (!defaultSheet || !m.sheetName || m.sheetName === defaultSheet) {
-      cellToVarMap.set(cleanRef, m.platformVar)
-    }
-  }
-  return rewriteFormulaCellRefs(rawFormula, cellToVarMap, defaultSheet)
-}
-
 export function ExcelImportStepper({
   currentCampos,
   currentFormulas,
@@ -86,9 +73,7 @@ export function ExcelImportStepper({
   onApplyToEditor,
   onImported,
 }: ExcelImportStepperProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<0 | 1 | 2>(0)
-  const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -105,29 +90,36 @@ export function ExcelImportStepper({
   const [templateNotas, setTemplateNotas] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const uploadAbortRef = useRef<AbortController | null>(null)
 
-  const variablesByCategory = useMemo(() => Array.from(getVariablesByCategory().entries()), [])
+  useEffect(() => {
+    return () => {
+      uploadAbortRef.current?.abort()
+    }
+  }, [])
+
+  const variablesByCategory = useMemo(
+    () => Array.from(getVariablesByCategory({ includeMem: true }).entries()),
+    [],
+  )
+
+  const inputDefinedNameByKey = useMemo(() => {
+    const map = new Map<string, string>()
+    if (!parseResult) return map
+    for (const s of parseResult.suggestedInputMappings) {
+      if (s.definedName) {
+        map.set(`${s.sheetName}!${s.cellRef}`, s.definedName)
+      }
+    }
+    return map
+  }, [parseResult])
 
   async function processFileUpload(file: File) {
-    setUploadError(null)
-    const lowerName = file.name.toLowerCase()
-    if (lowerName.endsWith('.xls')) {
-      setUploadError(LEGACY_XLS_CLIENT_MSG)
-      return
-    }
-    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.csv')) {
-      setUploadError('Formato no soportado. Sube únicamente archivos .xlsx o .csv.')
-      return
-    }
-    if (file.size === 0) {
-      setUploadError('El archivo seleccionado está vacío.')
-      return
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      setUploadError('El archivo supera el tamaño máximo permitido de 10 MB.')
-      return
-    }
+    uploadAbortRef.current?.abort()
+    const controller = new AbortController()
+    uploadAbortRef.current = controller
 
+    setUploadError(null)
     setUploading(true)
     try {
       const formData = new FormData()
@@ -135,30 +127,71 @@ export function ExcelImportStepper({
       const response = await fetch('/api/calculator/excel/parse', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
       const json = (await response.json()) as ExcelParseResult & { error?: string }
+      if (controller.signal.aborted) return
       if (!response.ok) {
         setUploadError(json.error || 'Error al analizar el archivo Excel.')
         return
       }
 
       setParseResult(json)
-      setSelectedSheet(json.defaultSheet || json.sheets[0]?.name || '')
+      const preferredSheet =
+        json.memWorkbookPreview?.isMemModel
+          ? (json.sheets.find((s) => s.name.toLowerCase() === 'input')?.name ??
+            json.sheets.find((s) => s.name.toLowerCase().includes('evaluacion'))?.name ??
+            json.defaultSheet)
+          : json.defaultSheet
+      setSelectedSheet(preferredSheet || json.sheets[0]?.name || '')
 
       const initInputs: Record<string, string> = {}
+      const initialInputMappings: ExcelInputMapping[] = []
+      const candidateByKey = new Map<string, (typeof json.candidateInputs)[number]>(
+        json.candidateInputs.map((c) => [`${c.sheetName}!${c.cellRef}`, c]),
+      )
       for (const s of json.suggestedInputMappings) {
-        initInputs[`${s.sheetName}!${s.cellRef}`] = s.suggestedVar ?? '__ignore__'
+        const key = `${s.sheetName}!${s.cellRef}`
+        const assigned = s.suggestedVar ?? '__ignore__'
+        initInputs[key] = assigned
+        if (assigned !== '__ignore__') {
+          const cand = candidateByKey.get(key)
+          initialInputMappings.push({
+            cellRef: s.cellRef,
+            sheetName: s.sheetName,
+            label: cand?.label ?? s.label,
+            platformVar: assigned,
+            sampleValue: cand?.sampleValue ?? s.sampleValue,
+          })
+        }
       }
       setInputSelections(initInputs)
 
+      const isMemModel = Boolean(json.memWorkbookPreview?.isMemModel)
       const initOutputs: Record<string, FormulaDefinicion['key'] | '__ignore__'> = {}
       const usedOutKeys = new Set<string>()
       for (const o of json.suggestedOutputMappings) {
-        if (o.suggestedOutputKey && !usedOutKeys.has(o.suggestedOutputKey)) {
-          initOutputs[`${o.sheetName}!${o.cellRef}`] = o.suggestedOutputKey
+        const key = `${o.sheetName}!${o.cellRef}`
+        let canPreselect = Boolean(o.suggestedOutputKey && !usedOutKeys.has(o.suggestedOutputKey))
+        if (canPreselect && isMemModel) {
+          try {
+            const check = previewFormulaRewrite(
+              o.rawFormula,
+              initialInputMappings,
+              o.sheetName,
+            )
+            if (check.unresolvedRefs.length > 0) {
+              canPreselect = false
+            }
+          } catch {
+            canPreselect = false
+          }
+        }
+        if (canPreselect && o.suggestedOutputKey) {
+          initOutputs[key] = o.suggestedOutputKey
           usedOutKeys.add(o.suggestedOutputKey)
         } else {
-          initOutputs[`${o.sheetName}!${o.cellRef}`] = '__ignore__'
+          initOutputs[key] = '__ignore__'
         }
       }
       setOutputSelections(initOutputs)
@@ -167,24 +200,13 @@ export function ExcelImportStepper({
       setSaveError(null)
       setStep(1)
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setUploadError(err instanceof Error ? err.message : 'Error de red al subir el archivo.')
     } finally {
-      setUploading(false)
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      void processFileUpload(e.dataTransfer.files[0])
-    }
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files[0]) {
-      void processFileUpload(e.target.files[0])
+      if (uploadAbortRef.current === controller) {
+        uploadAbortRef.current = null
+        setUploading(false)
+      }
     }
   }
 
@@ -227,15 +249,16 @@ export function ExcelImportStepper({
     return list
   }, [parseResult, inputSelections])
 
-  const formulaPreviews = useMemo(() => {
-    return sheetFormulaCells.map((fc) => {
+  const allFormulaPreviews = useMemo(() => {
+    if (!parseResult) return []
+    return parseResult.formulaCells.map((fc) => {
       const mapKey = `${fc.sheetName}!${fc.cellRef}`
       const assignedOutput = outputSelections[mapKey] ?? '__ignore__'
       let rewritten = fc.rawFormula
       let unresolvedRefs: string[] = []
       let parseErr: string | null = null
       try {
-        const res = previewCellRewriteClient(fc.rawFormula, activeInputMappings, selectedSheet)
+        const res = previewFormulaRewrite(fc.rawFormula, activeInputMappings, fc.sheetName)
         rewritten = res.rewritten
         unresolvedRefs = res.unresolvedRefs
       } catch (err) {
@@ -250,10 +273,14 @@ export function ExcelImportStepper({
         parseErr,
       }
     })
-  }, [sheetFormulaCells, outputSelections, activeInputMappings, selectedSheet])
+  }, [parseResult, outputSelections, activeInputMappings])
+
+  const formulaPreviews = useMemo(() => {
+    return allFormulaPreviews.filter((p) => p.fc.sheetName === selectedSheet)
+  }, [allFormulaPreviews, selectedSheet])
 
   const mappingValidation = useMemo(() => {
-    const selectedOutputs = formulaPreviews.filter((p) => p.assignedOutput !== '__ignore__')
+    const selectedOutputs = allFormulaPreviews.filter((p) => p.assignedOutput !== '__ignore__')
     const duplicateOutputs = new Set<string>()
     const seen = new Set<string>()
     for (const item of selectedOutputs) {
@@ -265,8 +292,11 @@ export function ExcelImportStepper({
       (p) => p.unresolvedRefs.length > 0 || p.parseErr !== null,
     )
 
+    const isMemModel = Boolean(parseResult?.memWorkbookPreview?.isMemModel)
+    const mappedInputCount = activeInputMappings.length
+
     const canProceedToStep3 =
-      selectedOutputs.length > 0 &&
+      (selectedOutputs.length > 0 || (isMemModel && mappedInputCount > 0)) &&
       duplicateOutputs.size === 0 &&
       unresolvedItems.length === 0
 
@@ -276,7 +306,7 @@ export function ExcelImportStepper({
       unresolvedItems,
       canProceedToStep3,
     }
-  }, [formulaPreviews])
+  }, [allFormulaPreviews, parseResult, activeInputMappings.length])
 
   const mergedFormulas: FormulaDefinicion[] = useMemo(() => {
     const baseList =
@@ -314,76 +344,10 @@ export function ExcelImportStepper({
         allowCellRefs: false,
         validateIdentifiers: true,
       })
-      const dryRun = evaluateSimulation({
-        proyecto: {
-          tipo: 'FV+BESS',
-          capex_estimado: 1_500_000,
-          moneda: 'MXN',
-          incluye_mem: false,
-          demanda_kw: 250,
-          capacidad_mw: 0.1,
-          capacidad_mwh: 0.2,
-          consumo_anual_gwh: null,
-          volumen_energia_mwh_anual: null,
-          tarifa_actual_cfe: 3.2,
-        },
-        activeConfig: {
-          id: 'preview-cfg',
-          proyecto_id: 'preview-proj',
-          nombre: 'Preview FV+BESS',
-          descripcion: null,
-          inversion_total: 1_500_000,
-          moneda: 'MXN',
-          ahorro_estimado_anual: null,
-          ahorro_estimado_mensual: null,
-          ahorro_moneda: 'MXN',
-          seleccionada: true,
-          created_at: '',
-          updated_at: '',
-        },
-        configProducts: [
-          {
-            id: 'preview-fv',
-            proyecto_id: 'preview-proj',
-            sitio_id: 'preview-site',
-            configuracion_id: 'preview-cfg',
-            tipo: 'fv',
-            datos: {
-              num_modulos: 160,
-              potencia_modulos_w: 500,
-              generacion_anual_kwh: 120_000,
-              capex: 1_000_000,
-              capex_moneda: 'MXN',
-            },
-            created_at: '',
-          },
-          {
-            id: 'preview-bess',
-            proyecto_id: 'preview-proj',
-            sitio_id: 'preview-site',
-            configuracion_id: 'preview-cfg',
-            tipo: 'bess',
-            datos: {
-              potencia_kw: 100,
-              capacidad_kwh: 200,
-              uso: 'load_shifting',
-              capex: 500_000,
-              capex_moneda: 'MXN',
-            },
-            created_at: '',
-          },
-        ],
-        activeFinancing: null,
-        template: {
-          id: '',
-          modo: 'excel_import',
-          campos: currentCampos,
-          formulas: mergedFormulas,
-        },
-        monedaCalculo: 'MXN',
-        horizonteAnios: 10,
-        vistaFinanciamiento: 'bruto',
-        overrides: {},
+      const dryRun = runTemplateDryRun({
+        modo: 'excel_import',
+        campos: currentCampos,
+        formulas: mergedFormulas,
       })
       return { ok: true as const, dryRun }
     } catch (err) {
@@ -391,6 +355,83 @@ export function ExcelImportStepper({
       return { ok: false as const, error: msg }
     }
   }, [step, mergedFormulas, currentCampos])
+
+  const memPreviewRun = useMemo(() => {
+    const preview = parseResult?.memWorkbookPreview
+    if (step !== 2 || !preview?.isMemModel) return null
+    const mergedInputs = {
+      ...DEFAULT_MEM_INPUTS,
+      ...preview.extractedInputs,
+    }
+    const assumptions = preview.extractedAssumptions ?? createDefaultMemAnnualAssumptions()
+    const baseHourly = getBaselineMemHourlyDataset()
+    const parsedHourly = preview.hourlyDataset
+    const hourly =
+      parsedHourly && parsedHourly.consumo_mwh.length === 8760
+        ? {
+            label: `${parseResult?.fileName ?? 'Excel MEM'}`,
+            year: baseHourly.year,
+            fechas: parsedHourly.fechas,
+            horas: parsedHourly.horas,
+            consumo_mwh: Float64Array.from(parsedHourly.consumo_mwh),
+            pml_mxn_mwh: Float64Array.from(parsedHourly.pml_mxn_mwh),
+            curva_solar_mw:
+              parsedHourly.curva_solar_mw.length === 8760
+                ? Float64Array.from(parsedHourly.curva_solar_mw)
+                : Float64Array.from(baseHourly.curva_solar_mw),
+          }
+        : baseHourly
+    const hc100 =
+      preview.criticalHours100HC && preview.criticalHours100HC.length > 0
+        ? preview.criticalHours100HC
+        : getBaseline100HC()
+
+    const outcome = runMemSimulation({
+      inputs: mergedInputs,
+      assumptions,
+      hourly,
+      criticalHours100HC: hc100,
+    })
+    return outcome.status === 'ok' ? outcome : null
+  }, [step, parseResult])
+
+  function buildCamposForSave(): CalculadoraCampoDef[] {
+    const memExtracted = parseResult?.memWorkbookPreview?.extractedInputs
+    const memExtractedKeys = new Set<string>(
+      parseResult?.memWorkbookPreview?.extractedInputKeys ?? [],
+    )
+    const shouldApplyKey = (key: string) =>
+      memExtractedKeys.size === 0 || memExtractedKeys.has(key)
+
+    const memMap = new Map<string, CalculadoraCampoDef>(
+      MEM_TEMPLATE_CAMPOS.map((c) => [c.key, { ...c }]),
+    )
+    const merged = currentCampos.map((c) => {
+      if (memExtracted && shouldApplyKey(c.key) && c.key in memExtracted) {
+        const val = (memExtracted as Record<string, unknown>)[c.key]
+        if (val !== undefined && val !== null) {
+          memMap.delete(c.key)
+          return { ...c, defaultValue: val as CalculadoraCampoDef['defaultValue'] }
+        }
+      }
+      memMap.delete(c.key)
+      return c
+    })
+    if (parseResult?.memWorkbookPreview?.isMemModel) {
+      for (const extra of memMap.values()) {
+        const val =
+          memExtracted && shouldApplyKey(extra.key)
+            ? (memExtracted as Record<string, unknown>)[extra.key]
+            : undefined
+        merged.push(
+          val !== undefined && val !== null
+            ? { ...extra, defaultValue: val as CalculadoraCampoDef['defaultValue'] }
+            : extra,
+        )
+      }
+    }
+    return merged
+  }
 
   function buildExcelMapeo(): ExcelMapeoCampos {
     const outputMappings: ExcelOutputMapping[] = mappingValidation.selectedOutputs
@@ -418,7 +459,7 @@ export function ExcelImportStepper({
     setSaving(true)
     setSaveError(null)
 
-    const previewSnapshot =
+    const baseSnapshot =
       step3Check?.ok && step3Check.dryRun.status === 'ok'
         ? {
             capex_total: step3Check.dryRun.capex_total,
@@ -427,13 +468,36 @@ export function ExcelImportStepper({
             van: step3Check.dryRun.van,
             tir_pct: step3Check.dryRun.tir_pct,
           }
-        : null
+        : {}
+
+    const previewSnapshot =
+      parseResult.memWorkbookPreview?.isMemModel
+        ? {
+            ...baseSnapshot,
+            isMemModel: true,
+            detectedSheets: parseResult.memWorkbookPreview.detectedSheets,
+            definedNamesMatched: parseResult.memWorkbookPreview.definedNamesMatched,
+            hourlySummary: parseResult.memWorkbookPreview.hourlySummary,
+            cachedExcelKpis: parseResult.memWorkbookPreview.cachedExcelKpis ?? null,
+            memPreviewKpis: memPreviewRun
+              ? {
+                  ahorro_total_y1: memPreviewRun.year1.ahorro_total_mxn,
+                  capex_total: memPreviewRun.financial.capex_total_mxn,
+                  vpn: memPreviewRun.financial.vpn,
+                  tir_pct: memPreviewRun.financial.tir_pct,
+                  payback_simple_anios: memPreviewRun.financial.payback_simple_anios,
+                }
+              : null,
+          }
+        : Object.keys(baseSnapshot).length > 0
+          ? baseSnapshot
+          : null
 
     const res = await guardarPlantillaCalculadora({
       nombre: templateNombre.trim(),
       descripcion: `Importado desde ${parseResult.fileName} (hoja ${selectedSheet})`,
       modo: 'excel_import',
-      campos: currentCampos,
+      campos: buildCamposForSave(),
       formulas: mergedFormulas,
       horizonte_opciones: currentHorizonteOpciones,
       excel_archivo_nombre: parseResult.fileName,
@@ -486,59 +550,17 @@ export function ExcelImportStepper({
 
       {/* STEP 1: Upload Excel / CSV */}
       {step === 0 && (
-        <div className="space-y-4">
-          {uploadError && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700 flex items-start gap-2">
-              <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-              <span>{uploadError}</span>
-            </div>
-          )}
-
-          <div
-            onDragEnter={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setDragActive(true)
-            }}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setDragActive(true)
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setDragActive(false)
-            }}
-            onDrop={handleDrop}
-            onClick={() => !uploading && fileInputRef.current?.click()}
-            className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-              dragActive
-                ? 'border-acento bg-acento/10 scale-[0.99]'
-                : 'border-linea bg-fondo/40 hover:border-principal/40 hover:bg-fondo'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.csv"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
-            <div className="w-12 h-12 rounded-2xl bg-principal text-acento flex items-center justify-center mb-3 shadow-sm">
-              {uploading ? <Loader2 size={22} className="animate-spin" /> : <Upload size={22} />}
-            </div>
-            <p className="text-sm font-bold text-principal">
-              {uploading
-                ? 'Analizando libro de cálculo y detectando fórmulas...'
-                : 'Arrastra tu archivo Excel (.xlsx) o .csv, o haz clic para seleccionarlo'}
-            </p>
-            <p className="text-xs text-texto-suave mt-1 text-center max-w-lg">
-              Tamaño máximo 10 MB. Se extraerán las celdas de entrada, referencias y fórmulas para que confirmes el mapeo antes de activar el modelo. Por seguridad, el formato binario <span className="font-semibold">.xls</span> antiguo no está permitido.
-            </p>
-          </div>
-        </div>
+        <SpreadsheetDropzone
+          uploading={uploading}
+          error={uploadError}
+          title="Arrastra tu archivo Excel (.xlsx) o .csv, o haz clic para seleccionarlo"
+          uploadingLabel="Analizando libro de cálculo y detectando fórmulas..."
+          description={
+            'Tamaño máximo 10 MB. Se extraerán las celdas de entrada, referencias y fórmulas para que confirmes el mapeo antes de activar el modelo. Por seguridad, el formato binario .xls antiguo no está permitido.'
+          }
+          onFileSelected={(file) => void processFileUpload(file)}
+          onValidationError={(msg) => setUploadError(msg)}
+        />
       )}
 
       {/* STEP 2: Map Fields & Formulas */}
@@ -567,6 +589,52 @@ export function ExcelImportStepper({
               Sugerencias automáticas aplicadas
             </Badge>
           </div>
+
+          {parseResult.memWorkbookPreview?.isMemModel && (
+            <div className="p-4 rounded-2xl bg-menta/10 border border-menta/30 text-xs space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-bold text-principal">
+                  Modelo FV + BESS MEM (8,760h + 100HC) detectado automáticamente
+                </span>
+                <Badge variant="success">
+                  {parseResult.memWorkbookPreview.definedNamesMatched} Defined Names
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-principal">
+                <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-linea">
+                  <span className="text-texto-suave block">Datos horarios</span>
+                  <span className="num font-bold">
+                    {fmtNum(parseResult.memWorkbookPreview.hourlySummary.datosRows, 0)} h
+                  </span>
+                </div>
+                <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-linea">
+                  <span className="text-texto-suave block">Curva Solar</span>
+                  <span className="num font-bold">
+                    {fmtNum(parseResult.memWorkbookPreview.hourlySummary.curvaSolarRows, 0)} h (
+                    {parseResult.memWorkbookPreview.hourlySummary.curvaSolarNonZeroHours} activas)
+                  </span>
+                </div>
+                <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-linea">
+                  <span className="text-texto-suave block">100 Horas Críticas</span>
+                  <span className="num font-bold">
+                    {parseResult.memWorkbookPreview.hourlySummary.criticalHoursCount} filas
+                    {parseResult.memWorkbookPreview.hourlySummary.duplicateCriticalHoursCount > 0 &&
+                      ` (${parseResult.memWorkbookPreview.hourlySummary.duplicateCriticalHoursCount} repetidas)`}
+                  </span>
+                </div>
+                <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-linea">
+                  <span className="text-texto-suave block">PML promedio</span>
+                  <span className="num font-bold">
+                    {fmtCurrency(
+                      parseResult.memWorkbookPreview.hourlySummary.avgPmlMxnMwh,
+                      'MXN',
+                    )}
+                    /MWh
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {mappingValidation.unresolvedItems.length > 0 && (
             <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
@@ -643,6 +711,11 @@ export function ExcelImportStepper({
                             <td className="px-3.5 py-2.5 text-principal">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{cand.label}</span>
+                                {inputDefinedNameByKey.has(mapKey) && (
+                                  <Badge variant="success">
+                                    {inputDefinedNameByKey.get(mapKey)} (100%)
+                                  </Badge>
+                                )}
                                 {cand.referencedBy && cand.referencedBy.length > 0 && (
                                   <Badge variant="default">
                                     Usada en {cand.referencedBy.join(', ')}
@@ -865,6 +938,67 @@ export function ExcelImportStepper({
           {step3Check && !step3Check.ok && (
             <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
               Error de compilación AST: {step3Check.error}
+            </div>
+          )}
+
+          {memPreviewRun && (
+            <div className="rounded-2xl border border-menta/40 bg-menta/10 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-principal">
+                  Paridad simulador horario MEM 8,760h + 100HC (con datos importados)
+                </span>
+                <Badge variant="success">Motor horario validado</Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                <div className="bg-white rounded-xl p-3 border border-linea">
+                  <span className="block text-[10px] text-texto-suave uppercase font-semibold">
+                    CAPEX MEM
+                  </span>
+                  <span className="num font-bold text-principal">
+                    {fmtCurrency(memPreviewRun.financial.capex_total_mxn, 'MXN')}
+                  </span>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-linea">
+                  <span className="block text-[10px] text-texto-suave uppercase font-semibold">
+                    Ahorro Año 1
+                  </span>
+                  <span className="num font-bold text-menta">
+                    {fmtCurrency(memPreviewRun.year1.ahorro_total_mxn, 'MXN')}
+                  </span>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-linea">
+                  <span className="block text-[10px] text-texto-suave uppercase font-semibold">
+                    VPN ({memPreviewRun.inputs.fin_horizonte_anios}a)
+                  </span>
+                  <span className="num font-bold text-principal">
+                    {fmtCurrency(memPreviewRun.financial.vpn, 'MXN')}
+                  </span>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-linea">
+                  <span className="block text-[10px] text-texto-suave uppercase font-semibold">
+                    TIR
+                  </span>
+                  <span className="num font-bold text-principal">
+                    {memPreviewRun.financial.tir_pct !== null
+                      ? fmtPct(memPreviewRun.financial.tir_pct, 2)
+                      : '—'}
+                  </span>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-linea">
+                  <span className="block text-[10px] text-texto-suave uppercase font-semibold">
+                    Payback Simple / Desc.
+                  </span>
+                  <span className="num font-bold text-principal">
+                    {memPreviewRun.financial.payback_simple_anios !== null
+                      ? `${fmtNum(memPreviewRun.financial.payback_simple_anios, 2)}a`
+                      : '—'}{' '}
+                    /{' '}
+                    {memPreviewRun.financial.payback_descontado_anios !== null
+                      ? `${fmtNum(memPreviewRun.financial.payback_descontado_anios, 2)}a`
+                      : '—'}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
