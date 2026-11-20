@@ -430,7 +430,9 @@ export type PaybackEstado = 'inmediato' | 'en_horizonte' | 'fuera_horizonte' | '
 export type ModoFormulaConfig = 'default' | 'custom_formulas' | 'excel_import'
 export type FuenteCalculo = 'fisico_tarifario' | 'ahorro_declarado' | 'formula_personalizada'
 
-export type CalculadoraCampoTipo = 'number' | 'percentage' | 'integer' | 'select' | 'number_array'
+export type CalculationMode = 'mem_horaria' | 'cfe_tarifario'
+
+export type CalculadoraCampoTipo = 'number' | 'percentage' | 'integer' | 'select' | 'number_array' | 'text' | 'date'
 export type CalculadoraCampoGrupo =
   | 'moneda'
   | 'tarifas'
@@ -439,6 +441,11 @@ export type CalculadoraCampoGrupo =
   | 'macro'
   | 'financiamiento'
   | 'horizontes'
+  | 'cliente'
+  | 'operacion'
+  | 'mercado_tc'
+  | 'costos'
+  | 'evaluacion_financiera'
 
 export interface CalculadoraCampoValidationRules {
   required?: boolean
@@ -547,6 +554,7 @@ export interface ExcelMappingSuggestion {
   suggestedVar: string | null
   confidence: number
   isFormulaDerived?: boolean
+  definedName?: string | null
 }
 
 export interface ExcelOutputMappingSuggestion {
@@ -556,8 +564,45 @@ export interface ExcelOutputMappingSuggestion {
   rawFormula: string
   cachedResult: number | string | null
   suggestedOutputKey: FormulaDefinicion['key'] | null
+  suggestedMemOutputKey?: string | null
   confidence: number
   dependencies: string[]
+  definedName?: string | null
+}
+
+export interface MemWorkbookImportPreview {
+  isMemModel: boolean
+  detectedSheets: string[]
+  definedNamesMatched: number
+  extractedInputs: Partial<MemSimulatorInputs>
+  extractedInputKeys?: (keyof MemSimulatorInputs)[]
+  extractedAssumptions: MemAnnualAssumptions | null
+  hourlySummary: {
+    datosRows: number
+    curvaSolarRows: number
+    curvaSolarNonZeroHours: number
+    criticalHoursCount: number
+    duplicateCriticalHoursCount: number
+    totalConsumoMwh: number
+    avgPmlMxnMwh: number
+    dateStart: string | null
+    dateEnd: string | null
+    skippedDatosRows?: number
+    skippedSolarRows?: number
+    invalid100HcRows?: number
+    alignmentMismatchCount?: number
+  }
+  hourlyDataset?: {
+    fechas: string[]
+    horas: number[]
+    consumo_mwh: number[]
+    pml_mxn_mwh: number[]
+    curva_solar_mw: number[]
+    solar_fechas?: string[]
+    solar_horas?: number[]
+  }
+  criticalHours100HC?: MemCriticalHourEntry[]
+  cachedExcelKpis?: Record<string, number | string | null>
 }
 
 export interface ExcelParseResult {
@@ -570,6 +615,7 @@ export interface ExcelParseResult {
   formulaCells: ExcelDetectedFormulaCell[]
   suggestedInputMappings: ExcelMappingSuggestion[]
   suggestedOutputMappings: ExcelOutputMappingSuggestion[]
+  memWorkbookPreview?: MemWorkbookImportPreview
 }
 
 export interface CalculadoraTemplate {
@@ -595,10 +641,10 @@ export interface CalculadoraTemplate {
   updated_at: string
 }
 
-// Strictly the 24 overridable simulation parameters stored in simulaciones_ahorro.parametros_override
-// (22 editableByUser:true campos excluding top-level moneda_default -> moneda_calculo, plus 2 runtime engineering inputs).
-// Top-level columns (moneda_calculo, horizonte_anios, vista_financiamiento) live on SimulacionRunRequest / DB columns.
+// Strictly the 24 overridable CFE/AST simulation parameters PLUS optional MEM FV+BESS 8,760h+100HC overrides
+// stored in simulaciones_ahorro.parametros_override.
 export interface SimulacionOverrides {
+  // Legacy / CFE scalar keys (v29)
   tipo_cambio_usd_mxn?: number
   tarifa_cfe_kwh?: number
   cargo_demanda_mensual_kw?: number
@@ -623,6 +669,35 @@ export interface SimulacionOverrides {
   tasa_interes_anual?: number
   plazo_meses?: number
   ensaas_factor_ahorro_pct?: number
+
+  // Rationalized MEM FV + BESS + 100HC keys (Simulador FV + BESS MEM.xlsx)
+  modo_motor?: CalculationMode
+  cliente?: string
+  demanda_contratada_mw?: number
+  bess_potencia_mw?: number
+  bess_capacidad_mwh?: number
+  bess_eficiencia_pct?: number
+  bess_soc_min_pct?: number
+  op_horas_carga?: number
+  op_ini_carga?: number
+  op_fin_carga?: number
+  op_ini_descarga?: number
+  op_fin_descarga?: number
+  fv_potencia_mw?: number
+  fv_degradacion_anual_pct?: number
+  tc_mxn_usd?: number
+  tc_fecha?: string
+  mbp_precio_mxn_mw_anio?: number
+  rap_factor?: number
+  capex_bess_usd_kwh?: number
+  capex_fv_usd_kwp?: number
+  opex_bess_mxn_mwh_anio?: number
+  opex_fv_mxn_mw_anio?: number
+  fin_horizonte_anios?: number
+  fin_tasa_descuento_pct?: number
+  fin_esc_opex_pct?: number
+  supuestos_anuales?: MemAnnualAssumptions
+  critical_hours_100hc?: MemCriticalHourEntry[]
 }
 
 export interface SimulacionRunRequest {
@@ -749,4 +824,258 @@ export type SimulationRunOutcome =
   | SimulationEvaluationResult
   | SimulationGatedResult
   | SimulationInvalidOverrideResult
+
+// ── MEM FV + BESS + 100HC Two-Stage Simulator Types ─────────────────────────
+
+export interface MemSimulatorInputs {
+  // 1. Cliente
+  cliente: string
+  demanda_contratada_mw: number
+  // 2. Batería (BESS)
+  bess_potencia_mw: number
+  bess_capacidad_mwh: number
+  bess_eficiencia_pct: number     // fraction (0..1), e.g. 0.86
+  bess_soc_min_pct: number        // fraction (0..0.5), e.g. 0.10
+  // 3. Estrategia de operación
+  op_horas_carga: number          // integer 0..24
+  op_ini_carga: number            // integer 1..24
+  op_fin_carga: number            // integer 1..24
+  op_ini_descarga: number         // integer 1..24
+  op_fin_descarga: number         // integer 1..24
+  // 4. Fotovoltaico (FV)
+  fv_potencia_mw: number          // >= 0
+  fv_degradacion_anual_pct: number // fraction (0..0.05), e.g. 0.005
+  // 5. Mercado y tipo de cambio
+  tc_mxn_usd: number              // > 0
+  tc_fecha: string                // ISO date YYYY-MM-DD
+  mbp_precio_mxn_mw_anio: number  // > 0
+  rap_factor: number              // > 0
+  // 6. Costos: inversión (USD) y operación (MXN)
+  capex_bess_usd_kwh: number      // >= 0
+  capex_fv_usd_kwp: number        // >= 0
+  opex_bess_mxn_mwh_anio: number  // >= 0
+  opex_fv_mxn_mw_anio: number     // >= 0
+  // 7. Evaluación financiera
+  fin_horizonte_anios: number     // integer 1..25
+  fin_tasa_descuento_pct: number  // fraction (0..0.5), e.g. 0.12
+  fin_esc_opex_pct: number        // fraction (-0.5..1), e.g. 0.035
+}
+
+export interface MemAnnualAssumptions {
+  // 25 elements per series (index 0 = Año 1 base, indices 1..24 = Años 2..25)
+  pct_mbp: number[]
+  fijo_mbp: (number | null)[]
+  pct_pml: number[]
+  deg_bess: number[]
+}
+
+export interface MemAnnualAssumptionsRow {
+  anio: number
+  pct_mbp_captura: number | null
+  fijo_mbp_captura: number | null
+  precio_mbp_mxn_mw_anio: number
+  pct_mbp_efectivo: number | null
+  var_mbp_mxn: number | null
+  idx_potencia: number
+  pct_pml_captura: number | null
+  idx_pml: number
+  pml_promedio_mxn_mwh: number
+  var_pml_mxn: number | null
+  deg_bess_captura: number | null
+  factor_deg_bess: number
+  capacidad_remanente_mwh: number
+  perdida_mwh: number | null
+}
+
+export interface MemHourlyDataset {
+  label: string
+  year: number
+  fechas: readonly string[]
+  horas: readonly number[] | Int32Array
+  consumo_mwh: readonly number[] | Float64Array
+  pml_mxn_mwh: readonly number[] | Float64Array
+  curva_solar_mw: readonly number[] | Float64Array
+}
+
+export interface MemCriticalHourEntry {
+  no: number
+  fecha: string
+  hora: number
+}
+
+export interface MemCriticalHourEvaluated {
+  no: number
+  fecha: string
+  hora: number
+  clave: string
+  repetida: boolean
+  encontrada: boolean
+  demanda_base_mw: number
+  demanda_proy_mw: number
+}
+
+export interface MemMonthlyEnergySaving {
+  mes: number
+  etiqueta: string
+  costo_base_mxn: number
+  costo_proy_mxn: number
+  ahorro_energia_mxn: number
+  consumo_mwh: number
+  gen_fv_mwh: number
+  descarga_bess_mwh: number
+}
+
+export interface MemHourlyProfilePoint {
+  hora: number
+  consumo_real_mw: number
+  gen_fv_mw: number
+  consumo_red_proy_mw: number
+  carga_bess_mw: number
+  descarga_bess_mw: number
+  soc_promedio_mwh: number
+}
+
+export interface MemYear1Results {
+  bess_duracion_h: number
+  // Balance de energía (MWh/año)
+  res_consumo_mwh: number
+  res_gen_fv_mwh: number
+  res_fv_auto_mwh: number
+  res_fv_a_bess_mwh: number
+  res_fv_perdida_mwh: number
+  res_carga_red_mwh: number
+  res_descarga_mwh: number
+  res_ciclos: number
+  res_consumo_red_mwh: number
+  // Energía (MXN/año)
+  res_costo_e_base_mxn: number
+  res_costo_e_proy_mxn: number
+  ahorro_e_total_mxn: number
+  pml_promedio_mxn_mwh: number
+  // Potencia — 100 Horas Críticas
+  prom_100hc_base_mw: number
+  prom_100hc_proy_mw: number
+  res_rap_base_mw: number
+  res_rap_proy_mw: number
+  res_rap_reduccion_mw: number
+  res_costo_c_base_mxn: number
+  res_costo_c_proy_mxn: number
+  ahorro_c_total_mxn: number
+  // Resumen Año 1
+  ahorro_total_mxn: number
+  res_pct_energia: number
+  res_pct_capacidad: number
+  res_pct_reduccion: number
+  // Charts & tables
+  monthly_savings: MemMonthlyEnergySaving[]
+  hourly_profile: MemHourlyProfilePoint[]
+  critical_hours_rows: MemCriticalHourEvaluated[]
+  duplicate_100hc_count: number
+  missing_100hc_count: number
+}
+
+export interface MemAnnualEvaluationRow {
+  anio: number // 0..25
+  activo: 0 | 1
+  idx_energia: number
+  idx_potencia: number
+  idx_opex: number
+  factor_deg_fv: number
+  factor_deg_bess: number
+  factor_deg_combinado: number
+  ahorro_energia: number
+  ahorro_potencia: number
+  total_ahorros: number
+  capex: number
+  opex: number
+  cuota_financiamiento: number
+  flujo_neto: number
+  flujo_acumulado: number
+  factor_descuento: number
+  flujo_descontado: number
+  flujo_descontado_acumulado: number
+}
+
+export interface MemFinancialEvaluation {
+  moneda: Moneda
+  vista_financiamiento: VistaFinanciamiento
+  vehiculo_inversion: string
+  capex_bess_mxn: number
+  capex_fv_mxn: number
+  capex_total_mxn: number
+  capex_total_usd: number
+  capex_total: number
+  desembolso_inicial: number
+  opex_y1_mxn: number
+  opex_y1: number
+  peso_fv: number
+  vpn: number
+  tir_pct: number | null
+  payback_simple_anios: number | null
+  payback_simple_estado: 'ok' | 'na' | 'fuera_horizonte'
+  payback_descontado_anios: number | null
+  payback_descontado_estado: 'ok' | 'na' | 'fuera_horizonte'
+  roi_pct: number | null
+  roi_desembolso_pct: number | null
+  flujo_neto_total: number
+  ahorro_total_horizonte: number
+  ahorro_energia_y1: number
+  ahorro_potencia_y1: number
+  ahorro_total_y1: number
+  rows: MemAnnualEvaluationRow[] // length 26 (years 0..25)
+  assumptions_rows: MemAnnualAssumptionsRow[] // length 25 (years 1..25)
+  serie_mensual: PeriodoMensualSimulacion[]
+}
+
+export interface MemSensitivitySweepConfig {
+  duracion_fija_h: number
+  potencia_inicial_mw: number
+  incremento_mw: number
+  num_casos: number // 1..20
+}
+
+export interface MemSensitivityCaseResult {
+  caso: number | 'Input'
+  isCurrentInput: boolean
+  bess_potencia_mw: number
+  bess_capacidad_mwh: number
+  ahorro_energia_y1: number
+  ahorro_potencia_y1: number
+  ahorro_total_y1: number
+  rap_reduccion_mw: number
+  ciclos_anio: number
+  capex: number
+  opex_y1: number
+  vpn: number
+  tir_pct: number | null
+  payback_simple_anios: number | null
+  payback_descontado_anios: number | null
+}
+
+export interface MemSensitivitySuite {
+  config: MemSensitivitySweepConfig
+  currentInputCase: MemSensitivityCaseResult
+  cases: MemSensitivityCaseResult[]
+  bestVpnCaseIndex: number // index inside cases[] or -1
+  elapsedMs: number
+}
+
+export interface MemFullSimulationResult {
+  status: 'ok'
+  mode: 'mem_horaria'
+  inputs: MemSimulatorInputs
+  assumptions: MemAnnualAssumptions
+  year1: MemYear1Results
+  financial: MemFinancialEvaluation
+  validationWarnings: string[]
+}
+
+export interface MemInvalidInputResult {
+  status: 'invalid_override'
+  mode: 'mem_horaria'
+  errors: Record<string, string>
+}
+
+export type MemSimulationOutcome = MemFullSimulationResult | MemInvalidInputResult | SimulationGatedResult
+
 

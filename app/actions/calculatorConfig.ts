@@ -19,9 +19,9 @@ import {
   findUnresolvedCellRefs,
   FormulaError,
   parseExcelFormula,
+  previewFormulaRewrite,
 } from '@/lib/calculator/formula-engine'
-import { previewFormulaRewrite } from '@/lib/calculator/excel-mapper'
-import { evaluateSimulation } from '@/lib/calculator/engine'
+import { runTemplateDryRun } from '@/lib/calculator/engine'
 
 const campoValidationRulesSchema = z
   .object({
@@ -45,7 +45,7 @@ const campoDefSchema = z.object({
   key: z.string().min(1).max(80),
   label: z.string().min(1).max(160),
   unit: z.string().max(40),
-  type: z.enum(['number', 'percentage', 'integer', 'select', 'number_array']),
+  type: z.enum(['number', 'percentage', 'integer', 'select', 'number_array', 'text', 'date']),
   group: z.enum([
     'moneda',
     'tarifas',
@@ -54,6 +54,11 @@ const campoDefSchema = z.object({
     'macro',
     'financiamiento',
     'horizontes',
+    'cliente',
+    'operacion',
+    'mercado_tc',
+    'costos',
+    'evaluacion_financiera',
   ]),
   min: z.number().finite().optional(),
   max: z.number().finite().optional(),
@@ -308,77 +313,11 @@ export async function guardarPlantillaCalculadora(
       }
     }
 
-    // 4. Deterministic dry-run against synthetic FV+BESS fixture (capex = 1,500,000, gen = 120,000)
-    const dryRunOutcome = evaluateSimulation({
-      proyecto: {
-        tipo: 'FV+BESS',
-        capex_estimado: 1_500_000,
-        moneda: 'MXN',
-        incluye_mem: false,
-        demanda_kw: 250,
-        capacidad_mw: 0.1,
-        capacidad_mwh: 0.2,
-        consumo_anual_gwh: null,
-        volumen_energia_mwh_anual: null,
-        tarifa_actual_cfe: 3.2,
-      },
-      activeConfig: {
-        id: 'dry-run-config',
-        proyecto_id: 'dry-run-proj',
-        nombre: 'Dry-run',
-        descripcion: null,
-        inversion_total: 1_500_000,
-        moneda: 'MXN',
-        ahorro_estimado_anual: null,
-        ahorro_estimado_mensual: null,
-        ahorro_moneda: 'MXN',
-        seleccionada: true,
-        created_at: '',
-        updated_at: '',
-      },
-      configProducts: [
-        {
-          id: 'dry-fv',
-          proyecto_id: 'dry-run-proj',
-          sitio_id: 'dry-site',
-          configuracion_id: 'dry-run-config',
-          tipo: 'fv',
-          datos: {
-            num_modulos: 160,
-            potencia_modulos_w: 500,
-            generacion_anual_kwh: 120_000,
-            capex: 1_000_000,
-            capex_moneda: 'MXN',
-          },
-          created_at: '',
-        },
-        {
-          id: 'dry-bess',
-          proyecto_id: 'dry-run-proj',
-          sitio_id: 'dry-site',
-          configuracion_id: 'dry-run-config',
-          tipo: 'bess',
-          datos: {
-            potencia_kw: 100,
-            capacidad_kwh: 200,
-            uso: 'load_shifting',
-            capex: 500_000,
-            capex_moneda: 'MXN',
-          },
-          created_at: '',
-        },
-      ],
-      activeFinancing: null,
-      template: {
-        id: '', // uncached dry-run
-        modo: validData.modo === 'default' ? 'custom_formulas' : validData.modo,
-        campos: validData.campos,
-        formulas: finalFormulas,
-      },
-      monedaCalculo: 'MXN',
-      horizonteAnios: 10,
-      vistaFinanciamiento: 'bruto',
-      overrides: {},
+    // 4. Deterministic dry-run against canonical synthetic FV+BESS fixture (capex = 1,500,000, gen = 120,000)
+    const dryRunOutcome = runTemplateDryRun({
+      modo: validData.modo === 'default' ? 'custom_formulas' : validData.modo,
+      campos: validData.campos,
+      formulas: finalFormulas,
     })
 
     if (dryRunOutcome.status !== 'ok') {

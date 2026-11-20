@@ -11,6 +11,11 @@ export type PlatformVariableCategory =
   | 'financiamiento'
   | 'horizontes'
   | 'tiempo'
+  | 'cliente'
+  | 'operacion'
+  | 'mercado_tc'
+  | 'costos'
+  | 'evaluacion_financiera'
 
 export type PlatformVariableValueType = 'number' | 'string' | 'number_array' | 'flag'
 
@@ -777,8 +782,448 @@ export const PLATFORM_OUTPUT_DEFINITIONS: readonly PlatformOutputDef[] = [
   },
 ] as const
 
+export interface MemPlatformOutputDef {
+  key: string
+  excelDefinedName: string
+  label: string
+  unit: string
+  sheet: 'Resultados' | 'Evaluación financiera'
+  legacyFormulaBridge?: FormulaDefinicion['key']
+  excelAliases: readonly string[]
+}
+
+/**
+ * Canonical MEM FV + BESS + 100HC Inputs & Annual Assumptions matching Simulador FV + BESS MEM.xlsx
+ * (24 Input cells + 3 Supuestos anuales vectors).
+ */
+export const MEM_PLATFORM_VARIABLES: readonly (PlatformVariableDef & { excelDefinedName: string })[] = [
+  // 1. Cliente
+  {
+    key: 'cliente',
+    excelDefinedName: 'Cliente',
+    label: 'Cliente',
+    unit: 'texto',
+    category: 'cliente',
+    valueType: 'string',
+    description: 'Nombre comercial del cliente o proyecto evaluado.',
+    primarySource: 'empresa.nombre_comercial ?? proyecto.cliente_final_empresa',
+    defaultFallback: 'Beetman',
+    overridable: true,
+    excelAliases: ['Cliente', 'cliente', 'nombre cliente'],
+  },
+  {
+    key: 'demanda_contratada_mw',
+    excelDefinedName: 'Demanda_Contratada',
+    label: 'Demanda contratada',
+    unit: 'MW',
+    category: 'cliente',
+    valueType: 'number',
+    description: 'Demanda contratada del sitio en MW (límite superior de carga desde red).',
+    primarySource: 'SUM(sitios.demanda_contratada_kw) / 1000',
+    defaultFallback: '10',
+    overridable: true,
+    excelAliases: ['Demanda_Contratada', 'demanda contratada', 'demanda contratada mw'],
+  },
+  // 2. Batería (BESS)
+  {
+    key: 'bess_potencia_mw',
+    excelDefinedName: 'BESS_Potencia',
+    label: 'Potencia BESS',
+    unit: 'MW',
+    category: 'bess',
+    valueType: 'number',
+    description: 'Potencia nominal de carga/descarga del BESS en MW.',
+    primarySource: 'SUM(bess.potencia_kw) / 1000',
+    defaultFallback: '6.00',
+    overridable: true,
+    excelAliases: ['BESS_Potencia', 'potencia bess', 'potencia'],
+  },
+  {
+    key: 'bess_duracion_h',
+    excelDefinedName: 'BESS_Duracion',
+    label: 'Duración a potencia nominal',
+    unit: 'h',
+    category: 'bess',
+    valueType: 'number',
+    description: 'Fórmula calculada de solo lectura: BESS_Capacidad / BESS_Potencia.',
+    primarySource: 'Derivado: bess_capacidad_mwh / bess_potencia_mw',
+    defaultFallback: '3.00',
+    overridable: false,
+    excelAliases: ['BESS_Duracion', 'duracion a potencia nominal', 'duracion nominal'],
+  },
+  {
+    key: 'bess_capacidad_mwh',
+    excelDefinedName: 'BESS_Capacidad',
+    label: 'Capacidad de almacenamiento (energía)',
+    unit: 'MWh',
+    category: 'bess',
+    valueType: 'number',
+    description: 'Capacidad energética nominal del BESS en MWh.',
+    primarySource: 'SUM(bess.capacidad_kwh) / 1000',
+    defaultFallback: '18.00',
+    overridable: true,
+    excelAliases: ['BESS_Capacidad', 'capacidad de almacenamiento', 'capacidad mwh'],
+  },
+  {
+    key: 'bess_eficiencia_pct',
+    excelDefinedName: 'BESS_Eficiencia',
+    label: 'Eficiencia ida y vuelta',
+    unit: '%',
+    category: 'bess',
+    valueType: 'number',
+    description: 'Eficiencia round-trip del BESS aplicada al cargar (fracción 0..1).',
+    primarySource: 'AVG(bess.eficiencia_pct) / 100',
+    defaultFallback: '0.86',
+    overridable: true,
+    excelAliases: ['BESS_Eficiencia', 'eficiencia ida y vuelta', 'round trip efficiency'],
+  },
+  {
+    key: 'bess_soc_min_pct',
+    excelDefinedName: 'BESS_SOCmin',
+    label: 'Estado de carga mínimo (SOC)',
+    unit: '%',
+    category: 'bess',
+    valueType: 'number',
+    description: 'Estado de carga mínimo operativo del BESS (fracción 0..0.50).',
+    primarySource: '1 - AVG(bess.dod_pct) / 100',
+    defaultFallback: '0.10',
+    overridable: true,
+    excelAliases: ['BESS_SOCmin', 'estado de carga minimo', 'soc minimo', 'soc min'],
+  },
+  // 3. Estrategia de operación
+  {
+    key: 'op_horas_carga',
+    excelDefinedName: 'Op_HorasCarga',
+    label: 'Horas de carga por día (las más baratas)',
+    unit: 'h',
+    category: 'operacion',
+    valueType: 'number',
+    description: 'Número de horas de menor PML seleccionadas cada día dentro de la ventana de carga.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '5',
+    overridable: true,
+    excelAliases: ['Op_HorasCarga', 'horas de carga por dia', 'horas de carga'],
+  },
+  {
+    key: 'op_ini_carga',
+    excelDefinedName: 'Op_IniCarga',
+    label: 'Inicio ventana de carga',
+    unit: 'hora',
+    category: 'operacion',
+    valueType: 'number',
+    description: 'Hora inicial de la ventana diaria de carga desde red (1..24).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '2',
+    overridable: true,
+    excelAliases: ['Op_IniCarga', 'inicio ventana de carga'],
+  },
+  {
+    key: 'op_fin_carga',
+    excelDefinedName: 'Op_FinCarga',
+    label: 'Fin ventana de carga',
+    unit: 'hora',
+    category: 'operacion',
+    valueType: 'number',
+    description: 'Hora final de la ventana diaria de carga desde red (1..24).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '10',
+    overridable: true,
+    excelAliases: ['Op_FinCarga', 'fin ventana de carga'],
+  },
+  {
+    key: 'op_ini_descarga',
+    excelDefinedName: 'Op_IniDescarga',
+    label: 'Inicio ventana de descarga',
+    unit: 'hora',
+    category: 'operacion',
+    valueType: 'number',
+    description: 'Hora inicial de la ventana diaria de descarga (100HC / punta, 1..24).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '20',
+    overridable: true,
+    excelAliases: ['Op_IniDescarga', 'inicio ventana de descarga'],
+  },
+  {
+    key: 'op_fin_descarga',
+    excelDefinedName: 'Op_FinDescarga',
+    label: 'Fin ventana de descarga',
+    unit: 'hora',
+    category: 'operacion',
+    valueType: 'number',
+    description: 'Hora final de la ventana diaria de descarga (1..24).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '22',
+    overridable: true,
+    excelAliases: ['Op_FinDescarga', 'fin ventana de descarga'],
+  },
+  // 4. Fotovoltaico (FV)
+  {
+    key: 'fv_potencia_mw',
+    excelDefinedName: 'FV_Potencia',
+    label: 'Potencia FV',
+    unit: 'MW',
+    category: 'fv',
+    valueType: 'number',
+    description: 'Potencia instalada fotovoltaica en MW.',
+    primarySource: 'SUM(fv.kwp) / 1000',
+    defaultFallback: '0',
+    overridable: true,
+    excelAliases: ['FV_Potencia', 'potencia fv', 'fv mw'],
+  },
+  {
+    key: 'fv_degradacion_anual_pct',
+    excelDefinedName: 'FV_Degradacion',
+    label: 'Degradación anual FV',
+    unit: '%/año',
+    category: 'fv',
+    valueType: 'number',
+    description: 'Degradación anual compuesta del sistema fotovoltaico.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '0.005',
+    overridable: true,
+    excelAliases: ['FV_Degradacion', 'degradacion anual fv'],
+  },
+  // 5. Mercado y tipo de cambio
+  {
+    key: 'tc_mxn_usd',
+    excelDefinedName: 'TC',
+    label: 'Tipo de cambio pactado (inversión)',
+    unit: 'MXN/USD',
+    category: 'mercado_tc',
+    valueType: 'number',
+    description: 'Tipo de cambio pactado para convertir la inversión USD a MXN.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '18.70',
+    overridable: true,
+    excelAliases: ['TC', 'tipo de cambio pactado', 'tc inversion'],
+  },
+  {
+    key: 'tc_fecha',
+    excelDefinedName: 'TC_Fecha',
+    label: 'Fecha del tipo de cambio pactado',
+    unit: 'fecha',
+    category: 'mercado_tc',
+    valueType: 'string',
+    description: 'Fecha de referencia del tipo de cambio pactado.',
+    primarySource: 'Escenario / hoy',
+    defaultFallback: '2026-11-18',
+    overridable: true,
+    excelAliases: ['TC_Fecha', 'fecha del tipo de cambio pactado'],
+  },
+  {
+    key: 'mbp_precio_mxn_mw_anio',
+    excelDefinedName: 'MBP_Precio',
+    label: 'Precio MBP publicado (año 100HC)',
+    unit: 'MXN/MW-año',
+    category: 'mercado_tc',
+    valueType: 'number',
+    description: 'Precio anual del Mercado para el Balance de Potencia (MBP) en MXN/MW-año.',
+    primarySource: 'Publicación CENACE / oferta_mem',
+    defaultFallback: '4690767.66',
+    overridable: true,
+    excelAliases: ['MBP_Precio', 'precio mbp publicado', 'precio mbp'],
+  },
+  {
+    key: 'rap_factor',
+    excelDefinedName: 'RAP_Factor',
+    label: 'Factor de ajuste RAP',
+    unit: 'factor',
+    category: 'mercado_tc',
+    valueType: 'number',
+    description: 'Factor multiplicador para convertir promedio 100HC a Requerimiento Anual de Potencia (RAP).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '1.077',
+    overridable: true,
+    excelAliases: ['RAP_Factor', 'factor de ajuste rap', 'factor rap'],
+  },
+  // 6. Costos: inversión (USD) y operación (MXN)
+  {
+    key: 'capex_bess_usd_kwh',
+    excelDefinedName: 'CAPEX_BESS',
+    label: 'CAPEX BESS',
+    unit: 'USD/kWh',
+    category: 'costos',
+    valueType: 'number',
+    description: 'Costo unitario de inversión BESS en USD por kWh.',
+    primarySource: 'Producto BESS capex / (capacidad_kwh) o default',
+    defaultFallback: '320.00',
+    overridable: true,
+    excelAliases: ['CAPEX_BESS', 'capex bess'],
+  },
+  {
+    key: 'capex_fv_usd_kwp',
+    excelDefinedName: 'CAPEX_FV',
+    label: 'CAPEX FV',
+    unit: 'USD/kWp',
+    category: 'costos',
+    valueType: 'number',
+    description: 'Costo unitario de inversión FV en USD por kWp.',
+    primarySource: 'Producto FV capex / kwp o default',
+    defaultFallback: '0',
+    overridable: true,
+    excelAliases: ['CAPEX_FV', 'capex fv'],
+  },
+  {
+    key: 'opex_bess_mxn_mwh_anio',
+    excelDefinedName: 'OPEX_BESS',
+    label: 'OPEX BESS',
+    unit: 'MXN/MWh-año',
+    category: 'costos',
+    valueType: 'number',
+    description: 'Costo anual unitario de operación y mantenimiento BESS en MXN/MWh-año.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '32198.40',
+    overridable: true,
+    excelAliases: ['OPEX_BESS', 'opex bess'],
+  },
+  {
+    key: 'opex_fv_mxn_mw_anio',
+    excelDefinedName: 'OPEX_FV',
+    label: 'OPEX FV',
+    unit: 'MXN/MW-año',
+    category: 'costos',
+    valueType: 'number',
+    description: 'Costo anual unitario de operación y mantenimiento FV en MXN/MW-año.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '0',
+    overridable: true,
+    excelAliases: ['OPEX_FV', 'opex fv'],
+  },
+  // 7. Evaluación financiera
+  {
+    key: 'fin_horizonte_anios',
+    excelDefinedName: 'Fin_Horizonte',
+    label: 'Horizonte de evaluación (máx. 25)',
+    unit: 'años',
+    category: 'evaluacion_financiera',
+    valueType: 'number',
+    description: 'Horizonte financiero de evaluación (1 a 25 años).',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '20',
+    overridable: true,
+    excelAliases: ['Fin_Horizonte', 'horizonte de evaluacion'],
+  },
+  {
+    key: 'fin_tasa_descuento_pct',
+    excelDefinedName: 'Fin_Tasa',
+    label: 'Tasa de descuento (MXN, nominal)',
+    unit: '%',
+    category: 'evaluacion_financiera',
+    valueType: 'number',
+    description: 'Tasa nominal anual de descuento en MXN para cálculo de VPN y payback descontado.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '0.12',
+    overridable: true,
+    excelAliases: ['Fin_Tasa', 'tasa de descuento nominal', 'tasa de descuento'],
+  },
+  {
+    key: 'fin_esc_opex_pct',
+    excelDefinedName: 'Fin_EscOPEX',
+    label: 'Escalamiento anual OPEX (MXN)',
+    unit: '%/año',
+    category: 'evaluacion_financiera',
+    valueType: 'number',
+    description: 'Tasa anual de escalamiento del OPEX.',
+    primarySource: 'Plantilla / override',
+    defaultFallback: '0.035',
+    overridable: true,
+    excelAliases: ['Fin_EscOPEX', 'escalamiento anual opex', 'escalamiento opex'],
+  },
+  // Supuestos anuales vectors
+  {
+    key: 'anual_idx_potencia',
+    excelDefinedName: 'Anual_IdxPotencia',
+    label: 'Índice potencia anual (Años 1–25)',
+    unit: 'factor[25]',
+    category: 'evaluacion_financiera',
+    valueType: 'number_array',
+    description: 'Vector anual de índice de potencia MBP (Año 1 = 1).',
+    primarySource: 'Hoja Supuestos anuales',
+    defaultFallback: '[1..2.56]',
+    overridable: false,
+    excelAliases: ['Anual_IdxPotencia'],
+  },
+  {
+    key: 'anual_idx_pml',
+    excelDefinedName: 'Anual_IdxPML',
+    label: 'Índice energía PML anual (Años 1–25)',
+    unit: 'factor[25]',
+    category: 'evaluacion_financiera',
+    valueType: 'number_array',
+    description: 'Vector anual de índice de energía PML (Año 1 = 1).',
+    primarySource: 'Hoja Supuestos anuales',
+    defaultFallback: '[1..2.56]',
+    overridable: false,
+    excelAliases: ['Anual_IdxPML'],
+  },
+  {
+    key: 'anual_deg_bess',
+    excelDefinedName: 'Anual_DegBESS',
+    label: 'Capacidad remanente BESS anual (Años 1–25)',
+    unit: 'factor[25]',
+    category: 'evaluacion_financiera',
+    valueType: 'number_array',
+    description: 'Vector anual de factor de degradación remanente BESS (Año 1 = 1).',
+    primarySource: 'Hoja Supuestos anuales',
+    defaultFallback: '[1..0.696]',
+    overridable: false,
+    excelAliases: ['Anual_DegBESS'],
+  },
+] as const
+
+export const MEM_PLATFORM_OUTPUTS: readonly MemPlatformOutputDef[] = [
+  { key: 'res_consumo_mwh', excelDefinedName: 'Res_Consumo', label: 'Consumo real (sin proyecto)', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_Consumo', 'consumo real sin proyecto'] },
+  { key: 'res_gen_fv_mwh', excelDefinedName: 'Res_GenFV', label: 'Generación FV', unit: 'MWh', sheet: 'Resultados', legacyFormulaBridge: 'fv_kwh_mes', excelAliases: ['Res_GenFV', 'generacion fv'] },
+  { key: 'res_fv_auto_mwh', excelDefinedName: 'Res_FVAuto', label: 'FV autoconsumida directamente', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_FVAuto', 'fv autoconsumida'] },
+  { key: 'res_fv_a_bess_mwh', excelDefinedName: 'Res_FVaBESS', label: 'Excedente FV cargado a BESS', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_FVaBESS', 'excedente fv cargado a bess'] },
+  { key: 'res_fv_perdida_mwh', excelDefinedName: 'Res_FVPerdida', label: 'Excedente FV no aprovechado', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_FVPerdida', 'excedente fv no aprovechado'] },
+  { key: 'res_carga_red_mwh', excelDefinedName: 'Res_CargaRed', label: 'Carga BESS desde red', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_CargaRed', 'carga bess desde red'] },
+  { key: 'res_descarga_mwh', excelDefinedName: 'Res_Descarga', label: 'Descarga BESS', unit: 'MWh', sheet: 'Resultados', legacyFormulaBridge: 'bess_kwh_mes', excelAliases: ['Res_Descarga', 'descarga bess'] },
+  { key: 'res_ciclos', excelDefinedName: 'Res_Ciclos', label: 'Ciclos equivalentes BESS', unit: 'ciclos/año', sheet: 'Resultados', excelAliases: ['Res_Ciclos', 'ciclos equivalentes bess'] },
+  { key: 'res_consumo_red_mwh', excelDefinedName: 'Res_ConsumoRed', label: 'Consumo de red con proyecto', unit: 'MWh', sheet: 'Resultados', excelAliases: ['Res_ConsumoRed', 'consumo de red con proyecto'] },
+  { key: 'res_costo_e_base_mxn', excelDefinedName: 'Res_CostoE_Base', label: 'Costo de energía sin proyecto', unit: 'MXN/año', sheet: 'Resultados', excelAliases: ['Res_CostoE_Base', 'costo de energia sin proyecto'] },
+  { key: 'res_costo_e_proy_mxn', excelDefinedName: 'Res_CostoE_Proy', label: 'Costo de energía con proyecto', unit: 'MXN/año', sheet: 'Resultados', excelAliases: ['Res_CostoE_Proy', 'costo de energia con proyecto'] },
+  { key: 'ahorro_energia_y1', excelDefinedName: 'Ahorro_E_Total', label: 'Ahorro de energía Año 1', unit: 'MXN/año', sheet: 'Resultados', legacyFormulaBridge: 'ahorro_bruto_mes', excelAliases: ['Ahorro_E_Total', 'ahorro de energia'] },
+  { key: 'res_rap_base_mw', excelDefinedName: 'Res_RAP_Base', label: 'RAP sin FV ni BESS (ajustada)', unit: 'MW', sheet: 'Resultados', excelAliases: ['Res_RAP_Base', 'rap sin fv ni bess'] },
+  { key: 'res_rap_proy_mw', excelDefinedName: 'Res_RAP_Proy', label: 'RAP con FV + BESS (ajustada)', unit: 'MW', sheet: 'Resultados', excelAliases: ['Res_RAP_Proy', 'rap con fv + bess'] },
+  { key: 'rap_reduccion_mw', excelDefinedName: 'Res_RAP_Reduccion', label: 'Reducción de RAP', unit: 'MW', sheet: 'Resultados', excelAliases: ['Res_RAP_Reduccion', 'reduccion de rap'] },
+  { key: 'res_costo_c_base_mxn', excelDefinedName: 'Res_CostoC_Base', label: 'Costo de potencia sin FV ni BESS', unit: 'MXN/año', sheet: 'Resultados', excelAliases: ['Res_CostoC_Base', 'costo de potencia sin fv ni bess'] },
+  { key: 'res_costo_c_proy_mxn', excelDefinedName: 'Res_CostoC_Proy', label: 'Costo de potencia con FV + BESS', unit: 'MXN/año', sheet: 'Resultados', excelAliases: ['Res_CostoC_Proy', 'costo de potencia con fv + bess'] },
+  { key: 'ahorro_potencia_y1', excelDefinedName: 'Ahorro_C_Total', label: 'Ahorro de potencia Año 1', unit: 'MXN/año', sheet: 'Resultados', excelAliases: ['Ahorro_C_Total', 'ahorro de potencia'] },
+  { key: 'ahorro_total_y1', excelDefinedName: 'Ahorro_Total', label: 'Ahorro total Año 1', unit: 'MXN/año', sheet: 'Resultados', legacyFormulaBridge: 'ahorro_bruto_mes', excelAliases: ['Ahorro_Total', 'ahorro total'] },
+  { key: 'res_pct_energia', excelDefinedName: 'Res_PctEnergia', label: 'Participación energía', unit: '%', sheet: 'Resultados', excelAliases: ['Res_PctEnergia', 'participacion energia'] },
+  { key: 'res_pct_capacidad', excelDefinedName: 'Res_PctCapacidad', label: 'Participación potencia', unit: '%', sheet: 'Resultados', excelAliases: ['Res_PctCapacidad', 'participacion potencia'] },
+  { key: 'res_pct_reduccion', excelDefinedName: 'Res_PctReduccion', label: 'Reducción del costo eléctrico', unit: '%', sheet: 'Resultados', excelAliases: ['Res_PctReduccion', 'reduccion del costo electrico'] },
+  { key: 'fin_capex_bess_mxn', excelDefinedName: 'Fin_CAPEX_BESS', label: 'CAPEX BESS (MXN)', unit: 'MXN', sheet: 'Evaluación financiera', excelAliases: ['Fin_CAPEX_BESS', 'capex bess'] },
+  { key: 'fin_capex_fv_mxn', excelDefinedName: 'Fin_CAPEX_FV', label: 'CAPEX FV (MXN)', unit: 'MXN', sheet: 'Evaluación financiera', excelAliases: ['Fin_CAPEX_FV', 'capex fv'] },
+  { key: 'capex_total_mxn', excelDefinedName: 'Fin_CAPEX', label: 'CAPEX total (MXN)', unit: 'MXN', sheet: 'Evaluación financiera', excelAliases: ['Fin_CAPEX', 'capex total'] },
+  { key: 'opex_y1_mxn', excelDefinedName: 'Fin_OPEX1', label: 'OPEX Año 1 (MXN)', unit: 'MXN/año', sheet: 'Evaluación financiera', legacyFormulaBridge: 'om_mes', excelAliases: ['Fin_OPEX1', 'opex ano 1'] },
+  { key: 'fin_capex_usd', excelDefinedName: 'Fin_CAPEX_USD', label: 'CAPEX total (USD)', unit: 'USD', sheet: 'Evaluación financiera', excelAliases: ['Fin_CAPEX_USD', 'capex total en usd'] },
+  { key: 'vpn_mxn', excelDefinedName: 'Fin_VPN', label: 'VPN (MXN)', unit: 'MXN', sheet: 'Evaluación financiera', excelAliases: ['Fin_VPN', 'vpn'] },
+  { key: 'tir_pct', excelDefinedName: 'Fin_TIR', label: 'TIR', unit: '%', sheet: 'Evaluación financiera', excelAliases: ['Fin_TIR', 'tir'] },
+  { key: 'payback_simple_anios', excelDefinedName: 'Fin_Payback', label: 'Recuperación simple', unit: 'años', sheet: 'Evaluación financiera', excelAliases: ['Fin_Payback', 'recuperacion simple'] },
+  { key: 'payback_descontado_anios', excelDefinedName: 'Fin_PaybackDesc', label: 'Recuperación descontada', unit: 'años', sheet: 'Evaluación financiera', excelAliases: ['Fin_PaybackDesc', 'recuperacion descontada'] },
+] as const
+
+export const ALL_PLATFORM_VARIABLES: readonly PlatformVariableDef[] = [
+  ...PLATFORM_VARIABLES,
+  ...MEM_PLATFORM_VARIABLES,
+]
+
+export const MEM_INPUT_DEFINED_NAME_MAP: ReadonlyMap<string, (typeof MEM_PLATFORM_VARIABLES)[number]> = new Map(
+  MEM_PLATFORM_VARIABLES.map((v) => [v.excelDefinedName.toLowerCase(), v]),
+)
+
+export const MEM_OUTPUT_DEFINED_NAME_MAP: ReadonlyMap<string, MemPlatformOutputDef> = new Map(
+  MEM_PLATFORM_OUTPUTS.map((o) => [o.excelDefinedName.toLowerCase(), o]),
+)
+
 export const PLATFORM_VARIABLE_MAP: ReadonlyMap<string, PlatformVariableDef> = new Map(
   PLATFORM_VARIABLES.map((v) => [v.key, v]),
+)
+
+export const ALL_PLATFORM_VARIABLE_MAP: ReadonlyMap<string, PlatformVariableDef> = new Map(
+  ALL_PLATFORM_VARIABLES.map((v) => [v.key, v]),
 )
 
 export const PLATFORM_OUTPUT_MAP: ReadonlyMap<FormulaDefinicion['key'], PlatformOutputDef> = new Map(
@@ -787,6 +1232,10 @@ export const PLATFORM_OUTPUT_MAP: ReadonlyMap<FormulaDefinicion['key'], Platform
 
 export const PLATFORM_OUTPUT_KEY_SET: ReadonlySet<string> = new Set(
   PLATFORM_OUTPUT_DEFINITIONS.map((o) => o.key),
+)
+
+export const MEM_OUTPUT_KEY_SET: ReadonlySet<string> = new Set(
+  MEM_PLATFORM_OUTPUTS.map((o) => o.key),
 )
 
 export const CATEGORY_LABELS: Readonly<Record<PlatformVariableCategory, string>> = {
@@ -800,19 +1249,33 @@ export const CATEGORY_LABELS: Readonly<Record<PlatformVariableCategory, string>>
   financiamiento: 'Financiamiento',
   horizontes: 'Horizontes',
   tiempo: 'Variables de Tiempo (Iteración)',
+  cliente: '1. Cliente (MEM)',
+  operacion: '3. Estrategia de Operación BESS',
+  mercado_tc: '5. Mercado MEM y Tipo de Cambio',
+  costos: '6. Costos CAPEX (USD) y OPEX (MXN)',
+  evaluacion_financiera: '7. Evaluación Financiera MEM',
 }
 
 export function getPlatformVariable(key: string): PlatformVariableDef | undefined {
-  return PLATFORM_VARIABLE_MAP.get(key)
+  return ALL_PLATFORM_VARIABLE_MAP.get(key)
 }
 
 export function isKnownPlatformIdentifier(key: string): boolean {
-  return PLATFORM_VARIABLE_MAP.has(key) || PLATFORM_OUTPUT_KEY_SET.has(key)
+  return (
+    ALL_PLATFORM_VARIABLE_MAP.has(key) ||
+    PLATFORM_OUTPUT_KEY_SET.has(key) ||
+    MEM_OUTPUT_KEY_SET.has(key) ||
+    MEM_INPUT_DEFINED_NAME_MAP.has(key.toLowerCase()) ||
+    MEM_OUTPUT_DEFINED_NAME_MAP.has(key.toLowerCase())
+  )
 }
 
-export function getVariablesByCategory(): Map<PlatformVariableCategory, PlatformVariableDef[]> {
+export function getVariablesByCategory(options?: {
+  includeMem?: boolean
+}): Map<PlatformVariableCategory, PlatformVariableDef[]> {
+  const source = options?.includeMem ? ALL_PLATFORM_VARIABLES : PLATFORM_VARIABLES
   const grouped = new Map<PlatformVariableCategory, PlatformVariableDef[]>()
-  for (const variable of PLATFORM_VARIABLES) {
+  for (const variable of source) {
     const list = grouped.get(variable.category)
     if (list) {
       list.push(variable)

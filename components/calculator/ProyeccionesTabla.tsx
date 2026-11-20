@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import type { GranularidadProyeccion, Moneda, PeriodoAgregadoSimulacion } from '@/lib/types'
 import { fmtCurrency, fmtNum } from '@/lib/format'
-import { buildProjectionCsv } from '@/lib/calculator/csv-export'
+import { buildProjectionCsv, downloadCsvContent } from '@/lib/calculator/csv-export'
 import { Button } from '@/components/ui/Button'
 
 export interface ProyeccionesTablaProps {
@@ -43,19 +43,11 @@ export function ProyeccionesTabla({
       proyectoNombre,
       escenarioNombre,
     })
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
     const baseName = (proyectoNombre || 'proyecto')
       .toLowerCase()
       .replace(/[^a-z0-9]+/gi, '_')
       .replace(/^_|_$/g, '')
-    link.href = url
-    link.download = `proyeccion_${baseName || 'nodo'}_${granularidad}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadCsvContent(csv, `proyeccion_${baseName || 'nodo'}_${granularidad}.csv`)
   }
 
   if (rows.length === 0) return null

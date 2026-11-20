@@ -13,6 +13,7 @@ import {
   FALLBACK_HORIZONTE_OPCIONES,
   FALLBACK_TEMPLATE_CAMPOS,
   FALLBACK_TEMPLATE_FORMULAS,
+  MEM_TEMPLATE_CAMPOS,
 } from '@/lib/calculator/template-schema'
 
 export interface ProjectSimulatorContext {
@@ -33,13 +34,13 @@ export interface FullProjectSimulatorBundle extends ProjectSimulatorContext {
 export function buildFallbackCalculatorTemplate(): CalculadoraTemplate {
   const now = new Date().toISOString()
   return {
-    id: 'fallback-v1',
-    version: 1,
-    nombre: 'Plantilla Racional Estándar Nodo MX v1',
-    descripcion: 'Plantilla racional por defecto en memoria.',
+    id: 'fallback-v2',
+    version: 2,
+    nombre: 'Plantilla Racional FV + BESS MEM v2',
+    descripcion: 'Plantilla racional MEM 8,760h + 100HC con respaldo tarifario CFE.',
     modo: 'default',
     is_active: true,
-    campos: FALLBACK_TEMPLATE_CAMPOS,
+    campos: [...MEM_TEMPLATE_CAMPOS, ...FALLBACK_TEMPLATE_CAMPOS],
     formulas: FALLBACK_TEMPLATE_FORMULAS,
     horizonte_opciones: [...FALLBACK_HORIZONTE_OPCIONES],
     excel_archivo_nombre: null,

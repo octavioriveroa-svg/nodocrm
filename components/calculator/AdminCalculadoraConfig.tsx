@@ -40,7 +40,7 @@ import {
   FormulaError,
   parseExcelFormula,
 } from '@/lib/calculator/formula-engine'
-import { evaluateSimulation } from '@/lib/calculator/engine'
+import { runTemplateDryRun } from '@/lib/calculator/engine'
 import {
   activarPlantillaCalculadora,
   guardarPlantillaCalculadora,
@@ -70,11 +70,16 @@ export interface AdminCalculadoraConfigProps {
 type AdminTab = 'campos' | 'formulas' | 'excel' | 'historial'
 
 const CAMPO_GROUPS: readonly { key: CalculadoraCampoGrupo; title: string; subtitle: string }[] = [
-  { key: 'moneda', title: 'Moneda y FX', subtitle: 'Divisa predeterminada y tipo de cambio USD/MXN.' },
+  { key: 'cliente', title: '1. Cliente y Demanda Contratada (MEM)', subtitle: 'Nombre de cliente base y demanda contratada en MW.' },
+  { key: 'operacion', title: '3. Estrategia de Operación BESS (MEM)', subtitle: 'Horas de carga diarias y ventanas horarias (1..24) de carga y descarga.' },
+  { key: 'mercado_tc', title: '5. Mercado MEM y Tipo de Cambio', subtitle: 'Tipo de cambio pactado, MBP y factor RAP.' },
+  { key: 'costos', title: '6. Costos CAPEX (USD) y OPEX (MXN)', subtitle: 'Costos unitarios de inversión y operación FV + BESS.' },
+  { key: 'evaluacion_financiera', title: '7. Evaluación Financiera MEM', subtitle: 'Horizonte predeterminado, tasa de descuento y escalamiento OPEX.' },
+  { key: 'moneda', title: 'Moneda y FX (CFE Fallback)', subtitle: 'Divisa predeterminada y tipo de cambio USD/MXN.' },
   { key: 'tarifas', title: 'Tarifas CFE / MEM', subtitle: 'Tarifas base y cargos por demanda en MXN.' },
-  { key: 'fv', title: 'Parámetros Técnicos FV y Estacionalidad', subtitle: 'HSP, Performance Ratio, degradación y curva mensual (12 meses = 100%).' },
-  { key: 'bess', title: 'Parámetros Técnicos BESS', subtitle: 'DoD, eficiencia round-trip, ciclos y recorte de demanda.' },
-  { key: 'macro', title: 'Macroeconomía y O&M', subtitle: 'Escalación tarifaria, inflación, O&M y WACC.' },
+  { key: 'fv', title: 'Parámetros Técnicos FV y Estacionalidad', subtitle: 'Potencia, HSP, PR, degradación y curva mensual (12 meses = 100%).' },
+  { key: 'bess', title: 'Parámetros Técnicos BESS', subtitle: 'Potencia, capacidad, eficiencia round-trip, SoC mínimo, DoD y ciclos.' },
+  { key: 'macro', title: 'Macroeconomía y O&M (CFE Fallback)', subtitle: 'Escalación tarifaria, inflación, O&M y WACC.' },
   { key: 'financiamiento', title: 'Financiamiento', subtitle: 'Tasas, enganches y plazos predeterminados por vehículo.' },
   { key: 'horizontes', title: 'Horizontes por Tecnología', subtitle: 'Horizonte predeterminado al abrir proyectos FV, BESS o MEM.' },
 ]
@@ -144,7 +149,10 @@ export function AdminCalculadoraConfig({
   const [activatingId, setActivatingId] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
-  const variablesByCategory = useMemo(() => Array.from(getVariablesByCategory().entries()), [])
+  const variablesByCategory = useMemo(
+    () => Array.from(getVariablesByCategory({ includeMem: true }).entries()),
+    [],
+  )
 
   function showNotice(type: 'ok' | 'err', text: string) {
     setBanner({ type, text })
@@ -216,76 +224,10 @@ export function AdminCalculadoraConfig({
         allowCellRefs: false,
         validateIdentifiers: true,
       })
-      const dryRun = evaluateSimulation({
-        proyecto: {
-          tipo: 'FV+BESS',
-          capex_estimado: 1_500_000,
-          moneda: 'MXN',
-          incluye_mem: false,
-          demanda_kw: 250,
-          capacidad_mw: 0.1,
-          capacidad_mwh: 0.2,
-          consumo_anual_gwh: null,
-          volumen_energia_mwh_anual: null,
-          tarifa_actual_cfe: 3.2,
-        },
-        activeConfig: {
-          id: 'admin-preview',
-          proyecto_id: 'admin-preview',
-          nombre: 'Preview',
-          descripcion: null,
-          inversion_total: 1_500_000,
-          moneda: 'MXN',
-          ahorro_estimado_anual: null,
-          ahorro_estimado_mensual: null,
-          ahorro_moneda: 'MXN',
-          seleccionada: true,
-          created_at: '',
-          updated_at: '',
-        },
-        configProducts: [
-          {
-            id: 'admin-fv',
-            proyecto_id: 'admin-preview',
-            sitio_id: 'admin-site',
-            configuracion_id: 'admin-preview',
-            tipo: 'fv',
-            datos: {
-              num_modulos: 160,
-              potencia_modulos_w: 500,
-              generacion_anual_kwh: 120_000,
-              capex: 1_000_000,
-              capex_moneda: 'MXN',
-            },
-            created_at: '',
-          },
-          {
-            id: 'admin-bess',
-            proyecto_id: 'admin-preview',
-            sitio_id: 'admin-site',
-            configuracion_id: 'admin-preview',
-            tipo: 'bess',
-            datos: {
-              potencia_kw: 100,
-              capacidad_kwh: 200,
-              uso: 'load_shifting',
-              capex: 500_000,
-              capex_moneda: 'MXN',
-            },
-            created_at: '',
-          },
-        ],
-        activeFinancing: null,
-        template: {
-          id: '',
-          modo: 'custom_formulas',
-          campos: draftCampos,
-          formulas: draftFormulas,
-        },
-        monedaCalculo: 'MXN',
-        horizonteAnios: 10,
-        vistaFinanciamiento: 'bruto',
-        overrides: {},
+      const dryRun = runTemplateDryRun({
+        modo: 'custom_formulas',
+        campos: draftCampos,
+        formulas: draftFormulas,
       })
 
       return {
@@ -716,6 +658,29 @@ export function AdminCalculadoraConfig({
                               </option>
                             ))}
                           </select>
+                          {err && <p className="text-[11px] font-semibold text-red-600">{err}</p>}
+                        </div>
+                      )
+                    }
+
+                    if (campo.type === 'text' || campo.type === 'date') {
+                      return (
+                        <div key={campo.key} className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-principal">
+                            {campo.label}
+                          </label>
+                          <input
+                            type={campo.type === 'date' ? 'date' : 'text'}
+                            value={String(campo.defaultValue ?? '')}
+                            onChange={(e) =>
+                              setDraftCampos((prev) =>
+                                prev.map((c) =>
+                                  c.key === campo.key ? { ...c, defaultValue: e.target.value } : c,
+                                ),
+                              )
+                            }
+                            className="w-full rounded-xl border border-borde bg-white px-3 py-2 text-sm font-semibold text-principal"
+                          />
                           {err && <p className="text-[11px] font-semibold text-red-600">{err}</p>}
                         </div>
                       )

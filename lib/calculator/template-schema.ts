@@ -1,9 +1,11 @@
 import type {
   CalculadoraCampoDef,
   FormulaDefinicion,
+  MemSimulatorInputs,
   Moneda,
   SimulacionOverrides,
 } from '@/lib/types'
+import { DEFAULT_MEM_INPUTS } from '@/lib/calculator/datasets/mem-baseline'
 
 export const FALLBACK_HORIZONTE_OPCIONES: readonly number[] = [1, 3, 5, 10, 15, 20, 25]
 
@@ -632,6 +634,22 @@ export function getOverridableCampoMap(
   return map
 }
 
+function isValidIsoDateString(val: string): boolean {
+  const trimmed = val.trim()
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+  if (!m) return false
+  const year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const dt = new Date(Date.UTC(year, month - 1, day))
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  )
+}
+
 /**
  * Validates a value against a declarative CalculadoraCampoDef (either baseline or override bounds).
  */
@@ -645,6 +663,23 @@ export function validateCampoValue(
 
   if (value === null || value === undefined || value === '') {
     return `${label}: valor requerido.`
+  }
+
+  if (campo.type === 'text' || campo.type === 'date') {
+    if (typeof value !== 'string') {
+      return `${label}: debe ser texto válido.`
+    }
+    const trimmed = value.trim()
+    if (trimmed.length === 0) {
+      return `${label}: valor requerido.`
+    }
+    if (campo.type === 'text' && trimmed.length > 200) {
+      return `${label}: máximo 200 caracteres.`
+    }
+    if (campo.type === 'date' && !isValidIsoDateString(trimmed)) {
+      return `${label}: debe ser una fecha ISO válida (YYYY-MM-DD).`
+    }
+    return null
   }
 
   if (campo.type === 'select') {
@@ -740,6 +775,18 @@ export function validateOverridesAgainstTemplate(
     list.filter((c) => !c.editableByUser).map((c) => c.key),
   )
 
+  const memOverrideKeySet = new Set<string>(MEM_OVERRIDE_KEYS)
+  const memCampoMap = new Map<string, CalculadoraCampoDef>(
+    MEM_TEMPLATE_CAMPOS.map((c) => [c.key, c]),
+  )
+  for (const c of list) {
+    if (memOverrideKeySet.has(c.key)) {
+      memCampoMap.set(c.key, c)
+    }
+  }
+  const isMemOverrideMode =
+    Object.getOwnPropertyDescriptor(overrides, 'modo_motor')?.value === 'mem_horaria'
+
   // Check explicit own keys including prototype-colliding keys if present via JSON.parse
   const ownKeys = Object.getOwnPropertyNames(overrides)
   for (const key of ownKeys) {
@@ -769,6 +816,131 @@ export function validateOverridesAgainstTemplate(
       continue
     }
 
+    if (isMemOverrideMode && memOverrideKeySet.has(key)) {
+      if (key === 'modo_motor') {
+        if (rawVal === 'mem_horaria' || rawVal === 'cfe_tarifario') {
+          sanitized.modo_motor = rawVal
+        } else {
+          errors[key] = 'modo_motor inválido.'
+        }
+        continue
+      }
+      if (key === 'supuestos_anuales') {
+        if (!rawVal || typeof rawVal !== 'object' || Array.isArray(rawVal)) {
+          errors[key] = 'supuestos_anuales debe ser un objeto con 4 vectores de 25 años.'
+          continue
+        }
+        const rawObj = rawVal as Record<string, unknown>
+        const nestedOwnKeys = Object.getOwnPropertyNames(rawObj)
+        if (nestedOwnKeys.some((nk) => FORBIDDEN_PROTOTYPE_KEYS.has(nk))) {
+          errors[key] = 'supuestos_anuales contiene claves prohibidas.'
+          continue
+        }
+        const pctMbp = Object.getOwnPropertyDescriptor(rawObj, 'pct_mbp')?.value
+        const fijoMbp = Object.getOwnPropertyDescriptor(rawObj, 'fijo_mbp')?.value
+        const pctPml = Object.getOwnPropertyDescriptor(rawObj, 'pct_pml')?.value
+        const degBess = Object.getOwnPropertyDescriptor(rawObj, 'deg_bess')?.value
+        const validPctMbp =
+          Array.isArray(pctMbp) &&
+          pctMbp.length === 25 &&
+          pctMbp.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= -0.5 && n <= 1)
+        const validFijoMbp =
+          Array.isArray(fijoMbp) &&
+          fijoMbp.length === 25 &&
+          fijoMbp.every(
+            (n) =>
+              n === null ||
+              (typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100_000_000),
+          )
+        const validPctPml =
+          Array.isArray(pctPml) &&
+          pctPml.length === 25 &&
+          pctPml.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= -0.5 && n <= 1)
+        const validDegBess =
+          Array.isArray(degBess) &&
+          degBess.length === 25 &&
+          degBess.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 0.5)
+        if (validPctMbp && validFijoMbp && validPctPml && validDegBess) {
+          sanitized.supuestos_anuales = {
+            pct_mbp: [...pctMbp],
+            fijo_mbp: [...fijoMbp],
+            pct_pml: [...pctPml],
+            deg_bess: [...degBess],
+          }
+        } else {
+          errors[key] =
+            'supuestos_anuales debe contener arreglos finitos de exactamente 25 años dentro de rango.'
+        }
+        continue
+      }
+      if (key === 'critical_hours_100hc') {
+        if (!Array.isArray(rawVal) || rawVal.length === 0 || rawVal.length > 120) {
+          errors[key] = 'critical_hours_100hc debe contener entre 1 y 120 horas críticas válidas.'
+          continue
+        }
+        const cleanedHc: Array<{ no: number; fecha: string; hora: number }> = []
+        let hcErr: string | null = null
+        for (let idx = 0; idx < rawVal.length; idx++) {
+          const item = rawVal[idx]
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            hcErr = `critical_hours_100hc[${idx}] debe ser un objeto { no, fecha, hora }.`
+            break
+          }
+          const itemObj = item as Record<string, unknown>
+          if (Object.getOwnPropertyNames(itemObj).some((ik) => FORBIDDEN_PROTOTYPE_KEYS.has(ik))) {
+            hcErr = 'critical_hours_100hc contiene claves prohibidas.'
+            break
+          }
+          const rawFecha = Object.getOwnPropertyDescriptor(itemObj, 'fecha')?.value
+          const rawHora = Object.getOwnPropertyDescriptor(itemObj, 'hora')?.value
+          const rawNo = Object.getOwnPropertyDescriptor(itemObj, 'no')?.value
+          if (typeof rawFecha !== 'string' || !isValidIsoDateString(rawFecha)) {
+            hcErr = `critical_hours_100hc[${idx}].fecha debe ser YYYY-MM-DD válida.`
+            break
+          }
+          if (
+            typeof rawHora !== 'number' ||
+            !Number.isInteger(rawHora) ||
+            rawHora < 1 ||
+            rawHora > 24
+          ) {
+            hcErr = `critical_hours_100hc[${idx}].hora debe ser un entero entre 1 y 24.`
+            break
+          }
+          const parsedNo =
+            rawNo === undefined
+              ? idx + 1
+              : typeof rawNo === 'number' && Number.isInteger(rawNo) && rawNo >= 1 && rawNo <= 120
+                ? rawNo
+                : null
+          if (parsedNo === null) {
+            hcErr = `critical_hours_100hc[${idx}].no debe ser un entero entre 1 y 120.`
+            break
+          }
+          cleanedHc.push({ no: parsedNo, fecha: rawFecha.trim(), hora: rawHora })
+        }
+        if (hcErr) {
+          errors[key] = hcErr
+        } else {
+          sanitized.critical_hours_100hc = cleanedHc
+        }
+        continue
+      }
+      const memCampo = memCampoMap.get(key)
+      if (!memCampo || !memCampo.editableByUser) {
+        errors[key] = `El parámetro MEM "${key}" no es editable.`
+        continue
+      }
+      const err = validateCampoValue(memCampo, rawVal, { useOverrideBounds: true })
+      if (err) {
+        errors[key] = err
+      } else {
+        ;(sanitized as Record<string, unknown>)[key] =
+          typeof rawVal === 'string' ? rawVal.trim() : rawVal
+      }
+      continue
+    }
+
     if (!ALLOWED_OVERRIDE_KEY_SET.has(key)) {
       errors[key] = `Parámetro desconocido o no permitido: "${key}".`
       continue
@@ -794,6 +966,29 @@ export function validateOverridesAgainstTemplate(
       errors[key] = err
     } else {
       ;(sanitized as Record<string, number>)[key] = rawVal as number
+    }
+  }
+
+  if (isMemOverrideMode) {
+    if (sanitized.op_ini_carga !== undefined || sanitized.op_fin_carga !== undefined) {
+      const effIni =
+        sanitized.op_ini_carga ?? Number(memCampoMap.get('op_ini_carga')?.defaultValue ?? 2)
+      const effFin =
+        sanitized.op_fin_carga ?? Number(memCampoMap.get('op_fin_carga')?.defaultValue ?? 10)
+      if (!errors.op_ini_carga && !errors.op_fin_carga && effIni > effFin) {
+        errors.op_fin_carga =
+          'Fin de ventana de carga debe ser mayor o igual al inicio (no cruza medianoche).'
+      }
+    }
+    if (sanitized.op_ini_descarga !== undefined || sanitized.op_fin_descarga !== undefined) {
+      const effIni =
+        sanitized.op_ini_descarga ?? Number(memCampoMap.get('op_ini_descarga')?.defaultValue ?? 20)
+      const effFin =
+        sanitized.op_fin_descarga ?? Number(memCampoMap.get('op_fin_descarga')?.defaultValue ?? 22)
+      if (!errors.op_ini_descarga && !errors.op_fin_descarga && effIni > effFin) {
+        errors.op_fin_descarga =
+          'Fin de ventana de descarga debe ser mayor o igual al inicio (no cruza medianoche).'
+      }
     }
   }
 
@@ -832,4 +1027,442 @@ export function computeSparseOverrides(
   }
 
   return sparse
+}
+
+/**
+ * Canonical 24 Input fields from Simulador FV + BESS MEM.xlsx (23 editable blue cells + BESS_Duracion).
+ */
+export const MEM_TEMPLATE_CAMPOS: CalculadoraCampoDef[] = [
+  // 1. Cliente
+  {
+    key: 'cliente',
+    label: 'Cliente',
+    unit: 'texto',
+    type: 'text',
+    group: 'cliente',
+    defaultValue: DEFAULT_MEM_INPUTS.cliente,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 101,
+  },
+  {
+    key: 'demanda_contratada_mw',
+    label: 'Demanda contratada',
+    unit: 'MW',
+    type: 'number',
+    group: 'cliente',
+    min: 0.001,
+    max: 5000,
+    step: 0.5,
+    defaultValue: DEFAULT_MEM_INPUTS.demanda_contratada_mw,
+    validationRules: { required: true, exclusiveMin: 0 },
+    editableByUser: true,
+    order: 102,
+  },
+  // 2. Batería (BESS)
+  {
+    key: 'bess_potencia_mw',
+    label: 'Potencia BESS',
+    unit: 'MW',
+    type: 'number',
+    group: 'bess',
+    min: 0,
+    max: 500,
+    step: 0.5,
+    defaultValue: DEFAULT_MEM_INPUTS.bess_potencia_mw,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 103,
+  },
+  {
+    key: 'bess_duracion_h',
+    label: 'Duración a potencia nominal',
+    unit: 'h',
+    type: 'number',
+    group: 'bess',
+    min: 0,
+    max: 24,
+    step: 0.5,
+    defaultValue: 3.0,
+    validationRules: { required: false },
+    editableByUser: false,
+    order: 104,
+  },
+  {
+    key: 'bess_capacidad_mwh',
+    label: 'Capacidad de almacenamiento (energía)',
+    unit: 'MWh',
+    type: 'number',
+    group: 'bess',
+    min: 0,
+    max: 2000,
+    step: 0.5,
+    defaultValue: DEFAULT_MEM_INPUTS.bess_capacidad_mwh,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 105,
+  },
+  {
+    key: 'bess_eficiencia_pct',
+    label: 'Eficiencia ida y vuelta',
+    unit: '%',
+    type: 'percentage',
+    group: 'bess',
+    min: 0.01,
+    max: 1,
+    step: 0.01,
+    defaultValue: DEFAULT_MEM_INPUTS.bess_eficiencia_pct,
+    validationRules: { required: true, exclusiveMin: 0 },
+    editableByUser: true,
+    order: 106,
+  },
+  {
+    key: 'bess_soc_min_pct',
+    label: 'Estado de carga mínimo (SOC)',
+    unit: '%',
+    type: 'percentage',
+    group: 'bess',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: DEFAULT_MEM_INPUTS.bess_soc_min_pct,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 107,
+  },
+  // 3. Estrategia de operación
+  {
+    key: 'op_horas_carga',
+    label: 'Horas de carga por día (las más baratas)',
+    unit: 'h',
+    type: 'integer',
+    group: 'operacion',
+    min: 0,
+    max: 24,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.op_horas_carga,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 108,
+  },
+  {
+    key: 'op_ini_carga',
+    label: 'Inicio ventana de carga',
+    unit: 'hora',
+    type: 'integer',
+    group: 'operacion',
+    min: 1,
+    max: 24,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.op_ini_carga,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 109,
+  },
+  {
+    key: 'op_fin_carga',
+    label: 'Fin ventana de carga',
+    unit: 'hora',
+    type: 'integer',
+    group: 'operacion',
+    min: 1,
+    max: 24,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.op_fin_carga,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 110,
+  },
+  {
+    key: 'op_ini_descarga',
+    label: 'Inicio ventana de descarga',
+    unit: 'hora',
+    type: 'integer',
+    group: 'operacion',
+    min: 1,
+    max: 24,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.op_ini_descarga,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 111,
+  },
+  {
+    key: 'op_fin_descarga',
+    label: 'Fin ventana de descarga',
+    unit: 'hora',
+    type: 'integer',
+    group: 'operacion',
+    min: 1,
+    max: 24,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.op_fin_descarga,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 112,
+  },
+  // 4. Fotovoltaico (FV)
+  {
+    key: 'fv_potencia_mw',
+    label: 'Potencia FV',
+    unit: 'MW',
+    type: 'number',
+    group: 'fv',
+    min: 0,
+    max: 500,
+    step: 0.05,
+    defaultValue: DEFAULT_MEM_INPUTS.fv_potencia_mw,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 113,
+  },
+  {
+    key: 'fv_degradacion_anual_pct',
+    label: 'Degradación anual FV',
+    unit: '%/año',
+    type: 'percentage',
+    group: 'fv',
+    min: 0,
+    max: 0.05,
+    step: 0.001,
+    defaultValue: DEFAULT_MEM_INPUTS.fv_degradacion_anual_pct,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 114,
+  },
+  // 5. Mercado y tipo de cambio
+  {
+    key: 'tc_mxn_usd',
+    label: 'Tipo de cambio pactado (inversión)',
+    unit: 'MXN/USD',
+    type: 'number',
+    group: 'mercado_tc',
+    min: 0.01,
+    max: 100,
+    step: 0.1,
+    defaultValue: DEFAULT_MEM_INPUTS.tc_mxn_usd,
+    validationRules: { required: true, exclusiveMin: 0 },
+    editableByUser: true,
+    order: 115,
+  },
+  {
+    key: 'tc_fecha',
+    label: 'Fecha del tipo de cambio pactado',
+    unit: 'fecha',
+    type: 'date',
+    group: 'mercado_tc',
+    defaultValue: DEFAULT_MEM_INPUTS.tc_fecha,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 116,
+  },
+  {
+    key: 'mbp_precio_mxn_mw_anio',
+    label: 'Precio MBP publicado (año 100HC)',
+    unit: 'MXN/MW-año',
+    type: 'number',
+    group: 'mercado_tc',
+    min: 1,
+    max: 100_000_000,
+    step: 10_000,
+    defaultValue: DEFAULT_MEM_INPUTS.mbp_precio_mxn_mw_anio,
+    validationRules: { required: true, exclusiveMin: 0 },
+    editableByUser: true,
+    order: 117,
+  },
+  {
+    key: 'rap_factor',
+    label: 'Factor de ajuste RAP',
+    unit: 'factor',
+    type: 'number',
+    group: 'mercado_tc',
+    min: 0.001,
+    max: 10,
+    step: 0.001,
+    defaultValue: DEFAULT_MEM_INPUTS.rap_factor,
+    validationRules: { required: true, exclusiveMin: 0 },
+    editableByUser: true,
+    order: 118,
+  },
+  // 6. Costos: inversión (USD) y operación (MXN)
+  {
+    key: 'capex_bess_usd_kwh',
+    label: 'CAPEX BESS',
+    unit: 'USD/kWh',
+    type: 'number',
+    group: 'costos',
+    min: 0,
+    max: 10_000,
+    step: 5,
+    defaultValue: DEFAULT_MEM_INPUTS.capex_bess_usd_kwh,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 119,
+  },
+  {
+    key: 'capex_fv_usd_kwp',
+    label: 'CAPEX FV',
+    unit: 'USD/kWp',
+    type: 'number',
+    group: 'costos',
+    min: 0,
+    max: 10_000,
+    step: 10,
+    defaultValue: DEFAULT_MEM_INPUTS.capex_fv_usd_kwp,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 120,
+  },
+  {
+    key: 'opex_bess_mxn_mwh_anio',
+    label: 'OPEX BESS',
+    unit: 'MXN/MWh-año',
+    type: 'number',
+    group: 'costos',
+    min: 0,
+    max: 5_000_000,
+    step: 500,
+    defaultValue: DEFAULT_MEM_INPUTS.opex_bess_mxn_mwh_anio,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 121,
+  },
+  {
+    key: 'opex_fv_mxn_mw_anio',
+    label: 'OPEX FV',
+    unit: 'MXN/MW-año',
+    type: 'number',
+    group: 'costos',
+    min: 0,
+    max: 5_000_000,
+    step: 500,
+    defaultValue: DEFAULT_MEM_INPUTS.opex_fv_mxn_mw_anio,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 122,
+  },
+  // 7. Evaluación financiera
+  {
+    key: 'fin_horizonte_anios',
+    label: 'Horizonte de evaluación (máx. 25)',
+    unit: 'años',
+    type: 'integer',
+    group: 'evaluacion_financiera',
+    min: 1,
+    max: 25,
+    step: 1,
+    defaultValue: DEFAULT_MEM_INPUTS.fin_horizonte_anios,
+    validationRules: { required: true, integer: true },
+    editableByUser: true,
+    order: 123,
+  },
+  {
+    key: 'fin_tasa_descuento_pct',
+    label: 'Tasa de descuento (MXN, nominal)',
+    unit: '%',
+    type: 'percentage',
+    group: 'evaluacion_financiera',
+    min: 0,
+    max: 0.5,
+    step: 0.005,
+    defaultValue: DEFAULT_MEM_INPUTS.fin_tasa_descuento_pct,
+    validationRules: { required: true },
+    editableByUser: true,
+    order: 124,
+  },
+  {
+    key: 'fin_esc_opex_pct',
+    label: 'Escalamiento anual OPEX (MXN)',
+    unit: '%/año',
+    type: 'percentage',
+    group: 'evaluacion_financiera',
+    min: -0.5,
+    max: 1.0,
+    step: 0.005,
+    defaultValue: DEFAULT_MEM_INPUTS.fin_esc_opex_pct,
+    validationRules: { required: true, allowNegative: true },
+    editableByUser: true,
+    order: 125,
+  },
+]
+
+export const MEM_OVERRIDE_KEYS = [
+  'modo_motor',
+  'cliente',
+  'demanda_contratada_mw',
+  'bess_potencia_mw',
+  'bess_capacidad_mwh',
+  'bess_eficiencia_pct',
+  'bess_soc_min_pct',
+  'op_horas_carga',
+  'op_ini_carga',
+  'op_fin_carga',
+  'op_ini_descarga',
+  'op_fin_descarga',
+  'fv_potencia_mw',
+  'fv_degradacion_anual_pct',
+  'tc_mxn_usd',
+  'tc_fecha',
+  'mbp_precio_mxn_mw_anio',
+  'rap_factor',
+  'capex_bess_usd_kwh',
+  'capex_fv_usd_kwp',
+  'opex_bess_mxn_mwh_anio',
+  'opex_fv_mxn_mw_anio',
+  'fin_horizonte_anios',
+  'fin_tasa_descuento_pct',
+  'fin_esc_opex_pct',
+  'supuestos_anuales',
+  'critical_hours_100hc',
+] as const
+
+export function extractMemInputsFromCampos(
+  campos: readonly CalculadoraCampoDef[] | null | undefined,
+): MemSimulatorInputs {
+  const result: MemSimulatorInputs = { ...DEFAULT_MEM_INPUTS }
+  if (!Array.isArray(campos)) return result
+
+  const byKey = new Map<string, CalculadoraCampoDef>()
+  for (const c of campos) {
+    if (c && typeof c.key === 'string') byKey.set(c.key, c)
+  }
+
+  const num = (key: string, fallback: number): number => {
+    const v = byKey.get(key)?.defaultValue
+    return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+  }
+  const str = (key: string, fallback: string): string => {
+    const v = byKey.get(key)?.defaultValue
+    return typeof v === 'string' && v.trim() !== '' ? v : fallback
+  }
+
+  // Also map tipo_cambio_usd_mxn if present when tc_mxn_usd is absent
+  const tcFallback = num('tipo_cambio_usd_mxn', DEFAULT_MEM_INPUTS.tc_mxn_usd)
+
+  result.cliente = str('cliente', DEFAULT_MEM_INPUTS.cliente)
+  result.demanda_contratada_mw = num('demanda_contratada_mw', DEFAULT_MEM_INPUTS.demanda_contratada_mw)
+  result.bess_potencia_mw = num('bess_potencia_mw', DEFAULT_MEM_INPUTS.bess_potencia_mw)
+  result.bess_capacidad_mwh = num('bess_capacidad_mwh', DEFAULT_MEM_INPUTS.bess_capacidad_mwh)
+  result.bess_eficiencia_pct = num('bess_eficiencia_pct', DEFAULT_MEM_INPUTS.bess_eficiencia_pct)
+  result.bess_soc_min_pct = num('bess_soc_min_pct', DEFAULT_MEM_INPUTS.bess_soc_min_pct)
+  result.op_horas_carga = Math.round(num('op_horas_carga', DEFAULT_MEM_INPUTS.op_horas_carga))
+  result.op_ini_carga = Math.round(num('op_ini_carga', DEFAULT_MEM_INPUTS.op_ini_carga))
+  result.op_fin_carga = Math.round(num('op_fin_carga', DEFAULT_MEM_INPUTS.op_fin_carga))
+  result.op_ini_descarga = Math.round(num('op_ini_descarga', DEFAULT_MEM_INPUTS.op_ini_descarga))
+  result.op_fin_descarga = Math.round(num('op_fin_descarga', DEFAULT_MEM_INPUTS.op_fin_descarga))
+  result.fv_potencia_mw = num('fv_potencia_mw', DEFAULT_MEM_INPUTS.fv_potencia_mw)
+  result.fv_degradacion_anual_pct = num('fv_degradacion_anual_pct', num('degradacion_fv_anual', DEFAULT_MEM_INPUTS.fv_degradacion_anual_pct))
+  result.tc_mxn_usd = num('tc_mxn_usd', tcFallback)
+  result.tc_fecha = str('tc_fecha', DEFAULT_MEM_INPUTS.tc_fecha)
+  result.mbp_precio_mxn_mw_anio = num('mbp_precio_mxn_mw_anio', DEFAULT_MEM_INPUTS.mbp_precio_mxn_mw_anio)
+  result.rap_factor = num('rap_factor', DEFAULT_MEM_INPUTS.rap_factor)
+  result.capex_bess_usd_kwh = num('capex_bess_usd_kwh', DEFAULT_MEM_INPUTS.capex_bess_usd_kwh)
+  result.capex_fv_usd_kwp = num('capex_fv_usd_kwp', DEFAULT_MEM_INPUTS.capex_fv_usd_kwp)
+  result.opex_bess_mxn_mwh_anio = num('opex_bess_mxn_mwh_anio', DEFAULT_MEM_INPUTS.opex_bess_mxn_mwh_anio)
+  result.opex_fv_mxn_mw_anio = num('opex_fv_mxn_mw_anio', DEFAULT_MEM_INPUTS.opex_fv_mxn_mw_anio)
+  result.fin_horizonte_anios = Math.round(num('fin_horizonte_anios', DEFAULT_MEM_INPUTS.fin_horizonte_anios))
+  result.fin_tasa_descuento_pct = num('fin_tasa_descuento_pct', DEFAULT_MEM_INPUTS.fin_tasa_descuento_pct)
+  result.fin_esc_opex_pct = num('fin_esc_opex_pct', DEFAULT_MEM_INPUTS.fin_esc_opex_pct)
+
+  return result
 }

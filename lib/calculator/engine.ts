@@ -1,7 +1,14 @@
 import type {
   CalculadoraTemplate,
+  CalculationMode,
   ConfiguracionTecnica,
   FuenteCalculo,
+  MemAnnualAssumptions,
+  MemCriticalHourEntry,
+  MemFullSimulationResult,
+  MemHourlyDataset,
+  MemSimulationOutcome,
+  MemSimulatorInputs,
   Moneda,
   OfertaMem,
   OpcionFinanciamiento,
@@ -19,11 +26,22 @@ import { CFE_TARIFF_RATES_MXN } from '@/lib/tariffs/cfe-calculator'
 import {
   type AllowedOverrideKey,
   computeSparseOverrides,
+  extractMemInputsFromCampos,
   extractTemplateDefaults,
   FALLBACK_TEMPLATE_FORMULAS,
   type TemplateDefaults,
   validateOverridesAgainstTemplate,
 } from '@/lib/calculator/template-schema'
+import {
+  createDefaultMemAnnualAssumptions,
+  getBaseline100HC,
+  getBaselineMemHourlyDataset,
+} from '@/lib/calculator/datasets/mem-baseline'
+import {
+  buildAnnualAssumptionsRows,
+  type MemFinancingTerms,
+  runMemSimulation,
+} from '@/lib/calculator/mem-hourly-engine'
 import {
   computeYear1Savings,
   type DefaultMonthlyParams,
@@ -159,7 +177,8 @@ export interface SimulationEngineInput {
     | 'consumo_anual_gwh'
     | 'volumen_energia_mwh_anual'
     | 'tarifa_actual_cfe'
-  >
+  > &
+    Partial<Pick<Proyecto, 'nombre_proyecto' | 'cliente_final_empresa'>>
   activeConfig: ConfiguracionTecnica | null
   configProducts: readonly ProyectoSitioProducto[]
   activeFinancing: OpcionFinanciamiento | null
@@ -661,6 +680,8 @@ export function evaluateSimulation(input: SimulationEngineInput): SimulationRunO
     ? compileAndSortFormulas(formulasToRun, { templateId: input.template.id })
     : null
 
+  const memTemplateDefaults = extractMemInputsFromCampos(input.template.campos)
+
   const buildAstScope = (): Map<string, FormulaValue> => {
     const scope = new Map<string, FormulaValue>()
     scope.set('capex_total', capexTotal)
@@ -720,6 +741,166 @@ export function evaluateSimulation(input: SimulationEngineInput): SimulationRunO
     scope.set('horizonte_anios', horizonteAnios)
     scope.set('mes_indice', 1)
     scope.set('anio_indice', 0)
+
+    // Populate MEM platform variables so custom Excel-imported formulas using MEM identifiers evaluate cleanly
+    const memBessPotMw =
+      typeof sanitized.bess_potencia_mw === 'number'
+        ? sanitized.bess_potencia_mw
+        : tier2.bessPotenciaKw > 0
+          ? tier2.bessPotenciaKw / 1000
+          : memTemplateDefaults.bess_potencia_mw
+    const memBessCapMwh =
+      typeof sanitized.bess_capacidad_mwh === 'number'
+        ? sanitized.bess_capacidad_mwh
+        : tier2.bessCapacidadKwh > 0
+          ? tier2.bessCapacidadKwh / 1000
+          : memTemplateDefaults.bess_capacidad_mwh
+    const memFvPotMw =
+      typeof sanitized.fv_potencia_mw === 'number'
+        ? sanitized.fv_potencia_mw
+        : tier2.kwpFv > 0
+          ? tier2.kwpFv / 1000
+          : memTemplateDefaults.fv_potencia_mw
+    const memMbpPrecio =
+      typeof sanitized.mbp_precio_mxn_mw_anio === 'number'
+        ? sanitized.mbp_precio_mxn_mw_anio
+        : memTemplateDefaults.mbp_precio_mxn_mw_anio
+    const memAssumpRows = buildAnnualAssumptionsRows(
+      { mbp_precio_mxn_mw_anio: memMbpPrecio, bess_capacidad_mwh: memBessCapMwh },
+      (sanitized.supuestos_anuales as MemAnnualAssumptions | undefined) ??
+        createDefaultMemAnnualAssumptions(),
+      1000,
+    )
+
+    scope.set('cliente', typeof sanitized.cliente === 'string' ? sanitized.cliente : memTemplateDefaults.cliente)
+    scope.set(
+      'demanda_contratada_mw',
+      typeof sanitized.demanda_contratada_mw === 'number'
+        ? sanitized.demanda_contratada_mw
+        : tier2.demandaContratadaKw > 0
+          ? tier2.demandaContratadaKw / 1000
+          : memTemplateDefaults.demanda_contratada_mw,
+    )
+    scope.set('bess_potencia_mw', memBessPotMw)
+    scope.set('bess_capacidad_mwh', memBessCapMwh)
+    scope.set('bess_duracion_h', memBessPotMw > 0 ? memBessCapMwh / memBessPotMw : 0)
+    scope.set(
+      'bess_eficiencia_pct',
+      typeof sanitized.bess_eficiencia_pct === 'number'
+        ? sanitized.bess_eficiencia_pct
+        : memTemplateDefaults.bess_eficiencia_pct,
+    )
+    scope.set(
+      'bess_soc_min_pct',
+      typeof sanitized.bess_soc_min_pct === 'number'
+        ? sanitized.bess_soc_min_pct
+        : memTemplateDefaults.bess_soc_min_pct,
+    )
+    scope.set(
+      'op_horas_carga',
+      typeof sanitized.op_horas_carga === 'number'
+        ? sanitized.op_horas_carga
+        : memTemplateDefaults.op_horas_carga,
+    )
+    scope.set(
+      'op_ini_carga',
+      typeof sanitized.op_ini_carga === 'number'
+        ? sanitized.op_ini_carga
+        : memTemplateDefaults.op_ini_carga,
+    )
+    scope.set(
+      'op_fin_carga',
+      typeof sanitized.op_fin_carga === 'number'
+        ? sanitized.op_fin_carga
+        : memTemplateDefaults.op_fin_carga,
+    )
+    scope.set(
+      'op_ini_descarga',
+      typeof sanitized.op_ini_descarga === 'number'
+        ? sanitized.op_ini_descarga
+        : memTemplateDefaults.op_ini_descarga,
+    )
+    scope.set(
+      'op_fin_descarga',
+      typeof sanitized.op_fin_descarga === 'number'
+        ? sanitized.op_fin_descarga
+        : memTemplateDefaults.op_fin_descarga,
+    )
+    scope.set('fv_potencia_mw', memFvPotMw)
+    scope.set(
+      'fv_degradacion_anual_pct',
+      typeof sanitized.fv_degradacion_anual_pct === 'number'
+        ? sanitized.fv_degradacion_anual_pct
+        : memTemplateDefaults.fv_degradacion_anual_pct,
+    )
+    scope.set(
+      'tc_mxn_usd',
+      typeof sanitized.tc_mxn_usd === 'number' ? sanitized.tc_mxn_usd : fx,
+    )
+    scope.set(
+      'tc_fecha',
+      typeof sanitized.tc_fecha === 'string'
+        ? sanitized.tc_fecha
+        : memTemplateDefaults.tc_fecha,
+    )
+    scope.set(
+      'mbp_precio_mxn_mw_anio',
+      typeof sanitized.mbp_precio_mxn_mw_anio === 'number'
+        ? sanitized.mbp_precio_mxn_mw_anio
+        : memTemplateDefaults.mbp_precio_mxn_mw_anio,
+    )
+    scope.set(
+      'rap_factor',
+      typeof sanitized.rap_factor === 'number'
+        ? sanitized.rap_factor
+        : memTemplateDefaults.rap_factor,
+    )
+    scope.set(
+      'capex_bess_usd_kwh',
+      typeof sanitized.capex_bess_usd_kwh === 'number'
+        ? sanitized.capex_bess_usd_kwh
+        : memTemplateDefaults.capex_bess_usd_kwh,
+    )
+    scope.set(
+      'capex_fv_usd_kwp',
+      typeof sanitized.capex_fv_usd_kwp === 'number'
+        ? sanitized.capex_fv_usd_kwp
+        : memTemplateDefaults.capex_fv_usd_kwp,
+    )
+    scope.set(
+      'opex_bess_mxn_mwh_anio',
+      typeof sanitized.opex_bess_mxn_mwh_anio === 'number'
+        ? sanitized.opex_bess_mxn_mwh_anio
+        : memTemplateDefaults.opex_bess_mxn_mwh_anio,
+    )
+    scope.set(
+      'opex_fv_mxn_mw_anio',
+      typeof sanitized.opex_fv_mxn_mw_anio === 'number'
+        ? sanitized.opex_fv_mxn_mw_anio
+        : memTemplateDefaults.opex_fv_mxn_mw_anio,
+    )
+    scope.set(
+      'fin_horizonte_anios',
+      typeof sanitized.fin_horizonte_anios === 'number'
+        ? sanitized.fin_horizonte_anios
+        : Math.min(25, horizonteAnios),
+    )
+    scope.set(
+      'fin_tasa_descuento_pct',
+      typeof sanitized.fin_tasa_descuento_pct === 'number'
+        ? sanitized.fin_tasa_descuento_pct
+        : memTemplateDefaults.fin_tasa_descuento_pct,
+    )
+    scope.set(
+      'fin_esc_opex_pct',
+      typeof sanitized.fin_esc_opex_pct === 'number'
+        ? sanitized.fin_esc_opex_pct
+        : memTemplateDefaults.fin_esc_opex_pct,
+    )
+    scope.set('anual_idx_potencia', memAssumpRows.map((r) => r.idx_potencia))
+    scope.set('anual_idx_pml', memAssumpRows.map((r) => r.idx_pml))
+    scope.set('anual_deg_bess', memAssumpRows.map((r) => r.factor_deg_bess))
+
     return scope
   }
 
@@ -908,4 +1089,475 @@ export function evaluateSimulation(input: SimulationEngineInput): SimulationRunO
     van: Number.isFinite(van) ? van : null,
     serie_mensual: serieMensual,
   }
+}
+
+/**
+ * Prefills canonical MEM 24 Inputs & Financing terms from CRM project entities + active template.
+ */
+export function resolveMemInputsFromProject(params: {
+  proyecto: SimulationEngineInput['proyecto']
+  activeConfig: ConfiguracionTecnica | null
+  configProducts: readonly ProyectoSitioProducto[]
+  activeFinancing: OpcionFinanciamiento | null
+  sitios?: readonly Pick<Sitio, 'demanda_contratada_kw'>[]
+  template: Pick<CalculadoraTemplate, 'campos'>
+}): {
+  baseInputs: MemSimulatorInputs
+  financingTerms: MemFinancingTerms
+} {
+  const base = extractMemInputsFromCampos(params.template.campos)
+  const templateDefaults = extractTemplateDefaults(params.template.campos)
+  const fx = base.tc_mxn_usd > 0 ? base.tc_mxn_usd : 18.7
+
+  const toUsd = (amount: number, curr: Moneda): number =>
+    curr === 'USD' ? amount : amount / fx
+
+  // Cliente
+  const clientName =
+    params.proyecto.cliente_final_empresa?.trim() ||
+    params.proyecto.nombre_proyecto?.trim() ||
+    base.cliente
+  base.cliente = clientName
+
+  // Demanda contratada (MW)
+  let demandaSitiosKw = 0
+  for (const s of params.sitios ?? []) {
+    if (s.demanda_contratada_kw != null && Number.isFinite(s.demanda_contratada_kw) && s.demanda_contratada_kw > 0) {
+      demandaSitiosKw += s.demanda_contratada_kw
+    }
+  }
+  if (demandaSitiosKw > 0) {
+    base.demanda_contratada_mw = demandaSitiosKw / 1000
+  } else if (params.proyecto.demanda_kw != null && Number.isFinite(params.proyecto.demanda_kw) && params.proyecto.demanda_kw > 0) {
+    base.demanda_contratada_mw = params.proyecto.demanda_kw / 1000
+  }
+
+  // Products aggregation
+  let fvKwp = 0
+  let fvCapexUsd = 0
+  let bessCapKwh = 0
+  let bessPotKw = 0
+  let bessCapexUsd = 0
+
+  for (const prod of params.configProducts) {
+    const datos = (prod.datos ?? {}) as Record<string, unknown>
+    const rawCapex = parseNum(datos.capex as string | number | null | undefined)
+    const capexCurr = ((datos.capex_moneda as Moneda | undefined) ??
+      (params.activeConfig?.moneda as Moneda | undefined) ??
+      'USD') as Moneda
+
+    if (prod.tipo === 'fv') {
+      const nm = parseNum(datos.num_modulos as string | number | null | undefined)
+      const pw = parseNum(datos.potencia_modulos_w as string | number | null | undefined)
+      if (nm > 0 && pw > 0) {
+        fvKwp += (nm * pw) / 1000
+      }
+      if (rawCapex > 0) {
+        fvCapexUsd += toUsd(rawCapex, capexCurr)
+      }
+    } else if (prod.tipo === 'bess') {
+      const pot = parseNum(datos.potencia_kw as string | number | null | undefined)
+      const cap = parseNum(datos.capacidad_kwh as string | number | null | undefined)
+      if (pot > 0) bessPotKw += pot
+      if (cap > 0) bessCapKwh += cap
+      if (rawCapex > 0) {
+        bessCapexUsd += toUsd(rawCapex, capexCurr)
+      }
+    }
+  }
+
+  // Config-level fallback CAPEX in USD
+  const totalConfigCapexUsd =
+    params.activeConfig?.inversion_total != null &&
+    Number.isFinite(params.activeConfig.inversion_total) &&
+    params.activeConfig.inversion_total > 0
+      ? toUsd(
+          params.activeConfig.inversion_total,
+          ((params.activeConfig.moneda || params.proyecto.moneda || 'MXN') as Moneda),
+        )
+      : params.proyecto.capex_estimado != null &&
+          Number.isFinite(params.proyecto.capex_estimado) &&
+          params.proyecto.capex_estimado > 0
+        ? toUsd(params.proyecto.capex_estimado, (params.proyecto.moneda || 'MXN') as Moneda)
+        : 0
+
+  const hasExplicitProducts = params.configProducts.length > 0
+  const hasProjectBess =
+    (params.proyecto.capacidad_mw != null && params.proyecto.capacidad_mw > 0) ||
+    (params.proyecto.capacidad_mwh != null && params.proyecto.capacidad_mwh > 0)
+
+  // FV sizing
+  if (fvKwp > 0) {
+    base.fv_potencia_mw = fvKwp / 1000
+  } else {
+    base.fv_potencia_mw = 0
+  }
+
+  // BESS sizing
+  if (bessCapKwh > 0 || bessPotKw > 0) {
+    base.bess_potencia_mw = bessPotKw / 1000
+    base.bess_capacidad_mwh = bessCapKwh / 1000
+  } else if (hasProjectBess) {
+    if (params.proyecto.capacidad_mw != null && params.proyecto.capacidad_mw > 0) {
+      base.bess_potencia_mw = params.proyecto.capacidad_mw
+    }
+    if (params.proyecto.capacidad_mwh != null && params.proyecto.capacidad_mwh > 0) {
+      base.bess_capacidad_mwh = params.proyecto.capacidad_mwh
+    }
+  } else if (
+    params.proyecto.tipo === 'FV' ||
+    hasExplicitProducts ||
+    (params.proyecto.capacidad_mw === 0 && params.proyecto.capacidad_mwh === 0)
+  ) {
+    base.bess_potencia_mw = 0
+    base.bess_capacidad_mwh = 0
+  }
+
+  // CAPEX allocation (USD/kWp & USD/kWh)
+  const effectiveBessKwh = base.bess_capacidad_mwh * 1000
+  if (fvKwp > 0 && fvCapexUsd > 0) {
+    base.capex_fv_usd_kwp = fvCapexUsd / fvKwp
+  }
+  if (effectiveBessKwh > 0 && bessCapexUsd > 0) {
+    base.capex_bess_usd_kwh = bessCapexUsd / effectiveBessKwh
+  }
+
+  if (totalConfigCapexUsd > 0) {
+    if (fvKwp > 0 && effectiveBessKwh === 0 && fvCapexUsd === 0) {
+      base.capex_fv_usd_kwp = totalConfigCapexUsd / fvKwp
+    } else if (effectiveBessKwh > 0 && fvKwp === 0 && bessCapexUsd === 0) {
+      base.capex_bess_usd_kwh = totalConfigCapexUsd / effectiveBessKwh
+    } else if (fvKwp > 0 && effectiveBessKwh > 0) {
+      if (fvCapexUsd === 0 && bessCapexUsd === 0) {
+        const refBessUsd =
+          effectiveBessKwh * (base.capex_bess_usd_kwh > 0 ? base.capex_bess_usd_kwh : 320)
+        const refFvUsd =
+          fvKwp * (base.capex_fv_usd_kwp > 0 ? base.capex_fv_usd_kwp : 900)
+        const refSum = refBessUsd + refFvUsd
+        if (refSum > 0) {
+          base.capex_bess_usd_kwh =
+            (totalConfigCapexUsd * (refBessUsd / refSum)) / effectiveBessKwh
+          base.capex_fv_usd_kwp = (totalConfigCapexUsd * (refFvUsd / refSum)) / fvKwp
+        }
+      } else if (fvCapexUsd === 0 && totalConfigCapexUsd > bessCapexUsd) {
+        base.capex_fv_usd_kwp = (totalConfigCapexUsd - bessCapexUsd) / fvKwp
+      } else if (bessCapexUsd === 0 && totalConfigCapexUsd > fvCapexUsd) {
+        base.capex_bess_usd_kwh = (totalConfigCapexUsd - fvCapexUsd) / effectiveBessKwh
+      }
+    }
+  }
+
+  // Financing terms for CRM value-add layer
+  const vehiculo = (params.activeFinancing?.vehiculo_inversion ?? 'contado').toLowerCase()
+  const financingTerms: MemFinancingTerms = {
+    vehiculo_inversion: vehiculo,
+    enganche_pct: vehiculo === 'credito' ? templateDefaults.credito_enganche_pct : 0,
+    tasa_interes_anual:
+      vehiculo === 'arrendamiento'
+        ? templateDefaults.arrendamiento_tasa_equivalente_anual
+        : vehiculo === 'credito'
+          ? templateDefaults.credito_tasa_interes_anual
+          : 0,
+    plazo_meses:
+      params.activeFinancing?.plazo_meses != null &&
+      Number.isFinite(params.activeFinancing.plazo_meses) &&
+      params.activeFinancing.plazo_meses >= 0
+        ? params.activeFinancing.plazo_meses
+        : templateDefaults.credito_plazo_meses_default,
+    ensaas_factor_ahorro_pct: templateDefaults.ensaas_factor_ahorro_pct,
+  }
+
+  return { baseInputs: base, financingTerms }
+}
+
+const MEM_SCALAR_KEYS: readonly (keyof MemSimulatorInputs)[] = [
+  'cliente',
+  'demanda_contratada_mw',
+  'bess_potencia_mw',
+  'bess_capacidad_mwh',
+  'bess_eficiencia_pct',
+  'bess_soc_min_pct',
+  'op_horas_carga',
+  'op_ini_carga',
+  'op_fin_carga',
+  'op_ini_descarga',
+  'op_fin_descarga',
+  'fv_potencia_mw',
+  'fv_degradacion_anual_pct',
+  'tc_mxn_usd',
+  'tc_fecha',
+  'mbp_precio_mxn_mw_anio',
+  'rap_factor',
+  'capex_bess_usd_kwh',
+  'capex_fv_usd_kwp',
+  'opex_bess_mxn_mwh_anio',
+  'opex_fv_mxn_mw_anio',
+  'fin_horizonte_anios',
+  'fin_tasa_descuento_pct',
+  'fin_esc_opex_pct',
+]
+
+export function computeSparseMemOverrides(
+  effective: MemSimulatorInputs,
+  baseInputs: MemSimulatorInputs,
+  assumptions: MemAnnualAssumptions,
+  criticalHours100HC?: readonly MemCriticalHourEntry[],
+): SimulacionOverrides {
+  const sparse: SimulacionOverrides = { modo_motor: 'mem_horaria' }
+  for (const key of MEM_SCALAR_KEYS) {
+    const val = effective[key]
+    const baseVal = baseInputs[key]
+    if (typeof val === 'string') {
+      if (val !== baseVal) {
+        ;(sparse as Record<string, unknown>)[key] = val
+      }
+    } else if (typeof val === 'number' && typeof baseVal === 'number') {
+      if (Math.abs(val - baseVal) > 1e-9) {
+        ;(sparse as Record<string, unknown>)[key] = val
+      }
+    }
+  }
+
+  const defAssump = createDefaultMemAnnualAssumptions()
+  const assumpDiff =
+    assumptions.pct_mbp.some((v, i) => i >= 1 && Math.abs(v - defAssump.pct_mbp[i]) > 1e-9) ||
+    assumptions.fijo_mbp.some((v) => v !== null) ||
+    assumptions.pct_pml.some((v, i) => i >= 1 && Math.abs(v - defAssump.pct_pml[i]) > 1e-9) ||
+    assumptions.deg_bess.some((v, i) => i >= 1 && Math.abs(v - defAssump.deg_bess[i]) > 1e-9)
+
+  if (assumpDiff) {
+    sparse.supuestos_anuales = assumptions
+  }
+
+  if (criticalHours100HC && criticalHours100HC.length > 0) {
+    const baselineHc = getBaseline100HC()
+    const hcChanged =
+      criticalHours100HC.length !== baselineHc.length ||
+      criticalHours100HC.some(
+        (entry, idx) =>
+          entry.fecha !== baselineHc[idx]?.fecha ||
+          entry.hora !== baselineHc[idx]?.hora,
+      )
+    if (hcChanged) {
+      sparse.critical_hours_100hc = criticalHours100HC.map((entry, idx) => ({
+        no: Number.isFinite(entry.no) ? Math.round(entry.no) : idx + 1,
+        fecha: entry.fecha,
+        hora: Math.round(entry.hora),
+      }))
+    }
+  }
+
+  return sparse
+}
+
+export interface UnifiedSimulationInput extends SimulationEngineInput {
+  mode?: CalculationMode
+  memInputsOverride?: Partial<MemSimulatorInputs>
+  memAssumptions?: MemAnnualAssumptions
+  hourlyDataset?: MemHourlyDataset
+  criticalHours100HC?: readonly MemCriticalHourEntry[]
+  ignoreProjectGating?: boolean
+}
+
+export type UnifiedSimulationOutcome =
+  | (MemFullSimulationResult & { usa_parametros_base: boolean; parametros_override_sparse: SimulacionOverrides })
+  | (SimulationRunOutcome & { mode: 'cfe_tarifario' })
+  | (MemSimulationOutcome & { usa_parametros_base?: boolean; parametros_override_sparse?: SimulacionOverrides })
+
+/**
+ * Top-level unified entry point:
+ * Executes the two-stage MEM + 100HC engine by default, and seamlessly supports CFE tariff mode
+ * when explicitly selected or configured for a non-MEM CFE tariff project.
+ */
+export function runSimulation(input: UnifiedSimulationInput): UnifiedSimulationOutcome {
+  const selectedMode: CalculationMode =
+    input.mode ??
+    ((input.overrides?.modo_motor as CalculationMode | undefined) ?? 'mem_horaria')
+
+  if (selectedMode === 'cfe_tarifario') {
+    const res = evaluateSimulation(input)
+    return { ...res, mode: 'cfe_tarifario' }
+  }
+
+  // Gating check unless explicitly running standalone/sandbox
+  if (!input.ignoreProjectGating) {
+    const templateDefaults = extractTemplateDefaults(input.template.campos)
+    const baselineProjectCapex = resolveCapexTotal({
+      activeConfig: input.activeConfig,
+      configProducts: input.configProducts,
+      proyecto: input.proyecto,
+      monedaCalculo: input.monedaCalculo ?? 'MXN',
+      fx: templateDefaults.tipo_cambio_usd_mxn,
+    })
+    if (!hasValidFinancialFigures(baselineProjectCapex)) {
+      return {
+        status: 'gated',
+        reason: 'missing_financial_figures',
+        message: GATED_MISSING_FINANCIAL_MESSAGE,
+      }
+    }
+  }
+
+  const { baseInputs, financingTerms } = resolveMemInputsFromProject({
+    proyecto: input.proyecto,
+    activeConfig: input.activeConfig,
+    configProducts: input.configProducts,
+    activeFinancing: input.activeFinancing,
+    sitios: input.sitios,
+    template: input.template,
+  })
+
+  const ov = input.overrides ?? {}
+  const mergedInputs: MemSimulatorInputs = {
+    ...baseInputs,
+    ...(typeof ov.cliente === 'string' ? { cliente: ov.cliente } : {}),
+    ...(typeof ov.demanda_contratada_mw === 'number' ? { demanda_contratada_mw: ov.demanda_contratada_mw } : {}),
+    ...(typeof ov.bess_potencia_mw === 'number' ? { bess_potencia_mw: ov.bess_potencia_mw } : {}),
+    ...(typeof ov.bess_capacidad_mwh === 'number' ? { bess_capacidad_mwh: ov.bess_capacidad_mwh } : {}),
+    ...(typeof ov.bess_eficiencia_pct === 'number' ? { bess_eficiencia_pct: ov.bess_eficiencia_pct } : {}),
+    ...(typeof ov.bess_soc_min_pct === 'number' ? { bess_soc_min_pct: ov.bess_soc_min_pct } : {}),
+    ...(typeof ov.op_horas_carga === 'number' ? { op_horas_carga: ov.op_horas_carga } : {}),
+    ...(typeof ov.op_ini_carga === 'number' ? { op_ini_carga: ov.op_ini_carga } : {}),
+    ...(typeof ov.op_fin_carga === 'number' ? { op_fin_carga: ov.op_fin_carga } : {}),
+    ...(typeof ov.op_ini_descarga === 'number' ? { op_ini_descarga: ov.op_ini_descarga } : {}),
+    ...(typeof ov.op_fin_descarga === 'number' ? { op_fin_descarga: ov.op_fin_descarga } : {}),
+    ...(typeof ov.fv_potencia_mw === 'number' ? { fv_potencia_mw: ov.fv_potencia_mw } : {}),
+    ...(typeof ov.fv_degradacion_anual_pct === 'number' ? { fv_degradacion_anual_pct: ov.fv_degradacion_anual_pct } : {}),
+    ...(typeof ov.tc_mxn_usd === 'number' ? { tc_mxn_usd: ov.tc_mxn_usd } : {}),
+    ...(typeof ov.tc_fecha === 'string' ? { tc_fecha: ov.tc_fecha } : {}),
+    ...(typeof ov.mbp_precio_mxn_mw_anio === 'number' ? { mbp_precio_mxn_mw_anio: ov.mbp_precio_mxn_mw_anio } : {}),
+    ...(typeof ov.rap_factor === 'number' ? { rap_factor: ov.rap_factor } : {}),
+    ...(typeof ov.capex_bess_usd_kwh === 'number' ? { capex_bess_usd_kwh: ov.capex_bess_usd_kwh } : {}),
+    ...(typeof ov.capex_fv_usd_kwp === 'number' ? { capex_fv_usd_kwp: ov.capex_fv_usd_kwp } : {}),
+    ...(typeof ov.opex_bess_mxn_mwh_anio === 'number' ? { opex_bess_mxn_mwh_anio: ov.opex_bess_mxn_mwh_anio } : {}),
+    ...(typeof ov.opex_fv_mxn_mw_anio === 'number' ? { opex_fv_mxn_mw_anio: ov.opex_fv_mxn_mw_anio } : {}),
+    ...(typeof ov.fin_horizonte_anios === 'number' ? { fin_horizonte_anios: ov.fin_horizonte_anios } : {}),
+    ...(typeof ov.fin_tasa_descuento_pct === 'number' ? { fin_tasa_descuento_pct: ov.fin_tasa_descuento_pct } : {}),
+    ...(typeof ov.fin_esc_opex_pct === 'number' ? { fin_esc_opex_pct: ov.fin_esc_opex_pct } : {}),
+    ...(input.horizonteAnios != null ? { fin_horizonte_anios: input.horizonteAnios } : {}),
+    ...(input.memInputsOverride ?? {}),
+  }
+
+  const assumptions =
+    input.memAssumptions ??
+    (ov.supuestos_anuales as MemAnnualAssumptions | undefined) ??
+    createDefaultMemAnnualAssumptions()
+
+  const hourly = input.hourlyDataset ?? getBaselineMemHourlyDataset()
+  const hc100 =
+    input.criticalHours100HC ??
+    (ov.critical_hours_100hc as MemCriticalHourEntry[] | undefined) ??
+    getBaseline100HC()
+
+  const outcome = runMemSimulation({
+    inputs: mergedInputs,
+    assumptions,
+    hourly,
+    criticalHours100HC: hc100,
+    financialOptions: {
+      moneda: input.monedaCalculo ?? 'MXN',
+      vistaFinanciamiento: input.vistaFinanciamiento ?? 'bruto',
+      financing: {
+        ...financingTerms,
+        ...(typeof ov.enganche_pct === 'number' ? { enganche_pct: ov.enganche_pct } : {}),
+        ...(typeof ov.tasa_interes_anual === 'number' ? { tasa_interes_anual: ov.tasa_interes_anual } : {}),
+        ...(typeof ov.plazo_meses === 'number' ? { plazo_meses: ov.plazo_meses } : {}),
+        ...(typeof ov.ensaas_factor_ahorro_pct === 'number' ? { ensaas_factor_ahorro_pct: ov.ensaas_factor_ahorro_pct } : {}),
+      },
+    },
+  })
+
+  if (outcome.status !== 'ok') {
+    return outcome
+  }
+
+  const sparse = computeSparseMemOverrides(mergedInputs, baseInputs, assumptions, hc100)
+  const usaParametrosBase = Object.keys(sparse).filter((k) => k !== 'modo_motor').length === 0
+
+  return {
+    ...outcome,
+    usa_parametros_base: usaParametrosBase,
+    parametros_override_sparse: sparse,
+  }
+}
+
+/**
+ * Evaluates a template's formula program against the canonical synthetic FV+BESS dry-run fixture
+ * (CAPEX 1,500,000 MXN, generación 120,000 kWh/año, tarifa 3.20 MXN/kWh, 10 años, bruto)
+ * so Admin configuration checks, Excel import preview, and Server Action saves execute one shared check.
+ */
+export function runTemplateDryRun(
+  template: Pick<CalculadoraTemplate, 'modo' | 'campos' | 'formulas'>,
+): SimulationRunOutcome {
+  return evaluateSimulation({
+    proyecto: {
+      tipo: 'FV+BESS',
+      capex_estimado: 1_500_000,
+      moneda: 'MXN',
+      incluye_mem: false,
+      demanda_kw: 250,
+      capacidad_mw: 0.1,
+      capacidad_mwh: 0.2,
+      consumo_anual_gwh: null,
+      volumen_energia_mwh_anual: null,
+      tarifa_actual_cfe: 3.2,
+    },
+    activeConfig: {
+      id: 'dry-run-config',
+      proyecto_id: 'dry-run-proj',
+      nombre: 'Dry-run FV+BESS',
+      descripcion: null,
+      inversion_total: 1_500_000,
+      moneda: 'MXN',
+      ahorro_estimado_anual: null,
+      ahorro_estimado_mensual: null,
+      ahorro_moneda: 'MXN',
+      seleccionada: true,
+      created_at: '',
+      updated_at: '',
+    },
+    configProducts: [
+      {
+        id: 'dry-fv',
+        proyecto_id: 'dry-run-proj',
+        sitio_id: 'dry-site',
+        configuracion_id: 'dry-run-config',
+        tipo: 'fv',
+        datos: {
+          num_modulos: 160,
+          potencia_modulos_w: 500,
+          generacion_anual_kwh: 120_000,
+          capex: 1_000_000,
+          capex_moneda: 'MXN',
+        },
+        created_at: '',
+      },
+      {
+        id: 'dry-bess',
+        proyecto_id: 'dry-run-proj',
+        sitio_id: 'dry-site',
+        configuracion_id: 'dry-run-config',
+        tipo: 'bess',
+        datos: {
+          potencia_kw: 100,
+          capacidad_kwh: 200,
+          uso: 'load_shifting',
+          capex: 500_000,
+          capex_moneda: 'MXN',
+        },
+        created_at: '',
+      },
+    ],
+    activeFinancing: null,
+    template: {
+      id: '',
+      modo: template.modo,
+      campos: template.campos,
+      formulas: template.formulas,
+    },
+    monedaCalculo: 'MXN',
+    horizonteAnios: 10,
+    vistaFinanciamiento: 'bruto',
+    overrides: {},
+  })
 }
