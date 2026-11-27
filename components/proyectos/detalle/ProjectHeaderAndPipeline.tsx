@@ -375,12 +375,12 @@ export default function ProjectHeaderAndPipeline({
             </div>
           </div>
 
-          <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+          <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="min-w-0 bg-white p-4 rounded-xl border border-borde shadow-xs">
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                 Inversión Total (CAPEX)
               </span>
-              <div className="text-xl font-black text-principal">
+              <div className="num text-lg sm:text-xl font-black text-principal break-words">
                 {effectiveCapex > 0 ? fmtCurrency(effectiveCapex, effectiveCapexMoneda) : '—'}
               </div>
               <p
@@ -391,11 +391,11 @@ export default function ProjectHeaderAndPipeline({
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+            <div className="min-w-0 bg-white p-4 rounded-xl border border-borde shadow-xs">
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                 Ahorro Anual Estimado
               </span>
-              <div className="text-xl font-black text-emerald-600">
+              <div className="num text-lg sm:text-xl font-black text-emerald-600 break-words">
                 {effectiveSavings && effectiveSavings > 0
                   ? fmtCurrency(effectiveSavings, effectiveSavingsMoneda)
                   : '—'}
@@ -409,11 +409,11 @@ export default function ProjectHeaderAndPipeline({
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+            <div className="min-w-0 bg-white p-4 rounded-xl border border-borde shadow-xs">
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                 Retorno Simple (Payback)
               </span>
-              <div className="text-xl font-black text-principal">
+              <div className="num text-lg sm:text-xl font-black text-principal">
                 {effectivePaybackYears ? `${fmtNum(effectivePaybackYears, 1)} años` : '—'}
               </div>
               <p className="text-[11px] text-gray-500 mt-1">
@@ -423,7 +423,7 @@ export default function ProjectHeaderAndPipeline({
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-borde shadow-xs">
+            <div className="min-w-0 bg-white p-4 rounded-xl border border-borde shadow-xs">
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                 Vehículo Financiero
               </span>
