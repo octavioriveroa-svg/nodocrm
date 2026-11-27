@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
   const data = await fetchDashboardData()
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="portal-content-container">
       <div className="mb-8">
         <p className="text-sm text-gray-400 mb-1">Panel de administración</p>
         <h1 className="text-2xl font-black tracking-tight">Visión global de la plataforma</h1>

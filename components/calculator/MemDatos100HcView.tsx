@@ -876,7 +876,7 @@ export function MemDatos100HcView({
       )}
 
       {/* Dataset KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-5 gap-3">
         <div className="bg-white border border-borde rounded-xl p-3">
           <span className="block text-[10px] font-bold uppercase text-texto-suave">Horas cargadas</span>
           <span className="num text-sm font-extrabold text-principal">{fmtNum(hourlyStats.rows, 0)} h</span>

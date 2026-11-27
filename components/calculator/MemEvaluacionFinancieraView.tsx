@@ -123,7 +123,7 @@ export function MemEvaluacionFinancieraView({
       </div>
 
       {/* Summary strip matching Excel C5:C14 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
         <div className="bg-white border border-borde rounded-xl p-3">
           <span className="block text-[10px] font-bold uppercase text-texto-suave">CAPEX BESS</span>
           <span className="num text-sm font-extrabold text-principal mt-0.5 block">

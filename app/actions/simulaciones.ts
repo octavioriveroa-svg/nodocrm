@@ -87,6 +87,11 @@ function revalidateProjectSimulationPaths(proyectoId: string): void {
   revalidatePath(`/finder/proyectos/${proyectoId}`)
   revalidatePath(`/financiero/proyectos/${proyectoId}`)
   revalidatePath(`/cliente/proyectos/${proyectoId}`)
+  revalidatePath('/admin/calculadora')
+  revalidatePath('/analista/calculadora')
+  revalidatePath('/epc/calculadora')
+  revalidatePath('/finder/calculadora')
+  revalidatePath('/financiero/calculadora')
 }
 
 async function authenticateAndVerifyProjectAccess(proyectoId: string) {

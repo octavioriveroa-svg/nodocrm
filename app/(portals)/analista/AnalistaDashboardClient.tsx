@@ -120,7 +120,7 @@ export default function AnalistaDashboardClient({ initialProyectos, initialOfert
   })
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="portal-content-container">
       <div className="mb-8 flex justify-between items-end">
         <div>
           <p className="text-sm text-gray-400 mb-1">Panel de analista</p>

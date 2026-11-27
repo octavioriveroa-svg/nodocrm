@@ -192,6 +192,25 @@ proxyDeeplinksSuite.test('Proxy.5: Unsupported routes fall back safely to /${tar
     `/cliente/proyectos/${clientProjId}`,
     'Cliente supports project detail deep link'
   )
+
+  // Standalone /calculadora tab deep links: allowed for operational/commercial portals, blocked for cliente & mem
+  for (const allowedPortal of ['admin', 'analista', 'epc', 'finder', 'financiero']) {
+    assertEqual(
+      resolveCrossPortalDeepLink('/admin/calculadora', allowedPortal, `?proyectoId=${clientProjId}`),
+      `/${allowedPortal}/calculadora?proyectoId=${clientProjId}`,
+      `${allowedPortal} portal must support /calculadora deep links`
+    )
+  }
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/calculadora', 'cliente'),
+    '/cliente',
+    'Cliente portal cannot access standalone /calculadora tab'
+  )
+  assertEqual(
+    resolveCrossPortalDeepLink('/admin/calculadora', 'mem'),
+    '/mem',
+    'MEM portal cannot access standalone /calculadora tab'
+  )
 })
 
 // ── 6. Query Parameters Preservation ─────────────────────────────────────────

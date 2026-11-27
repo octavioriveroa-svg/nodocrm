@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import EnergyChart from '@/components/telemetry/EnergyChart'
 import BatteryStatus from '@/components/telemetry/BatteryStatus'
-import { SimuladorAhorrosSeccion } from '@/components/calculator/SimuladorAhorrosSeccion'
+import { ProyectoSimulacionesResumen } from '@/components/calculator/ProyectoSimulacionesResumen'
 import { loadFullProjectSimulatorBundle } from '@/lib/calculator/load-context'
 import { ChevronLeft, Zap, MapPin, Briefcase } from 'lucide-react'
 import Link from 'next/link'
@@ -51,7 +51,6 @@ export default function FinancieroProyectoDetalle() {
   const supabase = createClient()
   
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [userId, setUserId] = useState<string>('')
   const [userRole, setUserRole] = useState<Rol>('financiero')
   const [simBundle, setSimBundle] = useState<SimulatorBundle | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetriaDB[]>([])
@@ -72,7 +71,6 @@ export default function FinancieroProyectoDetalle() {
         router.push('/login')
         return
       }
-      setUserId(session.user.id)
 
       const [{ data: pData, error: pErr }, { data: profileRow }, { data: teleData }, simContext] =
         await Promise.all([
@@ -148,13 +146,8 @@ export default function FinancieroProyectoDetalle() {
     batteryDischargeKwh: t.bateria_descarga_kwh
   }))
 
-  const activeConfigId =
-    simBundle.configuraciones.find((c) => c.seleccionada)?.id ??
-    simBundle.configuraciones[0]?.id ??
-    null
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="portal-content-container space-y-6">
       <div>
         <Link href="/financiero" className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-principal transition-colors mb-4">
           <ChevronLeft size={16} /> Volver al Portafolio
@@ -221,7 +214,7 @@ export default function FinancieroProyectoDetalle() {
         </div>
       )}
 
-      <SimuladorAhorrosSeccion
+      <ProyectoSimulacionesResumen
         proyecto={proyecto}
         sitios={simBundle.sitios}
         productos={simBundle.productos}
@@ -231,11 +224,8 @@ export default function FinancieroProyectoDetalle() {
         ofertasMem={simBundle.ofertasMem}
         activeTemplate={simBundle.activeTemplate}
         templatesById={simBundle.templatesById}
-        initialSimulaciones={simBundle.initialSimulaciones}
+        simulaciones={simBundle.initialSimulaciones}
         userRole={userRole}
-        currentUserId={userId}
-        activeConfigId={activeConfigId}
-        readOnlyMode={false}
       />
     </div>
   )
