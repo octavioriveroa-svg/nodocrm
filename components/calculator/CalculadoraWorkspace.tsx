@@ -98,6 +98,7 @@ export function CalculadoraWorkspace({
   const [userId, setUserId] = useState('')
   const [userRole, setUserRole] = useState<Rol>(PORTAL_DEFAULT_ROLE[portalPrefix])
   const [projects, setProjects] = useState<ProyectoConEpcista[]>([])
+  const [siteDemandByProjectId, setSiteDemandByProjectId] = useState<Record<string, number>>({})
   const [activeTemplate, setActiveTemplate] = useState<CalculadoraTemplate>(() =>
     buildFallbackCalculatorTemplate(),
   )
@@ -170,6 +171,42 @@ export function CalculadoraWorkspace({
       })
       if (cancelled) return
       setProjects(list)
+
+      if (list.length > 0) {
+        const projectIds = list.map((p) => p.id)
+        const { data: siteLinks } = await supabase
+          .from('proyecto_sitios')
+          .select('proyecto_id, sitios(demanda_contratada_kw)')
+          .in('proyecto_id', projectIds)
+
+        if (!cancelled && Array.isArray(siteLinks)) {
+          const demandMap: Record<string, number> = {}
+          for (const row of siteLinks) {
+            const pid = (row as { proyecto_id?: string | null }).proyecto_id
+            if (!pid) continue
+            const rawSitios = (
+              row as {
+                sitios?:
+                  | { demanda_contratada_kw?: number | null }
+                  | { demanda_contratada_kw?: number | null }[]
+                  | null
+              }
+            ).sitios
+            const siteList = Array.isArray(rawSitios)
+              ? rawSitios
+              : rawSitios
+                ? [rawSitios]
+                : []
+            for (const s of siteList) {
+              const kw = s?.demanda_contratada_kw
+              if (kw != null && Number.isFinite(kw) && kw > 0) {
+                demandMap[pid] = (demandMap[pid] ?? 0) + kw
+              }
+            }
+          }
+          setSiteDemandByProjectId(demandMap)
+        }
+      }
 
       if (urlProyectoId && list.some((p) => p.id === urlProyectoId)) {
         setSelectedProjectId(urlProyectoId)
@@ -328,11 +365,11 @@ export function CalculadoraWorkspace({
             </div>
           </div>
 
-          <div className="inline-flex rounded-xl border border-borde bg-fondo/80 p-1 gap-1 self-start lg:self-center">
+          <div className="inline-flex flex-wrap sm:flex-nowrap rounded-xl border border-borde bg-fondo/80 p-1 gap-1 self-start lg:self-center shrink-0">
             <button
               type="button"
               onClick={() => setWorkspaceMode('linked')}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                 workspaceMode === 'linked'
                   ? 'bg-principal text-acento shadow-sm'
                   : 'text-texto-suave hover:text-principal'
@@ -344,7 +381,7 @@ export function CalculadoraWorkspace({
             <button
               type="button"
               onClick={() => setWorkspaceMode('manual')}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                 workspaceMode === 'manual'
                   ? 'bg-principal text-acento shadow-sm'
                   : 'text-texto-suave hover:text-principal'
@@ -435,7 +472,10 @@ export function CalculadoraWorkspace({
                     className="w-full rounded-xl border border-borde bg-white px-3 py-2 text-xs font-semibold text-principal"
                   >
                     {filteredProjects.map((p) => {
-                      const elig = evaluateMemEligibility({ proyecto: p })
+                      const elig = evaluateMemEligibility({
+                        proyecto: p,
+                        overrideDemandaKw: siteDemandByProjectId[p.id],
+                      })
                       return (
                         <option key={p.id} value={p.id}>
                           {p.nombre_proyecto} · {p.cliente_final_empresa || p.cliente_final_nombre} ({p.tipo} ·{' '}
@@ -447,34 +487,30 @@ export function CalculadoraWorkspace({
                 </div>
 
                 <div className="lg:col-span-3 flex items-center justify-start lg:justify-end gap-2">
-                  {selectedProject && (
-                    <>
-                      <Badge
-                        variant={
-                          evaluateMemEligibility({
-                            proyecto: selectedProject,
-                            sitios: effectiveBundle.sitios,
-                          }).isEligible
-                            ? 'info'
-                            : 'neutral'
-                        }
-                      >
-                        {evaluateMemEligibility({
-                          proyecto: selectedProject,
-                          sitios: effectiveBundle.sitios,
-                        }).isEligible
-                          ? 'Elegible MEM'
-                          : 'CFE Tarifario'}
-                      </Badge>
-                      <Link
-                        href={`/${portalPrefix}/proyectos/${selectedProject.id}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-borde bg-white text-xs font-bold text-principal hover:bg-fondo transition-colors"
-                      >
-                        Ver proyecto
-                        <ArrowUpRight size={13} />
-                      </Link>
-                    </>
-                  )}
+                  {selectedProject && (() => {
+                    const selectedEligibility = evaluateMemEligibility({
+                      proyecto: selectedProject,
+                      sitios: effectiveBundle.sitios,
+                      overrideDemandaKw:
+                        effectiveBundle.sitios.length === 0
+                          ? siteDemandByProjectId[selectedProject.id]
+                          : undefined,
+                    })
+                    return (
+                      <>
+                        <Badge variant={selectedEligibility.isEligible ? 'info' : 'neutral'}>
+                          {selectedEligibility.isEligible ? 'Elegible MEM' : 'CFE Tarifario'}
+                        </Badge>
+                        <Link
+                          href={`/${portalPrefix}/proyectos/${selectedProject.id}`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-borde bg-white text-xs font-bold text-principal hover:bg-fondo transition-colors whitespace-nowrap"
+                        >
+                          Ver proyecto
+                          <ArrowUpRight size={13} />
+                        </Link>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
             )}

@@ -256,7 +256,7 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
             onFocus={() => setSearchOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder="Buscar proyectos por nombre o cliente…"
-            className="w-full pl-10 pr-16 py-2 text-sm rounded-xl border border-white/40 bg-white/50 backdrop-blur-md placeholder:text-gray-500 focus:bg-white focus:border-acento focus:ring-2 focus:ring-acento/20 transition-all shadow-sm outline-none"
+            className="w-full pl-9 sm:pl-10 pr-8 sm:pr-16 py-2 text-sm rounded-xl border border-white/40 bg-white/50 backdrop-blur-md placeholder:text-gray-500 focus:bg-white focus:border-acento focus:ring-2 focus:ring-acento/20 transition-all shadow-sm outline-none"
           />
           <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             {searchQuery ? (
@@ -282,7 +282,7 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
 
         {/* Search Results Dropdown */}
         {searchOpen && searchQuery.trim().length > 0 && (
-          <div className="absolute left-0 top-full mt-2 w-full min-w-[360px] max-w-[480px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/80 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-0 top-full mt-2 w-full min-w-[260px] sm:min-w-[360px] max-w-[480px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/80 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="px-3.5 py-2 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs text-gray-400 font-medium">
               <span>{isSearching ? 'Buscando…' : `${searchResults.length} proyecto${searchResults.length !== 1 ? 's' : ''} encontrado${searchResults.length !== 1 ? 's' : ''}`}</span>
               <span className="hidden sm:inline text-[10px]">↑↓ para navegar · ↵ para abrir</span>
@@ -420,11 +420,11 @@ export default function TopBar({ nombre, userId }: TopBarProps) {
         </div>
 
         {/* User avatar */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-principal flex items-center justify-center text-xs font-bold text-acento">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-full bg-principal flex items-center justify-center text-xs font-bold text-acento shrink-0">
             {initials}
           </div>
-          <span className="text-sm font-medium">{nombre}</span>
+          <span className="hidden sm:inline text-sm font-medium">{nombre}</span>
         </div>
       </div>
     </header>
