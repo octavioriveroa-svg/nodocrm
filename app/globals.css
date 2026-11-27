@@ -189,6 +189,31 @@ h1, h2, h3, h4 {
   overflow-x: clip;
 }
 
+/* Fluid content containers that reclaim horizontal space when the desktop sidebar collapses */
+.portal-content-container {
+  width: 100%;
+  max-width: 80rem; /* 1280px (matches max-w-7xl when sidebar is expanded) */
+  margin-inline: auto;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.portal-content-fluid {
+  width: 100%;
+  max-width: 90rem; /* 1440px when sidebar is expanded */
+  margin-inline: auto;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (min-width: 768px) {
+  [data-sidebar-collapsed='true'] .portal-content-container {
+    max-width: 107.5rem; /* 1720px when sidebar is collapsed */
+  }
+
+  [data-sidebar-collapsed='true'] .portal-content-fluid {
+    max-width: none;
+  }
+}
+
 /* Smooth transitions globally */
 button, a, input, textarea, select {
   transition: all 0.15s ease;

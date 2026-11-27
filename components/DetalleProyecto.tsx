@@ -15,7 +15,7 @@ import {
   buildFallbackCalculatorTemplate,
   loadProjectSimulatorContext,
 } from '@/lib/calculator/load-context'
-import { SimuladorAhorrosSeccion } from '@/components/calculator/SimuladorAhorrosSeccion'
+import { ProyectoSimulacionesResumen } from '@/components/calculator/ProyectoSimulacionesResumen'
 import { Seccion, buildDefaultHitos } from './proyectos/detalle/common'
 import ProjectHeaderAndPipeline from './proyectos/detalle/ProjectHeaderAndPipeline'
 import ProjectEditForm from './proyectos/detalle/ProjectEditForm'
@@ -191,7 +191,7 @@ export default function DetalleProyecto({
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
+    <div className="portal-content-container pb-12">
       <ProjectHeaderAndPipeline
         proyecto={proyecto} currentUser={currentUser} backHref={backHref} hitosCount={hitosLocales.length}
         generandoCronograma={generandoCronograma} onGenerarCronograma={generarCronograma} editando={editando}
@@ -234,7 +234,7 @@ export default function DetalleProyecto({
             configFinLinks={configFinLinks} onOpenEditFinanciamiento={() => setShowEditFinanciamiento(true)}
             onSelectFinancing={(optId) => handleSelectFinancing(optId)} seleccionandoFinancing={seleccionandoFinancing}
           />
-          <SimuladorAhorrosSeccion
+          <ProyectoSimulacionesResumen
             proyecto={proyecto}
             sitios={sitios}
             productos={productos}
@@ -244,12 +244,8 @@ export default function DetalleProyecto({
             ofertasMem={ofertasMem}
             activeTemplate={activeTemplate}
             templatesById={templatesById}
-            initialSimulaciones={initialSimulaciones}
+            simulaciones={initialSimulaciones}
             userRole={currentUser.rol}
-            currentUserId={currentUser.id}
-            activeConfigId={configsList.find((c) => c.seleccionada)?.id ?? null}
-            onEditSolucionTecnica={isCliente ? undefined : () => setShowEditTecnica(true)}
-            readOnlyMode={isCliente}
           />
           <ProjectOverviewSections
             proyecto={proyecto} currentUser={currentUser} sitios={sitios} archivos={archivos} setArchivos={setArchivos}

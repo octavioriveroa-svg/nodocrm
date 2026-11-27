@@ -7,7 +7,9 @@ import {
   CalendarClock,
   CheckCircle2,
   Coins,
+  Download,
   Flame,
+  Loader2,
   Percent,
   Printer,
   ShieldCheck,
@@ -51,6 +53,8 @@ export interface MemTableroViewProps {
   solarZeroEnergy: boolean
   moneda: Moneda
   vistaFinanciamiento: VistaFinanciamiento
+  onExportPdf?: () => void | Promise<void>
+  exportingPdf?: boolean
 }
 
 interface TooltipItem {
@@ -103,6 +107,8 @@ export function MemTableroView({
   solarZeroEnergy,
   moneda,
   vistaFinanciamiento,
+  onExportPdf,
+  exportingPdf = false,
 }: MemTableroViewProps) {
   const fx = inputs.tc_mxn_usd > 0 ? inputs.tc_mxn_usd : 18.7
   const toDisplayCurrency = useMemo(
@@ -259,16 +265,32 @@ export function MemTableroView({
         </div>
 
         <div className="flex items-center gap-2 print:hidden shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="!bg-white/10 !text-white !border-white/25 hover:!bg-white/20"
-          >
-            <Printer size={14} />
-            Imprimir / PDF
-          </Button>
+          {onExportPdf ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exportingPdf}
+              onClick={() => {
+                void onExportPdf()
+              }}
+              className="!bg-white/10 !text-white !border-white/25 hover:!bg-white/20"
+            >
+              {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Descargar PDF
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="!bg-white/10 !text-white !border-white/25 hover:!bg-white/20"
+            >
+              <Printer size={14} />
+              Imprimir / PDF
+            </Button>
+          )}
         </div>
       </div>
 
@@ -800,7 +822,7 @@ export function MemTableroView({
               Contribución de Energía (PML) vs Potencia (100 Horas Críticas).
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-center gap-4">
+          <div className="grid grid-cols-1 2xl:grid-cols-2 items-center gap-4">
             <div className="w-full h-[220px]">
               {positiveShareSlices.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">

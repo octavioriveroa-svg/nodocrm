@@ -5,6 +5,7 @@
 export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
   admin: [
     /^\/proyectos(\/.*)?$/,
+    /^\/calculadora(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/usuarios(\/.*)?$/,
@@ -12,6 +13,7 @@ export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
   ],
   analista: [
     /^\/proyectos(\/.*)?$/,
+    /^\/calculadora(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/usuarios(\/.*)?$/,
@@ -19,6 +21,7 @@ export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
   ],
   epc: [
     /^\/proyectos(\/.*)?$/,
+    /^\/calculadora(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/nuevo$/,
@@ -26,6 +29,7 @@ export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
   ],
   finder: [
     /^\/proyectos(\/.*)?$/,
+    /^\/calculadora(\/.*)?$/,
     /^\/clientes(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/nuevo$/,
@@ -39,6 +43,7 @@ export const PORTAL_SUPPORTED_ROUTES: Record<string, RegExp[]> = {
   ],
   financiero: [
     /^\/proyectos(\/.*)?$/,
+    /^\/calculadora(\/.*)?$/,
     /^\/instalaciones$/,
     /^\/configuracion(\/(?!calculadora).*)?$/,
   ],

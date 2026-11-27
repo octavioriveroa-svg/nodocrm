@@ -79,4 +79,17 @@ describe('Calculator modal portal & workspace CSS containing-block guards', () =
     expect(body).not.toMatch(/\btransform\s*:/)
     expect(cssSource).not.toMatch(/\.glass-surface:hover\s*\{[^}]*\btransform\s*:/)
   })
+
+  it('ensures DetalleProyecto delegates to compact ProyectoSimulacionesResumen and Sidebar provides collapsible /calculadora tab', () => {
+    const detalleSource = readRepoFile('components/DetalleProyecto.tsx')
+    expect(detalleSource).toContain('ProyectoSimulacionesResumen')
+    expect(detalleSource).not.toContain('SimuladorAhorrosSeccion')
+
+    const sidebarCtxSource = readRepoFile('components/layout/SidebarContext.tsx')
+    expect(sidebarCtxSource).toContain('useSyncExternalStore')
+
+    const sidebarSource = readRepoFile('components/Sidebar.tsx')
+    expect(sidebarSource).toContain('/calculadora')
+    expect(sidebarSource).toContain('toggleCollapsed')
+  })
 })

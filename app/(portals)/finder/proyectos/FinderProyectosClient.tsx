@@ -95,7 +95,7 @@ export default function FinderProyectosClient({ initialProyectos }: Props) {
   }, [proyectos])
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="portal-content-container">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

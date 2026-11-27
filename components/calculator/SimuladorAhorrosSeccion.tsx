@@ -3,15 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowRightLeft,
   BarChart3,
   Calculator,
   CalendarRange,
   Check,
   Database,
+  Download,
   FileSpreadsheet,
+  FolderPlus,
   Loader2,
   Save,
   Settings2,
+  ShieldAlert,
   Sliders,
   Sparkles,
   TrendingUp,
@@ -63,6 +67,11 @@ import {
   validateMemInputs,
 } from '@/lib/calculator/mem-hourly-engine'
 import { aggregateSeries } from '@/lib/calculator/aggregate'
+import {
+  evaluateManualMemEligibility,
+  evaluateMemEligibility,
+} from '@/lib/calculator/mem-eligibility'
+import { exportSimulationToPdf } from '@/lib/calculator/pdf-export'
 import { guardarSimulacion } from '@/app/actions/simulaciones'
 import { obtenerPlantillasCalculadora } from '@/app/actions/calculatorConfig'
 import { fmtCurrency, fmtNum, fmtPct, fmtUnit } from '@/lib/format'
@@ -83,6 +92,15 @@ import { MemEvaluacionFinancieraView } from '@/components/calculator/MemEvaluaci
 import { MemSensibilidadBessView } from '@/components/calculator/MemSensibilidadBessView'
 import { MemDatos100HcView } from '@/components/calculator/MemDatos100HcView'
 
+export interface LinkManualSimulationPayload {
+  calcMode: CalculationMode
+  monedaCalculo: Moneda
+  horizonteAnios: number
+  vistaFinanciamiento: VistaFinanciamiento
+  granularidad: GranularidadProyeccion
+  parametrosOverride: SimulacionOverrides | Record<string, unknown>
+}
+
 export interface SimuladorAhorrosSeccionProps {
   proyecto: Proyecto
   sitios: Sitio[]
@@ -99,6 +117,10 @@ export interface SimuladorAhorrosSeccionProps {
   activeConfigId?: string | null
   onEditSolucionTecnica?: () => void
   readOnlyMode?: boolean
+  workspaceMode?: 'linked' | 'manual'
+  initialSimulationId?: string | null
+  onManualProyectoChange?: (patch: Partial<Proyecto>) => void
+  onRequestLinkManualToProject?: (payload: LinkManualSimulationPayload) => void
 }
 
 type MemWorkspaceTab =
@@ -126,6 +148,73 @@ const GRANULARIDAD_OPTIONS: readonly { key: GranularidadProyeccion; label: strin
 
 const NON_FINANCED_VEHICLES = new Set(['no_sabe', 'mem', 'contado', ''])
 
+const MANUAL_TARIFF_OPTIONS = ['GDMTH', 'GDMTO', 'DIST', 'DIT', 'PDBT', 'DAC'] as const
+const MANUAL_TIPO_OPTIONS = ['FV', 'BESS', 'FV+BESS', 'MEM', 'BESS+MEM'] as const
+
+function hydrateMemInputsFromOverrides(
+  base: MemSimulatorInputs,
+  ov: Record<string, unknown>,
+  horizonYears: number,
+): MemSimulatorInputs {
+  return {
+    ...base,
+    ...(typeof ov.cliente === 'string' ? { cliente: ov.cliente } : {}),
+    ...(typeof ov.demanda_contratada_mw === 'number'
+      ? { demanda_contratada_mw: ov.demanda_contratada_mw }
+      : {}),
+    ...(typeof ov.bess_potencia_mw === 'number'
+      ? { bess_potencia_mw: ov.bess_potencia_mw }
+      : {}),
+    ...(typeof ov.bess_capacidad_mwh === 'number'
+      ? { bess_capacidad_mwh: ov.bess_capacidad_mwh }
+      : {}),
+    ...(typeof ov.bess_eficiencia_pct === 'number'
+      ? { bess_eficiencia_pct: ov.bess_eficiencia_pct }
+      : {}),
+    ...(typeof ov.bess_soc_min_pct === 'number'
+      ? { bess_soc_min_pct: ov.bess_soc_min_pct }
+      : {}),
+    ...(typeof ov.op_horas_carga === 'number' ? { op_horas_carga: ov.op_horas_carga } : {}),
+    ...(typeof ov.op_ini_carga === 'number' ? { op_ini_carga: ov.op_ini_carga } : {}),
+    ...(typeof ov.op_fin_carga === 'number' ? { op_fin_carga: ov.op_fin_carga } : {}),
+    ...(typeof ov.op_ini_descarga === 'number'
+      ? { op_ini_descarga: ov.op_ini_descarga }
+      : {}),
+    ...(typeof ov.op_fin_descarga === 'number'
+      ? { op_fin_descarga: ov.op_fin_descarga }
+      : {}),
+    ...(typeof ov.fv_potencia_mw === 'number' ? { fv_potencia_mw: ov.fv_potencia_mw } : {}),
+    ...(typeof ov.fv_degradacion_anual_pct === 'number'
+      ? { fv_degradacion_anual_pct: ov.fv_degradacion_anual_pct }
+      : {}),
+    ...(typeof ov.tc_mxn_usd === 'number' ? { tc_mxn_usd: ov.tc_mxn_usd } : {}),
+    ...(typeof ov.tc_fecha === 'string' ? { tc_fecha: ov.tc_fecha } : {}),
+    ...(typeof ov.mbp_precio_mxn_mw_anio === 'number'
+      ? { mbp_precio_mxn_mw_anio: ov.mbp_precio_mxn_mw_anio }
+      : {}),
+    ...(typeof ov.rap_factor === 'number' ? { rap_factor: ov.rap_factor } : {}),
+    ...(typeof ov.capex_bess_usd_kwh === 'number'
+      ? { capex_bess_usd_kwh: ov.capex_bess_usd_kwh }
+      : {}),
+    ...(typeof ov.capex_fv_usd_kwp === 'number'
+      ? { capex_fv_usd_kwp: ov.capex_fv_usd_kwp }
+      : {}),
+    ...(typeof ov.opex_bess_mxn_mwh_anio === 'number'
+      ? { opex_bess_mxn_mwh_anio: ov.opex_bess_mxn_mwh_anio }
+      : {}),
+    ...(typeof ov.opex_fv_mxn_mw_anio === 'number'
+      ? { opex_fv_mxn_mw_anio: ov.opex_fv_mxn_mw_anio }
+      : {}),
+    ...(typeof ov.fin_tasa_descuento_pct === 'number'
+      ? { fin_tasa_descuento_pct: ov.fin_tasa_descuento_pct }
+      : {}),
+    ...(typeof ov.fin_esc_opex_pct === 'number'
+      ? { fin_esc_opex_pct: ov.fin_esc_opex_pct }
+      : {}),
+    fin_horizonte_anios: horizonYears,
+  }
+}
+
 export function SimuladorAhorrosSeccion({
   proyecto,
   sitios,
@@ -142,17 +231,48 @@ export function SimuladorAhorrosSeccion({
   activeConfigId,
   onEditSolucionTecnica,
   readOnlyMode = false,
+  workspaceMode = 'linked',
+  initialSimulationId = null,
+  onManualProyectoChange,
+  onRequestLinkManualToProject,
 }: SimuladorAhorrosSeccionProps) {
+  const preloadedSim = useMemo(() => {
+    if (!initialSimulationId) return null
+    return initialSimulaciones.find((s) => s.id === initialSimulationId) ?? null
+  }, [initialSimulationId, initialSimulaciones])
+
+  const memEligibility = useMemo(
+    () => evaluateMemEligibility({ proyecto, sitios }),
+    [proyecto, sitios],
+  )
+
   const [currentActiveTemplate, setCurrentActiveTemplate] =
     useState<CalculadoraTemplate>(initialActiveTemplate)
-  const [templatesMap, setTemplatesMap] = useState<Record<string, CalculadoraTemplate>>(() => ({
-    ...initialTemplatesById,
-    [initialActiveTemplate.id]: initialActiveTemplate,
-  }))
-  const [historicalTemplateId, setHistoricalTemplateId] = useState<string | null>(null)
+  const [templatesMap, setTemplatesMap] = useState<Record<string, CalculadoraTemplate>>(() => {
+    const base: Record<string, CalculadoraTemplate> = {
+      ...initialTemplatesById,
+      [initialActiveTemplate.id]: initialActiveTemplate,
+    }
+    if (preloadedSim?.template && !base[preloadedSim.template.id]) {
+      base[preloadedSim.template.id] = preloadedSim.template
+    }
+    return base
+  })
+  const [historicalTemplateId, setHistoricalTemplateId] = useState<string | null>(() => {
+    if (
+      preloadedSim &&
+      preloadedSim.template_id !== initialActiveTemplate.id &&
+      (preloadedSim.template || initialTemplatesById[preloadedSim.template_id])
+    ) {
+      return preloadedSim.template_id
+    }
+    return null
+  })
 
   const [simulaciones, setSimulaciones] = useState<SimulacionAhorro[]>(initialSimulaciones)
-  const [activeSimulacionId, setActiveSimulacionId] = useState<string | null>(null)
+  const [activeSimulacionId, setActiveSimulacionId] = useState<string | null>(
+    () => preloadedSim?.id ?? null,
+  )
 
   useEffect(() => {
     setSimulaciones(initialSimulaciones)
@@ -168,9 +288,12 @@ export function SimuladorAhorrosSeccion({
   }, [initialActiveTemplate, initialTemplatesById])
 
   const defaultConfigId =
-    activeConfigId !== undefined
-      ? activeConfigId
-      : configuraciones.find((c) => c.seleccionada)?.id ?? configuraciones[0]?.id ?? null
+    preloadedSim?.configuracion_id &&
+    configuraciones.some((c) => c.id === preloadedSim.configuracion_id)
+      ? preloadedSim.configuracion_id
+      : activeConfigId !== undefined
+        ? activeConfigId
+        : configuraciones.find((c) => c.seleccionada)?.id ?? configuraciones[0]?.id ?? null
 
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(defaultConfigId)
 
@@ -205,6 +328,12 @@ export function SimuladorAhorrosSeccion({
   }, [activeConfig, configFinanciamiento, opcionesFinanciamiento])
 
   const [selectedFinancingId, setSelectedFinancingId] = useState<string | null>(() => {
+    if (
+      preloadedSim?.opcion_financiamiento_id &&
+      compatibleFinancingOptions.some((o) => o.id === preloadedSim.opcion_financiamiento_id)
+    ) {
+      return preloadedSim.opcion_financiamiento_id
+    }
     return (
       compatibleFinancingOptions.find((o) => o.seleccionada)?.id ??
       compatibleFinancingOptions[0]?.id ??
@@ -238,19 +367,40 @@ export function SimuladorAhorrosSeccion({
     [evalTemplate.campos],
   )
 
-  // Unified calculation mode (defaults to rationalized MEM 8760h+100HC simulator)
-  const [calcMode, setCalcMode] = useState<CalculationMode>('mem_horaria')
+  // Unified calculation mode: respect preloaded simulation, otherwise smart-default from MEM eligibility in linked mode
+  const [calcMode, setCalcMode] = useState<CalculationMode>(() => {
+    if (preloadedSim) {
+      return preloadedSim.parametros_override?.modo_motor === 'mem_horaria'
+        ? 'mem_horaria'
+        : 'cfe_tarifario'
+    }
+    if (workspaceMode === 'manual') return 'mem_horaria'
+    return memEligibility.defaultMode
+  })
   const [memTab, setMemTab] = useState<MemWorkspaceTab>('tablero')
 
   const [monedaCalculo, setMonedaCalculo] = useState<Moneda>(
-    () => (proyecto.moneda as Moneda) || templateDefaults.moneda_default || 'MXN',
+    () =>
+      preloadedSim?.moneda_calculo ||
+      (proyecto.moneda as Moneda) ||
+      templateDefaults.moneda_default ||
+      'MXN',
   )
-  const [vistaFinanciamiento, setVistaFinanciamiento] = useState<VistaFinanciamiento>('bruto')
-  const [horizonteAnios, setHorizonteAnios] = useState<number>(() =>
-    resolveDefaultHorizon(proyecto.tipo, templateDefaults),
+  const [vistaFinanciamiento, setVistaFinanciamiento] = useState<VistaFinanciamiento>(
+    () => preloadedSim?.vista_financiamiento ?? 'bruto',
   )
-  const [granularidad, setGranularidad] = useState<GranularidadProyeccion>('anual')
-  const [overrides, setOverrides] = useState<Record<string, unknown>>({})
+  const [horizonteAnios, setHorizonteAnios] = useState<number>(
+    () => preloadedSim?.horizonte_anios ?? resolveDefaultHorizon(proyecto.tipo, templateDefaults),
+  )
+  const [granularidad, setGranularidad] = useState<GranularidadProyeccion>(
+    () => preloadedSim?.granularidad_default ?? 'anual',
+  )
+  const [overrides, setOverrides] = useState<Record<string, unknown>>(() => {
+    if (preloadedSim && preloadedSim.parametros_override?.modo_motor !== 'mem_horaria') {
+      return { ...(preloadedSim.parametros_override ?? {}) }
+    }
+    return {}
+  })
   const [contextResetKey, setContextResetKey] = useState(0)
 
   // MEM Horario State
@@ -270,19 +420,47 @@ export function SimuladorAhorrosSeccion({
   const [memInputState, setMemInputState] = useState<{
     draft: MemSimulatorInputs
     valid: MemSimulatorInputs
-  }>(() => ({
-    draft: projectMemBaseline.baseInputs,
-    valid: projectMemBaseline.baseInputs,
-  }))
+  }>(() => {
+    if (preloadedSim && preloadedSim.parametros_override?.modo_motor === 'mem_horaria') {
+      const hydrated = hydrateMemInputsFromOverrides(
+        projectMemBaseline.baseInputs,
+        preloadedSim.parametros_override as Record<string, unknown>,
+        preloadedSim.horizonte_anios,
+      )
+      const isValid = Object.keys(validateMemInputs(hydrated).errors).length === 0
+      return {
+        draft: hydrated,
+        valid: isValid ? hydrated : projectMemBaseline.baseInputs,
+      }
+    }
+    return {
+      draft: projectMemBaseline.baseInputs,
+      valid: projectMemBaseline.baseInputs,
+    }
+  })
   const memInputs = memInputState.draft
   const validMemInputs = memInputState.valid
-  const [memAssumptions, setMemAssumptions] = useState<MemAnnualAssumptions>(() =>
-    createDefaultMemAnnualAssumptions(),
-  )
+  const [memAssumptions, setMemAssumptions] = useState<MemAnnualAssumptions>(() => {
+    const ov = preloadedSim?.parametros_override
+    if (ov?.modo_motor === 'mem_horaria' && ov.supuestos_anuales) {
+      return ov.supuestos_anuales
+    }
+    return createDefaultMemAnnualAssumptions()
+  })
   const [memHourly, setMemHourly] = useState<MemHourlyDataset>(() =>
     getBaselineMemHourlyDataset(),
   )
-  const [mem100HC, setMem100HC] = useState<MemCriticalHourEntry[]>(() => getBaseline100HC())
+  const [mem100HC, setMem100HC] = useState<MemCriticalHourEntry[]>(() => {
+    const ov = preloadedSim?.parametros_override
+    if (
+      ov?.modo_motor === 'mem_horaria' &&
+      ov.critical_hours_100hc &&
+      ov.critical_hours_100hc.length > 0
+    ) {
+      return ov.critical_hours_100hc
+    }
+    return getBaseline100HC()
+  })
   const lastSyncedMemBaseRef = useRef<MemSimulatorInputs>(projectMemBaseline.baseInputs)
 
   useEffect(() => {
@@ -496,6 +674,7 @@ export function SimuladorAhorrosSeccion({
   const [saveName, setSaveName] = useState('')
   const [saveDesc, setSaveDesc] = useState('')
   const [savingSim, setSavingSim] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -599,63 +778,11 @@ export function SimuladorAhorrosSeccion({
         sitios,
         template: targetTemplate,
       }).baseInputs
-      const nextMem: MemSimulatorInputs = {
-        ...base,
-        ...(typeof ov.cliente === 'string' ? { cliente: ov.cliente } : {}),
-        ...(typeof ov.demanda_contratada_mw === 'number'
-          ? { demanda_contratada_mw: ov.demanda_contratada_mw }
-          : {}),
-        ...(typeof ov.bess_potencia_mw === 'number'
-          ? { bess_potencia_mw: ov.bess_potencia_mw }
-          : {}),
-        ...(typeof ov.bess_capacidad_mwh === 'number'
-          ? { bess_capacidad_mwh: ov.bess_capacidad_mwh }
-          : {}),
-        ...(typeof ov.bess_eficiencia_pct === 'number'
-          ? { bess_eficiencia_pct: ov.bess_eficiencia_pct }
-          : {}),
-        ...(typeof ov.bess_soc_min_pct === 'number'
-          ? { bess_soc_min_pct: ov.bess_soc_min_pct }
-          : {}),
-        ...(typeof ov.op_horas_carga === 'number' ? { op_horas_carga: ov.op_horas_carga } : {}),
-        ...(typeof ov.op_ini_carga === 'number' ? { op_ini_carga: ov.op_ini_carga } : {}),
-        ...(typeof ov.op_fin_carga === 'number' ? { op_fin_carga: ov.op_fin_carga } : {}),
-        ...(typeof ov.op_ini_descarga === 'number'
-          ? { op_ini_descarga: ov.op_ini_descarga }
-          : {}),
-        ...(typeof ov.op_fin_descarga === 'number'
-          ? { op_fin_descarga: ov.op_fin_descarga }
-          : {}),
-        ...(typeof ov.fv_potencia_mw === 'number' ? { fv_potencia_mw: ov.fv_potencia_mw } : {}),
-        ...(typeof ov.fv_degradacion_anual_pct === 'number'
-          ? { fv_degradacion_anual_pct: ov.fv_degradacion_anual_pct }
-          : {}),
-        ...(typeof ov.tc_mxn_usd === 'number' ? { tc_mxn_usd: ov.tc_mxn_usd } : {}),
-        ...(typeof ov.tc_fecha === 'string' ? { tc_fecha: ov.tc_fecha } : {}),
-        ...(typeof ov.mbp_precio_mxn_mw_anio === 'number'
-          ? { mbp_precio_mxn_mw_anio: ov.mbp_precio_mxn_mw_anio }
-          : {}),
-        ...(typeof ov.rap_factor === 'number' ? { rap_factor: ov.rap_factor } : {}),
-        ...(typeof ov.capex_bess_usd_kwh === 'number'
-          ? { capex_bess_usd_kwh: ov.capex_bess_usd_kwh }
-          : {}),
-        ...(typeof ov.capex_fv_usd_kwp === 'number'
-          ? { capex_fv_usd_kwp: ov.capex_fv_usd_kwp }
-          : {}),
-        ...(typeof ov.opex_bess_mxn_mwh_anio === 'number'
-          ? { opex_bess_mxn_mwh_anio: ov.opex_bess_mxn_mwh_anio }
-          : {}),
-        ...(typeof ov.opex_fv_mxn_mw_anio === 'number'
-          ? { opex_fv_mxn_mw_anio: ov.opex_fv_mxn_mw_anio }
-          : {}),
-        ...(typeof ov.fin_tasa_descuento_pct === 'number'
-          ? { fin_tasa_descuento_pct: ov.fin_tasa_descuento_pct }
-          : {}),
-        ...(typeof ov.fin_esc_opex_pct === 'number'
-          ? { fin_esc_opex_pct: ov.fin_esc_opex_pct }
-          : {}),
-        fin_horizonte_anios: sim.horizonte_anios,
-      }
+      const nextMem = hydrateMemInputsFromOverrides(
+        base,
+        ov as Record<string, unknown>,
+        sim.horizonte_anios,
+      )
       setMemInputState((curr) => {
         const nextIsValid = Object.keys(validateMemInputs(nextMem).errors).length === 0
         return {
@@ -813,6 +940,122 @@ export function SimuladorAhorrosSeccion({
         memOutcome.financial.capex_total > 0
       : !isCfeGated && isOk
 
+  const memLegalNotice = useMemo(() => {
+    if (calcMode !== 'mem_horaria') return null
+    if (workspaceMode === 'linked') {
+      if (memEligibility.isEligible) return null
+      return {
+        title:
+          memEligibility.warningTitle ||
+          'Proyecto sin elegibilidad MEM por defecto',
+        message:
+          memEligibility.warningMessage ||
+          'Este proyecto tiene menos de 1 MW de demanda contratada y no tiene activado MEM.',
+      }
+    }
+    const manualCheck = evaluateManualMemEligibility(memInputs.demanda_contratada_mw)
+    if (manualCheck.isEligible) return null
+    return {
+      title: 'Aviso regulatorio MEM (demanda < 1.00 MW)',
+      message: manualCheck.warningMessage || '',
+    }
+  }, [calcMode, workspaceMode, memEligibility, memInputs.demanda_contratada_mw])
+
+  function buildActiveSavePayload(): LinkManualSimulationPayload | null {
+    if (calcMode === 'mem_horaria') {
+      if (memOutcome?.status !== 'ok' || memOutcome.financial.capex_total <= 0) return null
+      const baselineHc = getBaseline100HC()
+      const hcChanged =
+        mem100HC.length !== baselineHc.length ||
+        mem100HC.some(
+          (row, i) =>
+            row.fecha !== baselineHc[i]?.fecha || row.hora !== baselineHc[i]?.hora,
+        )
+      return {
+        calcMode: 'mem_horaria',
+        monedaCalculo,
+        horizonteAnios: memInputs.fin_horizonte_anios,
+        vistaFinanciamiento,
+        granularidad,
+        parametrosOverride: {
+          ...memSparseOverrides,
+          modo_motor: 'mem_horaria',
+          ...(hcChanged ? { critical_hours_100hc: mem100HC } : {}),
+        },
+      }
+    }
+    if (isCfeGated || outcome?.status !== 'ok') return null
+    return {
+      calcMode: 'cfe_tarifario',
+      monedaCalculo,
+      horizonteAnios,
+      vistaFinanciamiento,
+      granularidad,
+      parametrosOverride: outcome.parametros_override_sparse as SimulacionOverrides,
+    }
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true)
+    setErrorMsg('')
+    try {
+      const activeSimName = activeSimulacionId
+        ? simulaciones.find((s) => s.id === activeSimulacionId)?.nombre
+        : undefined
+      const originLabel =
+        workspaceMode === 'manual'
+          ? 'Simulación manual (sin proyecto vinculado)'
+          : `Proyecto vinculado: ${proyecto.nombre_proyecto}`
+
+      if (calcMode === 'mem_horaria' && activeMemResult) {
+        const filename = await exportSimulationToPdf({
+          kind: 'mem_horaria',
+          title: activeSimName
+            ? `${proyecto.nombre_proyecto} — ${activeSimName}`
+            : workspaceMode === 'manual'
+              ? activeMemResult.inputs.cliente || 'Simulación Manual MEM'
+              : proyecto.nombre_proyecto,
+          originLabel,
+          moneda: monedaCalculo,
+          vistaFinanciamiento,
+          inputs: activeMemResult.inputs,
+          year1: activeMemResult.year1,
+          financial: activeMemResult.financial,
+          datasetLabel: memHourly.label,
+          regulatoryWarning: memLegalNotice?.message ?? null,
+        })
+        showSavedBanner(`PDF descargado: ${filename}`)
+      } else if (calcMode === 'cfe_tarifario' && isOk) {
+        const filename = await exportSimulationToPdf({
+          kind: 'cfe_tarifario',
+          title: activeSimName
+            ? `${proyecto.nombre_proyecto} — ${activeSimName}`
+            : workspaceMode === 'manual'
+              ? proyecto.nombre_proyecto || 'Simulación Manual CFE'
+              : proyecto.nombre_proyecto,
+          originLabel,
+          moneda: monedaCalculo,
+          vistaFinanciamiento,
+          horizonteAnios,
+          proyecto,
+          outcome,
+          financingLabel: activeFinancing
+            ? `${activeFinancing.nombre} (${activeFinancing.vehiculo_inversion})`
+            : null,
+          fxUsed: effectiveFx,
+          templateVersion: evalTemplate.version,
+          regulatoryWarning: memLegalNotice?.message ?? null,
+        })
+        showSavedBanner(`PDF descargado: ${filename}`)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al generar PDF.'
+      setErrorMsg(`No se pudo generar el PDF: ${message}`)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   const nextHorizonTarget = useMemo(() => {
     if (!isOk || outcome.payback_extendido_anios == null) return 30
     const needed = Math.ceil(outcome.payback_extendido_anios)
@@ -871,10 +1114,15 @@ export function SimuladorAhorrosSeccion({
               )}
             </div>
             <p className="text-xs text-texto-suave mt-0.5">
-              {calcMode === 'mem_horaria'
-                ? 'Simulación horaria 8,760 h (PML) + 100 Horas Críticas (CENACE) + Evaluación a 25 años para '
-                : 'Proyección tarifaria CFE/AST y retorno financiero para '}
-              <strong className="text-principal">{proyecto.nombre_proyecto}</strong>.
+              {workspaceMode === 'manual'
+                ? 'Modo manual libre: evalúa escenarios FV + BESS (MEM o CFE) y descarga el reporte PDF o vincúlalo a un proyecto.'
+                : calcMode === 'mem_horaria'
+                  ? 'Simulación horaria 8,760 h (PML) + 100 Horas Críticas (CENACE) + Evaluación a 25 años para '
+                  : 'Proyección tarifaria CFE/AST y retorno financiero para '}
+              {workspaceMode === 'linked' && (
+                <strong className="text-principal">{proyecto.nombre_proyecto}</strong>
+              )}
+              {workspaceMode === 'linked' ? '.' : ''}
             </p>
           </div>
         </div>
@@ -918,7 +1166,37 @@ export function SimuladorAhorrosSeccion({
               Configurar plantilla y Excel
             </Button>
           )}
-          {!readOnlyMode && (
+
+          <Button
+            type="button"
+            variant={workspaceMode === 'manual' ? 'primary' : 'outline'}
+            size="sm"
+            disabled={!canSaveActiveMode || exportingPdf}
+            onClick={() => {
+              void handleExportPdf()
+            }}
+          >
+            {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Descargar PDF
+          </Button>
+
+          {workspaceMode === 'manual' && !readOnlyMode && onRequestLinkManualToProject && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canSaveActiveMode}
+              onClick={() => {
+                const payload = buildActiveSavePayload()
+                if (payload) onRequestLinkManualToProject(payload)
+              }}
+            >
+              <FolderPlus size={14} />
+              Vincular a proyecto
+            </Button>
+          )}
+
+          {workspaceMode === 'linked' && !readOnlyMode && (
             <Button
               type="button"
               variant="primary"
@@ -938,6 +1216,32 @@ export function SimuladorAhorrosSeccion({
           )}
         </div>
       </div>
+
+      {/* Non-blocking Legal Eligibility Warning when MEM is active for sub-1 MW / non-MEM projects */}
+      {memLegalNotice && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <ShieldAlert size={18} className="text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-950">{memLegalNotice.title}</p>
+              <p className="mt-0.5 text-amber-900 leading-relaxed">{memLegalNotice.message}</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCalcMode('cfe_tarifario')
+              setActiveSimulacionId(null)
+            }}
+            className="shrink-0 !bg-white !border-amber-300 !text-amber-950 hover:!bg-amber-100"
+          >
+            <ArrowRightLeft size={13} />
+            Cambiar a CFE Tarifario
+          </Button>
+        </div>
+      )}
 
       {savedMsg && (
         <div className="px-4 py-2.5 rounded-xl bg-acento text-principal text-xs font-bold flex items-center justify-between">
@@ -1116,6 +1420,8 @@ export function SimuladorAhorrosSeccion({
                     solarZeroEnergy={memSolarZeroEnergy}
                     moneda={monedaCalculo}
                     vistaFinanciamiento={vistaFinanciamiento}
+                    onExportPdf={handleExportPdf}
+                    exportingPdf={exportingPdf}
                   />
                 )}
 
@@ -1218,6 +1524,164 @@ export function SimuladorAhorrosSeccion({
       )}
 
       {/* ── MODE 2: CFE TARIFF FALLBACK ENGINE ──────────────────────────────── */}
+      {calcMode === 'cfe_tarifario' && workspaceMode === 'manual' && onManualProyectoChange && (
+        <div className="bg-white/90 border border-borde rounded-2xl p-4 space-y-3 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-principal">
+                Datos Manuales del Caso (CFE Tarifario)
+              </h4>
+              <p className="text-[11px] text-texto-suave">
+                Ajusta la inversión, capacidad y tarifa para simular sin vincular un proyecto todavía.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Nombre / Cliente
+              </label>
+              <input
+                type="text"
+                value={proyecto.nombre_proyecto}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    nombre_proyecto: e.target.value,
+                    cliente_final_empresa: e.target.value,
+                  })
+                }
+                className="w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Tecnología
+              </label>
+              <select
+                value={proyecto.tipo}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    tipo: e.target.value as Proyecto['tipo'],
+                  })
+                }
+                className="w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              >
+                {MANUAL_TIPO_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                CAPEX Estimado ({proyecto.moneda})
+              </label>
+              <input
+                type="number"
+                min={1}
+                step={50000}
+                value={proyecto.capex_estimado ?? 0}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    capex_estimado: Number(e.target.value) || 0,
+                  })
+                }
+                className="num w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Tarifa CFE
+              </label>
+              <select
+                value={String(proyecto.tarifa_actual_cfe || 'GDMTH')}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    tarifa_actual_cfe: e.target.value,
+                  })
+                }
+                className="w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              >
+                {MANUAL_TARIFF_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Capacidad FV (MW)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={0.05}
+                value={proyecto.capacidad_mw ?? 0}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    capacidad_mw: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                className="num w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Capacidad BESS (MWh)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={0.05}
+                value={proyecto.capacidad_mwh ?? 0}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    capacidad_mwh: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                className="num w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Demanda Contratada (kW)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={25}
+                value={proyecto.demanda_kw ?? 0}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    demanda_kw: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                className="num w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-texto-suave mb-1">
+                Consumo Anual (MWh)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={proyecto.volumen_energia_mwh_anual ?? 0}
+                onChange={(e) =>
+                  onManualProyectoChange({
+                    volumen_energia_mwh_anual: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                className="num w-full rounded-lg border border-borde px-3 py-1.5 text-xs font-semibold text-principal bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {calcMode === 'cfe_tarifario' &&
         (isCfeGated ? (
           <div className="glass-panel border-dashed rounded-2xl p-6">
@@ -1551,31 +2015,33 @@ export function SimuladorAhorrosSeccion({
           </>
         ))}
 
-      {/* Saved Scenarios Panel */}
-      <SimulacionesGuardadasPanel
-        simulaciones={simulaciones}
-        activeSimulacionId={activeSimulacionId}
-        isGated={calcMode === 'cfe_tarifario' && isCfeGated}
-        currentUserId={currentUserId}
-        userRole={userRole}
-        proyectoEpcistaId={proyecto.epcista_id}
-        readOnlyMode={readOnlyMode}
-        onLoad={handleLoadSimulation}
-        onDuplicate={handleDuplicateSimulation}
-        onRenamed={(updated) =>
-          setSimulaciones((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-        }
-        onRecalculated={(updated) => {
-          setSimulaciones((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-          if (activeSimulacionId === updated.id) {
-            handleLoadSimulation(updated)
+      {/* Saved Scenarios Panel (linked projects only) */}
+      {workspaceMode === 'linked' && (
+        <SimulacionesGuardadasPanel
+          simulaciones={simulaciones}
+          activeSimulacionId={activeSimulacionId}
+          isGated={calcMode === 'cfe_tarifario' && isCfeGated}
+          currentUserId={currentUserId}
+          userRole={userRole}
+          proyectoEpcistaId={proyecto.epcista_id}
+          readOnlyMode={readOnlyMode}
+          onLoad={handleLoadSimulation}
+          onDuplicate={handleDuplicateSimulation}
+          onRenamed={(updated) =>
+            setSimulaciones((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
           }
-        }}
-        onDeleted={(id) => {
-          setSimulaciones((prev) => prev.filter((s) => s.id !== id))
-          if (activeSimulacionId === id) setActiveSimulacionId(null)
-        }}
-      />
+          onRecalculated={(updated) => {
+            setSimulaciones((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+            if (activeSimulacionId === updated.id) {
+              handleLoadSimulation(updated)
+            }
+          }}
+          onDeleted={(id) => {
+            setSimulaciones((prev) => prev.filter((s) => s.id !== id))
+            if (activeSimulacionId === id) setActiveSimulacionId(null)
+          }}
+        />
+      )}
 
       {/* Save Scenario Modal */}
       <Modal

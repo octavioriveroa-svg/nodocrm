@@ -154,7 +154,7 @@ export default function FinancieroDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="portal-content-container space-y-8">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black mb-2 tracking-tight text-principal">Portafolio Financiero</h1>
